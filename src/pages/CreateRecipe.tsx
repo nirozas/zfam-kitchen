@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
+import ImageCropper from '@/components/ImageCropper';
 
 interface RecipeStep {
   text: string;
@@ -62,6 +63,62 @@ export default function CreateRecipe() {
 
   const ingredientRefs = useRef<Array<HTMLInputElement | null>>([]);
   const stepRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+
+  // Crop State
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<{ type: 'main' | 'step', index?: number } | null>(null);
+
+  const readFile = (file: File) => {
+    return new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => resolve(reader.result as string));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const onSelectFile = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'step', index?: number) => {
+    if (e.target.files?.[0]) {
+      const file = e.target.files[0];
+      const imageDataUrl = await readFile(file);
+      setImageToCrop(imageDataUrl);
+      setCropTarget({ type, index });
+      setCropModalOpen(true);
+      e.target.value = ''; // Reset so same file can be selected again
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    try {
+      setUploading(true);
+      const fileExt = 'jpeg';
+      const fileName = `${Math.random()}.${fileExt}`;
+      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
+
+      const { error: uploadError } = await supabase.storage
+        .from('recipes')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('recipes').getPublicUrl(fileName);
+      const url = data.publicUrl;
+
+      if (cropTarget?.type === 'main') {
+        setFormData(prev => ({ ...prev, image_url: url }));
+      } else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') {
+        updateStep(cropTarget.index, { image_url: url });
+      }
+
+      setCropModalOpen(false);
+      setImageToCrop(null);
+      setCropTarget(null);
+    } catch (error) {
+      alert('Upload failed: ' + (error as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     async function loadRecipe() {
@@ -160,31 +217,6 @@ export default function CreateRecipe() {
 
     const { data } = supabase.storage.from('recipes').getPublicUrl(filePath);
     return data.publicUrl;
-  };
-
-  const handleMainImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      setUploading(true);
-      if (!event.target.files?.[0]) return;
-      const url = await handleFileUpload(event.target.files[0]);
-      setFormData({ ...formData, image_url: url });
-    } catch (error) {
-      alert((error as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleStepImageUpload = async (idx: number, file: File) => {
-    try {
-      setUploading(true);
-      const url = await handleFileUpload(file);
-      updateStep(idx, { image_url: url });
-    } catch (error) {
-      alert((error as Error).message);
-    } finally {
-      setUploading(false);
-    }
   };
 
   const handleGalleryAdd = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -499,7 +531,7 @@ export default function CreateRecipe() {
                         <p className="text-[9px] uppercase font-black tracking-widest mt-1 opacity-50">Landscape preferred</p>
                       </div>
                     )}
-                    <input type="file" accept="image/*" onChange={handleMainImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} />
+                    <input type="file" accept="image/*" onChange={(e) => onSelectFile(e, 'main')} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} />
                   </div>
                   <input
                     type="text"
@@ -634,7 +666,6 @@ export default function CreateRecipe() {
                 </div>
               </div>
             </section>
-
           </div>
 
           {/* RIGHT COLUMN */}
@@ -765,41 +796,35 @@ export default function CreateRecipe() {
                                 key={align.val}
                                 type="button"
                                 onClick={() => updateStep(idx, { alignment: align.val as any })}
-                                className={`p-2 rounded-lg transition-all ${step.alignment === align.val ? 'bg-primary-600 text-white shadow-lg' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'}`}
+                                className={`p-2 rounded-lg transition-all ${step.alignment === align.val ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-400 hover:text-gray-900'}`}
                               >
                                 {align.icon}
                               </button>
                             ))}
                           </div>
-                          <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest hidden sm:block">Image Alignment</div>
                         </div>
                       </div>
 
-                      <div className="w-full md:w-28 flex-shrink-0">
-                        <div className="relative aspect-square rounded-2xl bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden group/img transition-all hover:border-primary-200">
-                          {step.image_url ? (
-                            <>
-                              <img src={step.image_url} className="w-full h-full object-cover" />
-                              <button type="button" onClick={() => updateStep(idx, { image_url: '' })} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center font-black text-[10px] uppercase">Remove</button>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={16} className="text-gray-300" />
-                              <span className="text-[8px] font-black text-gray-400 mt-1 uppercase">Step Photo</span>
-                              <input type="file" accept="image/*" onChange={e => {
-                                const file = e.target.files?.[0];
-                                if (file) handleStepImageUpload(idx, file);
-                              }} className="absolute inset-0 opacity-0 cursor-pointer" />
-                            </>
-                          )}
-                        </div>
+                      <div className="relative w-32 aspect-square rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex-shrink-0 cursor-pointer overflow-hidden group/img hover:border-primary-200 transition-colors">
+                        {step.image_url ? (
+                          <>
+                            <img src={step.image_url} className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => updateStep(idx, { image_url: '' })} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center font-black text-[10px] uppercase">Remove</button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={16} className="text-gray-300" />
+                            <span className="text-[8px] font-black text-gray-400 mt-1 uppercase">Step Photo</span>
+                            <input type="file" accept="image/*" onChange={(e) => onSelectFile(e, 'step', idx)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                          </>
+                        )}
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => removeStep(idx)}
-                      className="absolute -right-3 -top-3 w-10 h-10 bg-white text-red-100 hover:text-red-500 rounded-full shadow-lg flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 border border-gray-50"
+                      className="absolute -right-3 -top-3 w-10 h-10 bg-white text-gray-400 hover:text-red-500 rounded-full shadow-lg flex items-center justify-center transition-all border border-gray-50 z-10"
                     >
                       <X size={20} />
                     </button>
@@ -906,6 +931,21 @@ export default function CreateRecipe() {
               <button type="button" onClick={createNewCategory} className="w-full py-5 bg-primary-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-primary-100 hover:bg-primary-700 transition-all">Create Path</button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {cropModalOpen && imageToCrop && (
+          <ImageCropper
+            imageSrc={imageToCrop}
+            onCropComplete={handleCropComplete}
+            onCancel={() => {
+              setCropModalOpen(false);
+              setImageToCrop(null);
+              setCropTarget(null);
+            }}
+            aspectRatio={cropTarget?.type === 'main' ? 4 / 3 : 1}
+          />
         )}
       </AnimatePresence>
     </div>

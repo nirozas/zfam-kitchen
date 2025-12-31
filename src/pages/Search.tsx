@@ -159,7 +159,7 @@ export default function Search() {
                 </header>
 
                 {filteredRecipes.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-8">
+                    <div className="grid grid-cols-4 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4 lg:gap-8">
                         {filteredRecipes.map((recipe) => (
                             <RecipeCard key={recipe.id} recipe={recipe} />
                         ))}

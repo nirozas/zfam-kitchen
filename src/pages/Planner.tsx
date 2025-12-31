@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 export default function Planner() {
     const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, +1 = next week
     const { addMultipleToCart } = useShoppingCart();
-    const { plannedMeals, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate } = useMealPlanner();
+    const { plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, saveDailyNote } = useMealPlanner();
     const { recipes, loading, error } = useRecipes();
 
     const today = new Date();
@@ -254,9 +254,19 @@ export default function Planner() {
                                         )}
                                     </div>
 
+
+                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                        <textarea
+                                            placeholder="Notes..."
+                                            className="w-full text-xs bg-gray-50 border-none rounded-xl p-3 min-h-[60px] resize-none focus:ring-1 focus:ring-primary-500 transition-all font-medium text-gray-600 placeholder:text-gray-300"
+                                            value={dailyNotes[dateStr] || ''}
+                                            onChange={(e) => saveDailyNote(dateStr, e.target.value)}
+                                        />
+                                    </div>
+
                                     <button
                                         onClick={() => openSearch(dateStr)}
-                                        className="mt-6 w-full py-3 flex items-center justify-center text-primary-400 hover:text-primary-600 hover:bg-primary-50 rounded-2xl transition-all border-2 border-dashed border-gray-100 hover:border-primary-200 bg-gray-50/50"
+                                        className="mt-4 w-full py-3 flex items-center justify-center text-primary-400 hover:text-primary-600 hover:bg-primary-50 rounded-2xl transition-all border-2 border-dashed border-gray-100 hover:border-primary-200 bg-gray-50/50"
                                     >
                                         <Plus size={24} strokeWidth={3} />
                                     </button>

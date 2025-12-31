@@ -4,9 +4,11 @@ import { supabase } from '@/lib/supabase';
 
 interface MealPlannerContextType {
     plannedMeals: Record<string, PlannerMeal[]>;
+    dailyNotes: Record<string, string>;
     addRecipeToDate: (recipe: Recipe, dateStr: string) => void;
     addCustomMealToDate: (title: string, dateStr: string) => void;
     removeRecipeFromDate: (dateStr: string, index: number) => void;
+    saveDailyNote: (dateStr: string, note: string) => Promise<void>;
     loading: boolean;
 }
 
@@ -14,6 +16,7 @@ const MealPlannerContext = createContext<MealPlannerContextType | undefined>(und
 
 export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     const [plannedMeals, setPlannedMeals] = useState<Record<string, PlannerMeal[]>>({});
+    const [dailyNotes, setDailyNotes] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
 
     // Load from Supabase on mount or auth change
@@ -22,21 +25,28 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 setPlannedMeals({});
+                setDailyNotes({});
                 setLoading(false);
                 return;
             }
 
-            const { data, error } = await supabase
-                .from('meal_planner')
-                .select('*, recipes(*, categories(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
-                .eq('user_id', user.id)
-                .order('id', { ascending: true });
+            const [mealsResult, notesResult] = await Promise.all([
+                supabase
+                    .from('meal_planner')
+                    .select('*, recipes(*, categories(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
+                    .eq('user_id', user.id)
+                    .order('id', { ascending: true }),
+                supabase
+                    .from('daily_notes')
+                    .select('date, note')
+                    .eq('user_id', user.id)
+            ]);
 
-            if (error) {
-                console.error('Error fetching meal plan:', error);
-            } else if (data) {
+            if (mealsResult.error) {
+                console.error('Error fetching meal plan:', mealsResult.error);
+            } else if (mealsResult.data) {
                 const grouped: Record<string, PlannerMeal[]> = {};
-                data.forEach((item: any) => {
+                mealsResult.data.forEach((item: any) => {
                     const date = item.date;
                     if (!grouped[date]) grouped[date] = [];
 
@@ -69,6 +79,17 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                 });
                 setPlannedMeals(grouped);
             }
+
+            if (notesResult.error) {
+                console.error('Error fetching notes:', notesResult.error);
+            } else if (notesResult.data) {
+                const notesMap: Record<string, string> = {};
+                notesResult.data.forEach((item: any) => {
+                    notesMap[item.date] = item.note;
+                });
+                setDailyNotes(notesMap);
+            }
+
             setLoading(false);
         };
 
@@ -175,8 +196,30 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const saveDailyNote = async (dateStr: string, note: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Optimistic
+        setDailyNotes(prev => ({ ...prev, [dateStr]: note }));
+
+        if (!note.trim()) {
+            // Delete if empty
+            await supabase.from('daily_notes').delete().match({ user_id: user.id, date: dateStr });
+        } else {
+            // Upsert
+            const { error } = await supabase.from('daily_notes').upsert({
+                user_id: user.id,
+                date: dateStr,
+                note: note.trim()
+            }, { onConflict: 'user_id,date' });
+
+            if (error) console.error('Error saving note:', error);
+        }
+    };
+
     return (
-        <MealPlannerContext.Provider value={{ plannedMeals, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, loading }}>
+        <MealPlannerContext.Provider value={{ plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, saveDailyNote, loading }}>
             {children}
         </MealPlannerContext.Provider>
     );

@@ -103,7 +103,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
                         {featuredRecipes.map((recipe) => (
                             <RecipeCard key={recipe.id} recipe={recipe} />
                         ))}
@@ -129,7 +129,7 @@ const Index = () => {
                         </Link>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
                         {popularRecipes.map((recipe) => (
                             <RecipeCard key={recipe.id} recipe={recipe} />
                         ))}
