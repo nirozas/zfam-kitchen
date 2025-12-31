@@ -85,7 +85,7 @@ export default function Navbar() {
                                     alt="Zoabi Family Kitchen"
                                     className="h-full w-full object-contain mix-blend-multiply"
                                 />
-                                <div className="lg:hidden absolute bottom-0 right-0 bg-white rounded-full shadow-sm p-0.5 border border-gray-100">
+                                <div className="absolute bottom-0 right-0 bg-white rounded-full shadow-sm p-0.5 border border-gray-100">
                                     <ChevronDown size={10} className={clsx("transition-transform duration-300", isLogoDropdownOpen && "rotate-180")} />
                                 </div>
                             </div>
@@ -93,7 +93,7 @@ export default function Navbar() {
                                 <span className="font-bold text-base lg:text-xl tracking-tight text-gray-900 font-serif whitespace-nowrap">
                                     Zoabi Family Kitchen
                                 </span>
-                                <div className="lg:hidden flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary-600 leading-none">
+                                <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary-600 leading-none">
                                     Menu <ChevronDown size={8} className={clsx("transition-transform duration-300", isLogoDropdownOpen && "rotate-180")} />
                                 </div>
                             </div>
@@ -106,7 +106,7 @@ export default function Navbar() {
                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute top-full left-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden lg:hidden"
+                                    className="absolute top-full left-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
                                 >
                                     <div className="p-2">
                                         {dropdownMenu.map((item, idx) => (
