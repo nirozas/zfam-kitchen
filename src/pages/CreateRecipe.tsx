@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
+import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import ImageCropper from '@/components/ImageCropper';
 
 interface RecipeStep {
@@ -21,12 +22,47 @@ interface GalleryItem {
   caption?: string;
 }
 
+const COOKING_UNITS = [
+  { label: 'Grams (g)', value: 'g' },
+  { label: 'Kilograms (kg)', value: 'kg' },
+  { label: 'Milligrams (mg)', value: 'mg' },
+  { label: 'Milliliters (ml)', value: 'ml' },
+  { label: 'Liters (l)', value: 'l' },
+  { label: 'Teaspoon (tsp)', value: 'tsp' },
+  { label: 'Tablespoon (tbsp)', value: 'tbsp' },
+  { label: 'Cup (cup)', value: 'cup' },
+  { label: 'Fluid Ounce (fl oz)', value: 'fl oz' },
+  { label: 'Ounce (oz)', value: 'oz' },
+  { label: 'Pound (lb)', value: 'lb' },
+  { label: 'Pint (pt)', value: 'pt' },
+  { label: 'Quart (qt)', value: 'qt' },
+  { label: 'Gallon (gal)', value: 'gal' },
+  { label: 'Piece (pcs)', value: 'pcs' },
+  { label: 'Slice (slice)', value: 'slice' },
+  { label: 'Clove (clove)', value: 'clove' },
+  { label: 'Pinch (pinch)', value: 'pinch' },
+  { label: 'Dash (dash)', value: 'dash' },
+  { label: 'Bunch (bunch)', value: 'bunch' },
+  { label: 'Sprig (sprig)', value: 'sprig' },
+  { label: 'Can (can)', value: 'can' },
+  { label: 'Jar (jar)', value: 'jar' },
+  { label: 'Package (pkg)', value: 'pkg' },
+  { label: 'Bag (bag)', value: 'bag' },
+  { label: 'Stalk (stalk)', value: 'stalk' },
+  { label: 'Head (head)', value: 'head' },
+  { label: 'Large (lg)', value: 'large' },
+  { label: 'Medium (md)', value: 'medium' },
+  { label: 'Small (sm)', value: 'small' },
+  { label: 'To taste', value: 'to taste' },
+];
+
 export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const isEditing = !!id;
   const { categories } = useCategories();
+  const { refreshMealPlan } = useMealPlanner();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -59,7 +95,7 @@ export default function CreateRecipe() {
   const [bulkStepsText, setBulkStepsText] = useState('');
   const [showBulkNutrition, setShowBulkNutrition] = useState(false);
   const [bulkNutritionText, setBulkNutritionText] = useState('');
-  const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: 'g' }]);
+  const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
 
   const ingredientRefs = useRef<Array<HTMLInputElement | null>>([]);
   const stepRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
@@ -173,8 +209,9 @@ export default function CreateRecipe() {
             setIngredients(recipe.recipe_ingredients?.map((i: any) => ({
               name: i.ingredient?.name || '',
               amount: i.amount_in_grams.toString(),
-              unit: i.unit || 'g'
-            })) || [{ name: '', amount: '', unit: 'g' }]);
+              unit: i.unit || 'g',
+              group_name: i.group_name || 'Ingredients'
+            })) || [{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
           }
         } catch (error) {
           console.error('Error loading recipe:', error);
@@ -295,6 +332,23 @@ export default function CreateRecipe() {
         const { data, error } = await supabase.from('recipes').insert([recipeData]).select().single();
         if (error) throw error;
         recipeId = data.id;
+
+        // Automatically link this new recipe to any custom entries in the meal planner with the same title
+        try {
+          await supabase
+            .from('meal_planner')
+            .update({
+              recipe_id: recipeId,
+              custom_title: null
+            })
+            .eq('user_id', session.user.id)
+            .ilike('custom_title', recipeData.title);
+
+          await refreshMealPlan();
+        } catch (plannerError) {
+          console.error('Error auto-linking to meal planner:', plannerError);
+          // Don't fail the whole recipe creation if this optional step fails
+        }
       }
 
       // Sync Ingredients
@@ -317,7 +371,8 @@ export default function CreateRecipe() {
           recipe_id: recipeId,
           ingredient_id: ingredientId,
           amount_in_grams: parseFloat(ing.amount) || 0,
-          unit: ing.unit || 'g'
+          unit: ing.unit || 'g',
+          group_name: ing.group_name || 'Ingredients'
         }]);
       }
 
@@ -375,12 +430,23 @@ export default function CreateRecipe() {
   };
   const removeStep = (idx: number) => setFormData({ ...formData, steps: formData.steps.filter((_, i) => i !== idx) });
 
-  const addIngredient = () => {
-    setIngredients((prev: any) => [...prev, { name: '', amount: '', unit: 'g' }]);
+  const addIngredient = (idx?: number) => {
+    const newIng = { name: '', amount: '', unit: 'g', group_name: idx !== undefined ? ingredients[idx].group_name : (ingredients[ingredients.length - 1]?.group_name || 'Ingredients') };
+    if (idx !== undefined) {
+      const next = [...ingredients];
+      next.splice(idx + 1, 0, newIng);
+      setIngredients(next);
+    } else {
+      setIngredients((prev: any) => [...prev, newIng]);
+    }
     setTimeout(() => {
-      const lastIndex = ingredients.length;
-      ingredientRefs.current[lastIndex]?.focus();
+      const targetIdx = idx !== undefined ? idx + 1 : ingredients.length;
+      ingredientRefs.current[targetIdx]?.focus();
     }, 0);
+  };
+
+  const addIngredientGroup = () => {
+    setIngredients((prev: any) => [...prev, { name: '', amount: '', unit: 'g', group_name: 'New Group', is_special_header: true }]);
   };
   const updateIngredient = (idx: number, field: string, val: string) => {
     const newIngredients = [...ingredients];
@@ -400,16 +466,27 @@ export default function CreateRecipe() {
 
   const parseBulkIngredients = () => {
     const lines = bulkIngredientsText.split('\n').filter(line => line.trim() !== '');
-    const newIngredients = lines.map(line => {
+    let currentGroup = 'Ingredients';
+    const newIngredients: any[] = [];
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
+        currentGroup = trimmed.replace(/^#\s*|[:]$/g, '');
+        return;
+      }
+
       const match = line.match(/^([\d\/\.]+)?\s*(g|ml|pcs|cup|lb|oz|tbsp|tsp)?\s*(.*)$/i);
       if (match) {
-        return {
+        newIngredients.push({
           amount: match[1] || '1',
           unit: (match[2]?.toLowerCase() as any) || 'pcs',
-          name: match[3]?.trim() || line.trim()
-        };
+          name: match[3]?.trim() || trimmed,
+          group_name: currentGroup
+        });
+      } else {
+        newIngredients.push({ name: trimmed, amount: '1', unit: 'pcs', group_name: currentGroup });
       }
-      return { name: line.trim(), amount: '1', unit: 'pcs' };
     });
 
     setIngredients([...ingredients.filter(i => i.name !== ''), ...newIngredients]);
@@ -687,7 +764,8 @@ export default function CreateRecipe() {
                 </div>
                 <div className="flex gap-4">
                   <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-primary-600">Bulk</button>
-                  <button type="button" onClick={addIngredient} className="text-primary-600 font-black text-[10px] uppercase tracking-widest">+ Add</button>
+                  <button type="button" onClick={() => addIngredientGroup()} className="text-orange-600 font-black text-[10px] uppercase tracking-widest">+ Section</button>
+                  <button type="button" onClick={() => addIngredient()} className="text-primary-600 font-black text-[10px] uppercase tracking-widest">+ Add</button>
                 </div>
               </div>
 
@@ -703,7 +781,7 @@ export default function CreateRecipe() {
                     <textarea
                       rows={5}
                       className="w-full px-5 py-4 rounded-2xl border-none focus:ring-2 focus:ring-primary-500 transition-all text-sm font-mono"
-                      placeholder="2 cups Milk&#10;300g Flour&#10;2 Eggs"
+                      placeholder="For Sauce:&#10;2 cups Milk&#10;300g Flour&#10;&#10;# For Topping:&#10;2 Eggs"
                       value={bulkIngredientsText}
                       onChange={e => setBulkIngredientsText(e.target.value)}
                     />
@@ -715,25 +793,67 @@ export default function CreateRecipe() {
                 )}
               </AnimatePresence>
 
-              <div className="space-y-3">
-                {ingredients.map((ing, idx) => (
-                  <div key={idx} className="flex gap-2 group">
-                    <input
-                      ref={el => ingredientRefs.current[idx] = el}
-                      type="text"
-                      placeholder="Item"
-                      className="flex-1 bg-gray-50 border-none rounded-xl text-xs font-bold px-3 py-1.5"
-                      value={ing.name}
-                      onChange={e => updateIngredient(idx, 'name', e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient())}
-                    />
-                    <input type="text" placeholder="Q" className="w-12 bg-gray-50 border-none rounded-xl text-xs font-bold text-center" value={ing.amount} onChange={e => updateIngredient(idx, 'amount', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient())} />
-                    <select className="w-14 bg-gray-50 border-none rounded-xl text-[8px] font-black" value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
-                      {['g', 'ml', 'tsp', 'tbsp', 'cup', 'lb', 'pcs'].map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                    <button type="button" onClick={() => removeIngredient(idx)} className="p-1 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"><X size={14} /></button>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {ingredients.map((ing, idx) => {
+                  const showHeader = idx === 0 || ing.group_name !== ingredients[idx - 1].group_name;
+                  return (
+                    <div key={idx} className="space-y-3">
+                      {showHeader && (
+                        <div className="flex items-center gap-3 pt-4 first:pt-0">
+                          <input
+                            type="text"
+                            className="bg-transparent border-b border-gray-100 focus:border-primary-500 text-[10px] font-black uppercase tracking-widest text-gray-400 w-full outline-none py-1"
+                            value={ing.group_name}
+                            onChange={(e) => {
+                              const newGroupName = e.target.value;
+                              const next = [...ingredients];
+                              // Update all ingredients in this group
+                              const originalGroup = ing.group_name;
+                              for (let i = idx; i < next.length; i++) {
+                                if (next[i].group_name === originalGroup || (i === idx)) {
+                                  next[i] = { ...next[i], group_name: newGroupName };
+                                } else {
+                                  break;
+                                }
+                              }
+                              setIngredients(next);
+                            }}
+                            placeholder="Section Title..."
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 group">
+                        <input
+                          ref={el => ingredientRefs.current[idx] = el}
+                          type="text"
+                          placeholder="Item"
+                          className="flex-1 bg-gray-50 border-none rounded-xl text-xs font-bold px-3 py-1.5"
+                          value={ing.name}
+                          onChange={e => updateIngredient(idx, 'name', e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))}
+                        />
+                        <input type="text" placeholder="Q" className="w-12 bg-gray-50 border-none rounded-xl text-xs font-bold text-center" value={ing.amount} onChange={e => updateIngredient(idx, 'amount', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))} />
+                        <div className="relative">
+                          <input
+                            list="unit-suggestions"
+                            placeholder="Unit"
+                            className="w-20 bg-gray-50 border-none rounded-xl text-[10px] font-black px-2 py-1.5"
+                            value={ing.unit}
+                            onChange={e => updateIngredient(idx, 'unit', e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))}
+                          />
+                          <datalist id="unit-suggestions">
+                            {COOKING_UNITS.map(u => (
+                              <option key={u.value} value={u.value}>{u.label}</option>
+                            ))}
+                          </datalist>
+                        </div>
+                        <button type="button" onClick={() => removeIngredient(idx)} className="p-1 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"><X size={14} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
             {/* Section 4: Advanced Instructions */}

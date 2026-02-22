@@ -537,34 +537,48 @@ export default function RecipeDetail() {
                                 </div>
                             </div>
 
-                            <div className="space-y-3 mb-12">
-                                {recipe.ingredients.map((ing, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center gap-4 group"
-                                    >
-                                        {/* Checkbox for Cart Selection */}
-                                        <button
-                                            onClick={() => toggleSelectedForCart(index)}
-                                            className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(index)
-                                                ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-100'
-                                                : 'border-gray-200 hover:border-primary-200'
-                                                }`}
-                                        >
-                                            {selectedForCart.includes(index) && <Check size={16} strokeWidth={4} />}
-                                        </button>
+                            <div className="space-y-6 mb-12">
+                                {Object.entries(
+                                    recipe.ingredients.reduce((groups, ing, index) => {
+                                        const groupName = ing.group_name || 'Ingredients';
+                                        if (!groups[groupName]) groups[groupName] = [];
+                                        groups[groupName].push({ ...ing, originalIndex: index });
+                                        return groups;
+                                    }, {} as Record<string, any[]>)
+                                ).map(([groupName, ings]) => (
+                                    <div key={groupName} className="space-y-3">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-500 mb-2 px-2">{groupName}</h3>
+                                        <div className="space-y-2">
+                                            {ings.map((ing) => (
+                                                <div
+                                                    key={ing.originalIndex}
+                                                    className="flex items-center gap-4 group/item"
+                                                >
+                                                    {/* Checkbox for Cart Selection */}
+                                                    <button
+                                                        onClick={() => toggleSelectedForCart(ing.originalIndex)}
+                                                        className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(ing.originalIndex)
+                                                            ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-100'
+                                                            : 'border-gray-200 hover:border-primary-200'
+                                                            }`}
+                                                    >
+                                                        {selectedForCart.includes(ing.originalIndex) && <Check size={14} strokeWidth={4} />}
+                                                    </button>
 
-                                        {/* Ingredient Info - Clickable for Crossing Out */}
-                                        <div
-                                            onClick={() => toggleCrossed(index)}
-                                            className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors"
-                                        >
-                                            <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(index) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
-                                                {ing.ingredient.name}
-                                            </span>
-                                            <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(index) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-3 py-1 rounded-full'}`}>
-                                                {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
-                                            </span>
+                                                    {/* Ingredient Info - Clickable for Crossing Out */}
+                                                    <div
+                                                        onClick={() => toggleCrossed(ing.originalIndex)}
+                                                        className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors"
+                                                    >
+                                                        <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
+                                                            {ing.ingredient.name}
+                                                        </span>
+                                                        <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
+                                                            {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 ))}

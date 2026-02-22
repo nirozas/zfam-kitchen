@@ -73,6 +73,7 @@ create table recipe_ingredients (
   ingredient_id bigint references ingredients(id) on delete cascade,
   amount_in_grams numeric not null, -- Amount in grams (or ml for liquids)
   unit text default 'g', -- Unit: 'g', 'ml', 'cup', 'lb', or 'pcs'
+  group_name text default 'Main', -- Added for grouping ingredients
   unique(recipe_id, ingredient_id)
 );
 
@@ -159,6 +160,7 @@ create policy "Users can delete own recipes." on recipes for delete using (auth.
 -- MEAL PLANNER (Private)
 create policy "Users can only see their own meal plan." on meal_planner for select using (auth.uid() = user_id);
 create policy "Users can insert into their own meal plan." on meal_planner for insert with check (auth.uid() = user_id);
+create policy "Users can update their own meal plan." on meal_planner for update using (auth.uid() = user_id);
 create policy "Users can delete from their own meal plan." on meal_planner for delete using (auth.uid() = user_id);
 
 -- SHOPPING

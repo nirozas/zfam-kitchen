@@ -132,18 +132,21 @@ export interface Database {
                     recipe_id: string
                     ingredient_id: number
                     amount_in_grams: number
+                    group_name: string | null
                 }
                 Insert: {
                     id?: number
                     recipe_id: string
                     ingredient_id: number
                     amount_in_grams?: number
+                    group_name?: string | null
                 }
                 Update: {
                     id?: number
                     recipe_id?: string
                     ingredient_id?: number
                     amount_in_grams?: number
+                    group_name?: string | null
                 }
             }
             tags: {

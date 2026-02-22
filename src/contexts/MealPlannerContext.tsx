@@ -10,6 +10,7 @@ interface MealPlannerContextType {
     removeRecipeFromDate: (dateStr: string, index: number) => void;
     assignRecipeToMeal: (mealId: number | string, recipe: Recipe) => Promise<void>;
     saveDailyNote: (dateStr: string, note: string) => Promise<void>;
+    refreshMealPlan: () => Promise<void>;
     loading: boolean;
 }
 
@@ -20,81 +21,80 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     const [dailyNotes, setDailyNotes] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
 
+    const fetchMealPlan = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            setPlannedMeals({});
+            setDailyNotes({});
+            setLoading(false);
+            return;
+        }
+
+        const [mealsResult, notesResult] = await Promise.all([
+            supabase
+                .from('meal_planner')
+                .select('*, recipes(*, categories(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
+                .eq('user_id', user.id)
+                .order('id', { ascending: true }),
+            supabase
+                .from('daily_notes')
+                .select('date, note')
+                .eq('user_id', user.id)
+        ]);
+
+        if (mealsResult.error) {
+            console.error('Error fetching meal plan:', mealsResult.error);
+        } else if (mealsResult.data) {
+            const grouped: Record<string, PlannerMeal[]> = {};
+            mealsResult.data.forEach((item: any) => {
+                const date = item.date;
+                if (!grouped[date]) grouped[date] = [];
+
+                if (item.custom_title) {
+                    grouped[date].push({
+                        id: item.id,
+                        title: item.custom_title,
+                        isCustom: true
+                    });
+                } else if (item.recipes) {
+                    const rawRecipe = item.recipes;
+                    const recipe: Recipe = {
+                        ...rawRecipe,
+                        ingredients: rawRecipe.recipe_ingredients.map((ri: any) => ({
+                            ingredient: ri.ingredients,
+                            amount_in_grams: ri.amount_in_grams,
+                            unit: ri.unit
+                        })),
+                        category: rawRecipe.categories,
+                        tags: rawRecipe.recipe_tags.map((rt: any) => rt.tags)
+                    };
+
+                    grouped[date].push({
+                        id: recipe.id,
+                        title: recipe.title,
+                        image_url: recipe.image_url || undefined,
+                        recipe: recipe
+                    });
+                }
+            });
+            setPlannedMeals(grouped);
+        }
+
+        if (notesResult.error) {
+            console.error('Error fetching notes:', notesResult.error);
+        } else if (notesResult.data) {
+            const notesMap: Record<string, string> = {};
+            notesResult.data.forEach((item: any) => {
+                notesMap[item.date] = item.note;
+            });
+            setDailyNotes(notesMap);
+        }
+
+        setLoading(false);
+    };
+
     // Load from Supabase on mount or auth change
     useEffect(() => {
-        const fetchMealPlan = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setPlannedMeals({});
-                setDailyNotes({});
-                setLoading(false);
-                return;
-            }
-
-            const [mealsResult, notesResult] = await Promise.all([
-                supabase
-                    .from('meal_planner')
-                    .select('*, recipes(*, categories(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
-                    .eq('user_id', user.id)
-                    .order('id', { ascending: true }),
-                supabase
-                    .from('daily_notes')
-                    .select('date, note')
-                    .eq('user_id', user.id)
-            ]);
-
-            if (mealsResult.error) {
-                console.error('Error fetching meal plan:', mealsResult.error);
-            } else if (mealsResult.data) {
-                const grouped: Record<string, PlannerMeal[]> = {};
-                mealsResult.data.forEach((item: any) => {
-                    const date = item.date;
-                    if (!grouped[date]) grouped[date] = [];
-
-                    if (item.custom_title) {
-                        grouped[date].push({
-                            id: item.id,
-                            title: item.custom_title,
-                            isCustom: true
-                        });
-                    } else if (item.recipes) {
-                        const rawRecipe = item.recipes;
-                        const recipe: Recipe = {
-                            ...rawRecipe,
-                            ingredients: rawRecipe.recipe_ingredients.map((ri: any) => ({
-                                ingredient: ri.ingredients,
-                                amount_in_grams: ri.amount_in_grams,
-                                unit: ri.unit
-                            })),
-                            category: rawRecipe.categories,
-                            tags: rawRecipe.recipe_tags.map((rt: any) => rt.tags)
-                        };
-
-                        grouped[date].push({
-                            id: recipe.id,
-                            title: recipe.title,
-                            image_url: recipe.image_url || undefined,
-                            recipe: recipe
-                        });
-                    }
-                });
-                setPlannedMeals(grouped);
-            }
-
-            if (notesResult.error) {
-                console.error('Error fetching notes:', notesResult.error);
-            } else if (notesResult.data) {
-                const notesMap: Record<string, string> = {};
-                notesResult.data.forEach((item: any) => {
-                    notesMap[item.date] = item.note;
-                });
-                setDailyNotes(notesMap);
-            }
-
-
-            setLoading(false);
-        };
-
         fetchMealPlan();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
@@ -258,7 +258,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <MealPlannerContext.Provider value={{ plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, loading }}>
+        <MealPlannerContext.Provider value={{ plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, loading, refreshMealPlan: fetchMealPlan }}>
             {children}
         </MealPlannerContext.Provider>
     );
