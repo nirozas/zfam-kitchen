@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
-import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes } from '@/lib/hooks';
+import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 
 export default function RecipeDetail() {
@@ -12,7 +12,8 @@ export default function RecipeDetail() {
     const { recipe, loading } = useRecipe(id);
     const { reviews, fetchReviews } = useReviews(id);
     const { likes, toggleLike } = useLikes();
-    const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(id);
+    const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(recipe?.id);
+    const { stats: usageStats } = useDetailedRecipeStats(recipe?.id);
     const [multiplier, setMultiplier] = useState(1);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -48,14 +49,14 @@ export default function RecipeDetail() {
 
     const handleSubmitReview = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!id || !currentUserId || userRating === 0) return;
+        if (!recipe || !currentUserId || userRating === 0) return;
         setSubmittingReview(true);
         try {
             const { error } = await supabase
                 .from('reviews')
                 .upsert({
                     user_id: currentUserId,
-                    recipe_id: id,
+                    recipe_id: recipe!.id,
                     rating: userRating,
                     comment: reviewComment
                 }, { onConflict: 'user_id,recipe_id' });
@@ -66,14 +67,14 @@ export default function RecipeDetail() {
             const { data: allReviews } = await supabase
                 .from('reviews')
                 .select('rating')
-                .eq('recipe_id', id);
+                .eq('recipe_id', recipe!.id);
 
             if (allReviews && allReviews.length > 0) {
                 const avg = allReviews.reduce((acc, r) => acc + (r.rating || 0), 0) / allReviews.length;
                 await supabase
                     .from('recipes')
                     .update({ rating: Math.round(avg * 10) / 10 })
-                    .eq('id', id);
+                    .eq('id', recipe!.id);
             }
 
             setReviewComment('');
@@ -88,13 +89,13 @@ export default function RecipeDetail() {
     };
 
     const handleDelete = async () => {
-        if (!id) return;
+        if (!recipe) return;
         setIsDeleting(true);
         try {
             const { error } = await supabase
                 .from('recipes')
                 .delete()
-                .eq('id', id);
+                .eq('id', recipe!.id);
 
             if (error) throw error;
             navigate('/');
@@ -365,6 +366,18 @@ export default function RecipeDetail() {
                         <h1 className="text-3xl sm:text-5xl md:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9]">
                             {recipe.title}
                         </h1>
+
+                        {/* Alternative Titles */}
+                        {recipe.alternative_titles && (
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {recipe.alternative_titles.split(',').map((alt, i) => (
+                                    <span key={i} className="px-6 py-3 bg-white/10 backdrop-blur-md rounded-2xl text-white/60 text-[20px] font-black uppercase tracking-widest border border-white/5">
+                                        {alt.trim()}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
                         <p className="text-white/80 text-xl font-medium line-clamp-2 mb-8 max-w-2xl leading-relaxed">
                             {recipe.description}
                         </p>
@@ -424,6 +437,22 @@ export default function RecipeDetail() {
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-white/10 rounded-xl"><span className="text-sm">👥</span></div>
                                 <span>{(recipe.servings || 1) * multiplier} servings</span>
+                            </div>
+                        </div>
+
+                        {/* Usage Stats - Centered & Large */}
+                        <div className="flex items-center gap-12 sm:gap-16 py-2">
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] text-white/50 mb-1 font-black">THIS MONTH</span>
+                                <span className="text-5xl font-black text-white leading-none">{usageStats.month}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] text-white/50 mb-1 font-black">THIS YEAR</span>
+                                <span className="text-5xl font-black text-white leading-none">{usageStats.year}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] text-white/50 mb-1 font-black">ALL TIME</span>
+                                <span className="text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
                             </div>
                         </div>
 
@@ -601,7 +630,7 @@ export default function RecipeDetail() {
                             </div>
 
                             {/* Nutrition Facts Sidebar Item */}
-                            <div className="mt-14 pt-10 border-t-4 border-gray-50">
+                            <div className="mt-14 pt-10 border-t-4 border-gray-50 hidden lg:block">
                                 <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-4 uppercase tracking-tighter">
                                     <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
                                     Nutrition Facts
@@ -825,6 +854,27 @@ export default function RecipeDetail() {
                                 </a>
                             </div>
                         )}
+
+                        {/* Mobile Nutrition Facts (Only visible on small screens) */}
+                        <div className="block lg:hidden mt-20 pt-10 border-t-4 border-gray-50">
+                            <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-4 uppercase tracking-tighter">
+                                <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
+                                Nutrition Facts
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {[
+                                    { label: 'Prot', value: recipe.nutrition?.protein, unit: 'g', color: 'text-rose-600', bg: 'bg-rose-50' },
+                                    { label: 'Carbs', value: recipe.nutrition?.carbs, unit: 'g', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                                    { label: 'Fat', value: recipe.nutrition?.fat, unit: 'g', color: 'text-amber-600', bg: 'bg-amber-50' },
+                                    { label: 'Kcal', value: recipe.nutrition?.calories || Math.round(baseCalories), unit: '', color: 'text-emerald-600', bg: 'bg-emerald-50' }
+                                ].map((stat, i) => (
+                                    <div key={i} className={`${stat.bg} p-6 rounded-[2rem] flex flex-col items-center justify-center transform hover:scale-105 transition-transform border border-white shadow-sm`}>
+                                        <span className={`text-2xl font-black ${stat.color} tracking-tighter`}>{stat.value || 0}{stat.unit}</span>
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 opacity-60">{stat.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

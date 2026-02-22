@@ -1,7 +1,7 @@
 import RecipeCard from '@/components/RecipeCard';
 import CategoryCard from '@/components/CategoryCard';
 import { motion } from 'framer-motion';
-import { ArrowRight, Heart } from 'lucide-react';
+import { ArrowRight, Heart, Plus, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HeroSection } from '@/components/HeroSection';
 import { useRecipes, useCategories } from '@/lib/hooks';
@@ -54,7 +54,7 @@ const Index = () => {
 
             {/* Categories Section */}
             <section className="py-16 bg-white/50 backdrop-blur-sm border-y border-gray-100">
-                <div className="container mx-auto px-4 max-w-[1800px]">
+                <div className="w-full max-w-[1800px] mx-auto px-6 md:px-12">
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h2 className="font-display text-2xl md:text-3xl font-bold mb-2 text-gray-900">
@@ -64,21 +64,29 @@ const Index = () => {
                                 Find the perfect recipe for any occasion
                             </p>
                         </div>
-                        <Link to="/categories" className={`${buttonVariants('outline')} hidden md:flex`}>
-                            Explore All
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <Link to="/create" className={buttonVariants('hero')}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">New Recipe</span>
+                            </Link>
+                            <Link to="/categories" className={buttonVariants('outline')}>
+                                Explore All
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 sm:gap-4">
                         {categoriesLoading ? (
                             Array.from({ length: 4 }).map((_, i) => (
                                 <CategoryCardSkeleton key={i} />
                             ))
                         ) : (
-                            categories.map((category, index) => (
-                                <CategoryCard key={category.id} category={category} index={index} />
-                            ))
+                            categories
+                                .filter(category => !category.parent_id)
+                                .map((category, index) => (
+                                    <CategoryCard key={category.id} category={category} index={index} />
+                                ))
                         )}
                     </div>
                 </div>
@@ -86,7 +94,7 @@ const Index = () => {
 
             {/* Featured Recipes */}
             <section className="py-16">
-                <div className="container mx-auto px-4 max-w-[1800px]">
+                <div className="w-full max-w-[1800px] mx-auto px-6 md:px-12">
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h2 className="font-display text-2xl md:text-3xl font-bold mb-2 text-gray-900">
@@ -98,7 +106,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
                                 <RecipeCardSkeleton key={i} />
@@ -114,7 +122,7 @@ const Index = () => {
 
             {/* Popular Recipes */}
             <section className="py-16 bg-white/50 border-y border-gray-100">
-                <div className="container mx-auto px-4 max-w-[1800px]">
+                <div className="w-full max-w-[1800px] mx-auto px-6 md:px-12">
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h2 className="font-display text-2xl md:text-3xl font-bold mb-2 text-gray-900">
@@ -124,13 +132,23 @@ const Index = () => {
                                 Most loved by our community
                             </p>
                         </div>
-                        <Link to="/search" className={`${buttonVariants('outline')} hidden md:flex`}>
-                            See All Recipes
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <Link to="/create" className={buttonVariants('hero')}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">New Recipe</span>
+                            </Link>
+                            <Link to="/search" className={buttonVariants('outline')}>
+                                <Search className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">Search</span>
+                            </Link>
+                            <Link to="/search" className={buttonVariants('outline')}>
+                                See All
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
                                 <RecipeCardSkeleton key={i} />

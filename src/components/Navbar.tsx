@@ -1,4 +1,4 @@
-import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid } from 'lucide-react';
+import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid, Home } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -63,10 +63,11 @@ export default function Navbar() {
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
     const dropdownMenu = [
+        { label: 'Home', icon: Home, path: '/', color: 'text-gray-600', bg: 'bg-gray-50' },
         { label: 'All Recipes', icon: Utensils, path: '/search', color: 'text-primary-600', bg: 'bg-primary-50' },
         { label: 'My Favorites', icon: Star, path: '/activity?type=favorites', color: 'text-amber-500', bg: 'bg-amber-50' },
         { label: 'Liked Recipes', icon: Heart, path: '/activity?type=likes', color: 'text-rose-500', bg: 'bg-rose-50' },
-        { label: 'Edit Categories', icon: LayoutGrid, path: '/admin/categories', color: 'text-blue-500', bg: 'bg-blue-50' },
+        { label: 'Categories', icon: LayoutGrid, path: '/categories', color: 'text-blue-500', bg: 'bg-blue-50' },
     ];
 
     return (
@@ -151,10 +152,9 @@ export default function Navbar() {
                         </Link>
                     </div>
 
-                    {/* Search Bar - Expanding */}
                     <div className={clsx(
-                        "flex-1 transition-all duration-300 ease-in-out px-2",
-                        isSearchExpanded ? "max-w-xl" : "max-w-[40px] sm:max-w-xs md:max-w-md"
+                        "flex-1 transition-all duration-300 ease-in-out px-1 sm:px-2",
+                        isSearchExpanded ? "max-w-xl" : "max-w-[32px] sm:max-w-xs md:max-w-md"
                     )}>
                         <form
                             onSubmit={(e) => {
@@ -202,16 +202,16 @@ export default function Navbar() {
 
                         <Link to="/planner" className="hidden sm:flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors px-2 py-2 rounded-lg hover:bg-gray-100">
                             <Calendar size={20} />
-                            <span className="font-medium text-xs hidden md:inline">Planner</span>
+                            <span className="font-medium text-xs hidden lg:inline">Planner</span>
                         </Link>
 
                         {session ? (
                             <div className="flex items-center gap-1">
                                 <button
                                     onClick={() => navigate('/profile')}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 hover:border-primary-100 hover:bg-primary-50/30 transition-all font-bold text-gray-900 group"
+                                    className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full border border-gray-200 hover:border-primary-100 hover:bg-primary-50/30 transition-all font-bold text-gray-900 group"
                                 >
-                                    <span className="text-sm truncate max-w-[120px] group-hover:text-primary-600">
+                                    <span className="text-sm truncate max-w-[40px] xs:max-w-[80px] md:max-w-[120px] group-hover:text-primary-600">
                                         {profileUsername || session.user.user_metadata.username || 'User'}
                                     </span>
                                 </button>

@@ -69,18 +69,27 @@ export function useRecipe(id: string | undefined) {
         }
 
         async function fetchRecipe() {
+            if (!id) return;
             try {
                 setLoading(true);
-                const { data, error } = await supabase
+                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+                let query = supabase
                     .from('recipes')
                     .select(`
                         *,
                         category:category_id(id, name, slug),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, ingredients(*))
-                    `)
-                    .eq('id', id)
-                    .single();
+                        recipe_ingredients(amount_in_grams, unit, group_name, ingredients(*))
+                    `);
+
+                if (isUuid) {
+                    query = query.eq('id', id);
+                } else {
+                    query = query.eq('slug', id);
+                }
+
+                const { data, error } = await query.single();
 
                 if (error) throw error;
 
@@ -93,6 +102,7 @@ export function useRecipe(id: string | undefined) {
                         ingredients: data.recipe_ingredients?.map((ri: any) => ({
                             amount_in_grams: ri.amount_in_grams,
                             unit: ri.unit || 'g',
+                            group_name: ri.group_name || 'Main',
                             ingredient: ri.ingredients
                         })).filter((ing: any) => ing.ingredient) || [],
                     };
@@ -112,43 +122,40 @@ export function useRecipe(id: string | undefined) {
 }
 
 export function useCategories() {
-    const [categories, setCategories] = useState<Array<{ id: number; name: string; slug: string; image_url: string | null; order_index: number; created_at: string | null }>>([]);
+    const [categories, setCategories] = useState<Array<{ id: number; name: string; slug: string; image_url: string | null; order_index: number; parent_id: number | null; created_at: string | null }>>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function fetchCategories() {
-            try {
-                setLoading(true);
-                // Try ordering by order_index, fallback to name if it fails (e.g. column missing)
-                let { data, error } = await supabase
+    const fetchCategories = async () => {
+        try {
+            setLoading(true);
+            let { data, error: fetchError } = await supabase
+                .from('categories')
+                .select('*')
+                .order('order_index', { ascending: true });
+
+            if (fetchError) {
+                const fallback = await supabase
                     .from('categories')
                     .select('*')
-                    .order('order_index', { ascending: true });
-
-                if (error) {
-                    console.warn('Ordering by order_index failed, falling back to name:', error);
-                    const fallback = await supabase
-                        .from('categories')
-                        .select('*')
-                        .order('name');
-
-                    if (fallback.error) throw fallback.error;
-                    data = fallback.data;
-                }
-
-                setCategories(data || []);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to fetch categories');
-            } finally {
-                setLoading(false);
+                    .order('name');
+                if (fallback.error) throw fallback.error;
+                data = fallback.data;
             }
-        }
 
+            setCategories(data || []);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchCategories();
     }, []);
 
-    return { categories, loading, error };
+    return { categories, loading, error, refreshCategories: fetchCategories };
 }
 
 export function useRecipeStats() {
@@ -181,6 +188,42 @@ export function useRecipeStats() {
 
         fetchStats();
     }, []);
+
+    return { stats, loading };
+}
+
+export function useDetailedRecipeStats(recipeId: string | undefined) {
+    const [stats, setStats] = useState({ month: 0, year: 0, allTime: 0 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!recipeId) return;
+        async function fetchStats() {
+            try {
+                setLoading(true);
+                const now = new Date();
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+
+                const [allTimeRes, monthRes, yearRes] = await Promise.all([
+                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId),
+                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', monthStart),
+                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', yearStart)
+                ]);
+
+                setStats({
+                    allTime: allTimeRes.count || 0,
+                    month: monthRes.count || 0,
+                    year: yearRes.count || 0
+                });
+            } catch (err) {
+                console.error('Error fetching detailed stats:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchStats();
+    }, [recipeId]);
 
     return { stats, loading };
 }

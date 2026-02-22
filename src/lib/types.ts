@@ -7,8 +7,8 @@ export type Tag = Database['public']['Tables']['tags']['Row'];
 // Recipe with joined data (as used in the UI)
 type RecipeRow = Database['public']['Tables']['recipes']['Row'];
 
-export interface Recipe extends Omit<RecipeRow, 'steps'> {
-    // Inherited from Row: id, title, image_url, video_url, source_url, time_minutes, etc.
+export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 'cook_time_minutes' | 'servings' | 'nutrition' | 'gallery_urls' | 'rating'> {
+    // Inherited from Row: id, slug, title, image_url, video_url, source_url, time_minutes, etc.
     prep_time_minutes?: number;
     cook_time_minutes?: number;
     servings?: number;
@@ -39,6 +39,8 @@ export interface MealPlanEntry {
     date: string; // Database date string YYYY-MM-DD
     recipe?: Recipe;
     custom_title?: string | null;
+    note?: string | null;
+    completed?: boolean;
 }
 
 export type PlannerMeal = {
@@ -48,4 +50,6 @@ export type PlannerMeal = {
     isCustom?: boolean;
     recipe?: Recipe;
     custom_title?: string;
+    note?: string;
+    completed?: boolean;
 };

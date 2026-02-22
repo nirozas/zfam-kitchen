@@ -25,6 +25,7 @@ create table recipes (
   author_id uuid references profiles(id) on delete set null,
   category_id bigint references categories(id) on delete set null,
   title text not null,
+  slug text unique not null,
   image_url text, -- Added per user request
   video_url text, -- YouTube/Instagram/TikTok URL
   source_url text, -- Original recipe link (added for import/credit)
@@ -36,6 +37,8 @@ create table recipes (
   cook_time_minutes integer default 0,
   servings integer default 1,
   nutrition jsonb default '{"calories": 0, "protein": 0, "fat": 0, "carbs": 0}'::jsonb,
+  rating numeric default 3,
+  notes text,
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );

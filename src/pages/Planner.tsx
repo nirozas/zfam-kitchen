@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipe, PlannerMeal } from '@/lib/types';
-import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart } from 'lucide-react';
+import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart, History, ExternalLink, CheckCircle2, Circle } from 'lucide-react';
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { useRecipes } from '@/lib/hooks';
@@ -11,10 +11,12 @@ import { Link } from 'react-router-dom';
 export default function Planner() {
     const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, +1 = next week
     const { addMultipleToCart } = useShoppingCart();
-    const { plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote } = useMealPlanner();
+    const { plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, updateMealNote, toggleMealCompleted } = useMealPlanner();
     const { recipes, loading, error } = useRecipes();
 
+    const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
     const [assigningMealId, setAssigningMealId] = useState<number | string | null>(null);
+    const [showAllOccurrences, setShowAllOccurrences] = useState(false);
 
     const today = new Date();
     const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
@@ -69,6 +71,7 @@ export default function Planner() {
 
     const filteredRecipes = recipes.filter(r =>
         r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.alternative_titles || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.tags.some(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
@@ -89,7 +92,7 @@ export default function Planner() {
         const itemsToBatch: any[] = [];
         allRecipesThisWeek.forEach(recipe => {
             recipe.ingredients.forEach(item => {
-                itemsToBatch.push({
+                item.ingredient && itemsToBatch.push({
                     name: item.ingredient.name,
                     amount: item.amount_in_grams,
                     unit: item.unit || 'g',
@@ -104,6 +107,28 @@ export default function Planner() {
             addMultipleToCart(itemsToBatch);
         }
     };
+
+    const navigateToDate = (dateStr: string) => {
+        const targetDate = new Date(dateStr);
+        const diffInDays = Math.floor((targetDate.getTime() - startOfWeek(today, { weekStartsOn: 1 }).getTime()) / (1000 * 60 * 60 * 24));
+        const offset = Math.floor(diffInDays / 7);
+        setWeekOffset(offset);
+        setPlannerSearchQuery('');
+    };
+
+    // Global Planner Search Results
+    const globalSearchResults = Object.entries(plannedMeals).flatMap(([date, meals]) =>
+        meals
+            .filter(m =>
+                plannerSearchQuery && (
+                    m.title.toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
+                    (m.recipe?.alternative_titles || '').toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
+                    (m.recipe?.category?.name || '').toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
+                    (m.recipe?.tags || []).some(t => t.name.toLowerCase().includes(plannerSearchQuery.toLowerCase()))
+                )
+            )
+            .map(m => ({ ...m, date }))
+    ).sort((a, b) => b.date.localeCompare(a.date));
 
     const weekEndDate = addDays(currentWeekStart, 6);
     const isCurrentWeek = weekOffset === 0;
@@ -139,16 +164,92 @@ export default function Planner() {
     return (
         <div className="pb-10 relative max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Week Navigation Header */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-3xl font-bold text-gray-900">Weekly Meal Planner</h1>
+            <div className="mb-8 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 flex-1">
+                        <h1 className="text-3xl font-bold text-gray-900">Weekly Meal Planner</h1>
+                        <div className="relative group max-w-sm flex-1 hidden sm:block">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search in your plan..."
+                                className="w-full pl-11 pr-10 py-2.5 bg-white border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-sm shadow-sm"
+                                value={plannerSearchQuery}
+                                onChange={(e) => setPlannerSearchQuery(e.target.value)}
+                            />
+                            {plannerSearchQuery && (
+                                <div className="absolute top-full left-0 w-[400px] mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 p-2 z-[60] overflow-hidden max-h-[400px] flex flex-col">
+                                    <div className="flex items-center justify-between p-3 border-b border-gray-50">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">History Results</span>
+                                        <button
+                                            onClick={() => setShowAllOccurrences(true)}
+                                            className="text-[10px] font-black text-primary-600 uppercase hover:underline"
+                                        >
+                                            See All Occurrences
+                                        </button>
+                                    </div>
+                                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                                        {globalSearchResults.slice(0, 10).map((result, i) => (
+                                            <button
+                                                key={`${result.date}-${i}`}
+                                                onClick={() => navigateToDate(result.date)}
+                                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
+                                            >
+                                                <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                                                    {result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">{result.title.substring(0, 2)}</div>}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-xs text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">{result.title}</p>
+                                                    <p className="text-[10px] text-gray-400 font-medium">{format(new Date(result.date), 'MMM d, yyyy')}</p>
+                                                </div>
+                                                <ExternalLink size={12} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-all" />
+                                            </button>
+                                        ))}
+                                        {globalSearchResults.length === 0 && (
+                                            <div className="p-8 text-center">
+                                                <p className="text-xs text-gray-400 italic">No historical matches</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {plannerSearchQuery && (
+                                <button
+                                    onClick={() => setPlannerSearchQuery('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
                     <button
                         onClick={addWeekToCart}
-                        className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                        className="flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-100 flex-shrink-0"
                     >
                         <ShoppingCart size={18} />
                         Add Week to Cart
                     </button>
+                </div>
+
+                {/* Mobile Search */}
+                <div className="relative group sm:hidden">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search in your plan..."
+                        className="w-full pl-11 pr-10 py-3 bg-white border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-sm shadow-sm"
+                        value={plannerSearchQuery}
+                        onChange={(e) => setPlannerSearchQuery(e.target.value)}
+                    />
+                    {plannerSearchQuery && (
+                        <button
+                            onClick={() => setPlannerSearchQuery('')}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -197,7 +298,7 @@ export default function Planner() {
                             return (
                                 <div
                                     key={dateStr}
-                                    className={`min-h-[450px] bg-white rounded-[2rem] p-4 border-2 transition-all duration-300 flex flex-col relative overflow-hidden
+                                    className={`min-h-[350px] md:min-h-[450px] bg-white rounded-[2rem] p-4 border-2 transition-all duration-300 flex flex-col relative overflow-hidden
                     ${isToday ? 'border-primary-500 shadow-xl shadow-primary-100/50 scale-[1.02] z-10' : 'border-gray-50 hover:border-primary-100 hover:shadow-lg'}
                   `}
                                 >
@@ -217,67 +318,107 @@ export default function Planner() {
                                     </div>
 
                                     <div className="space-y-4 flex-1">
-                                        {meals.map((meal, idx) => (
-                                            <motion.div
-                                                layout
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                key={`${meal.id}-${idx}`}
-                                                className="group relative"
-                                            >
-                                                {meal.recipe ? (
-                                                    <Link
-                                                        to={`/recipe/${meal.id}`}
-                                                        className="block bg-white p-2 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary-200 transition-all cursor-pointer"
-                                                    >
-                                                        <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-100 mb-2 shadow-sm border border-gray-50">
-                                                            {meal.image_url ? (
-                                                                <img src={meal.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="" />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">
-                                                                    {meal.title.substring(0, 2).toUpperCase()}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <p className="font-bold text-xs text-gray-900 leading-tight line-clamp-2 px-1 mb-1">{meal.title}</p>
-                                                    </Link>
-                                                ) : (
-                                                    <div className="flex items-center justify-between w-full pr-2">
-                                                        <Link
-                                                            to={`/create?title=${encodeURIComponent(meal.title)}`}
-                                                            className="flex-1 block bg-primary-50 p-4 rounded-2xl shadow-sm border border-primary-100 hover:shadow-md hover:border-primary-200 transition-all border-dashed cursor-pointer group/custom"
-                                                            title="Create recipe from this entry"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0 group-hover/custom:bg-primary-600 group-hover/custom:text-white transition-colors">
-                                                                    <Plus size={14} />
-                                                                </div>
-                                                                <p className="font-bold text-sm text-primary-900 leading-tight line-clamp-2">{meal.title}</p>
-                                                            </div>
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => openSearchForAssign(meal.id)}
-                                                            className="ml-2 p-2 text-primary-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
-                                                            title="Assign an existing recipe"
-                                                        >
-                                                            <Search size={18} />
-                                                        </button>
-                                                    </div>
-                                                )}
+                                        {meals.map((meal, idx) => {
+                                            const matchesSearch = !plannerSearchQuery ||
+                                                meal.title.toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
+                                                (meal.recipe?.category?.name || '').toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
+                                                (meal.recipe?.tags || []).some(t => t.name.toLowerCase().includes(plannerSearchQuery.toLowerCase()));
 
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        removeRecipeFromDate(dateStr, idx);
+                                            return (
+                                                <motion.div
+                                                    layout
+                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                    animate={{
+                                                        opacity: matchesSearch ? 1 : 0.3,
+                                                        scale: matchesSearch ? 1 : 0.95,
+                                                        filter: matchesSearch ? 'none' : 'grayscale(0.5)'
                                                     }}
-                                                    className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 p-1.5 text-white bg-red-500 hover:bg-red-600 rounded-full transition-all shadow-lg z-20"
-                                                    title="Remove"
+                                                    key={`${meal.id}-${idx}`}
+                                                    className="group relative"
                                                 >
-                                                    <X size={12} strokeWidth={4} />
-                                                </button>
-                                            </motion.div>
-                                        ))}
+                                                    {meal.recipe ? (
+                                                        <div className="relative">
+                                                            <Link
+                                                                to={`/recipe/${meal.recipe.slug || meal.recipe.id}`}
+                                                                className={`block bg-white p-2 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary-200 transition-all cursor-pointer ${meal.completed ? 'opacity-60 grayscale-[0.5]' : ''}`}
+                                                            >
+                                                                <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-100 mb-2 shadow-sm border border-gray-50 relative">
+                                                                    {meal.image_url ? (
+                                                                        <img src={meal.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="" />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">
+                                                                            {meal.title.substring(0, 2).toUpperCase()}
+                                                                        </div>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMealCompleted(dateStr, idx); }}
+                                                                        className={`absolute bottom-2 left-2 p-1.5 rounded-lg backdrop-blur-md transition-all shadow-lg ${meal.completed ? 'bg-green-500 text-white' : 'bg-white/80 text-gray-400 hover:text-primary-600'}`}
+                                                                    >
+                                                                        {meal.completed ? <CheckCircle2 size={14} strokeWidth={3} /> : <Circle size={14} strokeWidth={3} />}
+                                                                    </button>
+                                                                </div>
+                                                                <p className="font-bold text-xs text-gray-900 leading-tight line-clamp-2 px-1 mb-1">{meal.title}</p>
+                                                            </Link>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-2">
+                                                            <div className="flex items-center justify-between w-full pr-2">
+                                                                <button
+                                                                    onClick={() => toggleMealCompleted(dateStr, idx)}
+                                                                    className={`mr-2 p-2 rounded-xl transition-all ${meal.completed ? 'text-green-500 bg-green-50' : 'text-gray-300 hover:bg-gray-50'}`}
+                                                                >
+                                                                    {meal.completed ? <CheckCircle2 size={20} strokeWidth={3} /> : <Circle size={20} strokeWidth={3} />}
+                                                                </button>
+                                                                <Link
+                                                                    to={`/create?title=${encodeURIComponent(meal.title)}`}
+                                                                    className={`flex-1 block bg-primary-50 p-4 rounded-2xl shadow-sm border border-primary-100 hover:shadow-md hover:border-primary-200 transition-all border-dashed cursor-pointer group/custom ${meal.completed ? 'opacity-60' : ''}`}
+                                                                    title="Create recipe from this entry"
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                                                                            <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600 group-hover/custom:bg-primary-600 group-hover/custom:text-white transition-colors">
+                                                                                <Plus size={14} />
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSearchForAssign(meal.id); }}
+                                                                                className="w-8 h-8 rounded-lg bg-white border border-primary-100 flex items-center justify-center text-primary-400 hover:text-primary-600 hover:border-primary-300 transition-all"
+                                                                                title="Assign an existing recipe"
+                                                                            >
+                                                                                <Search size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <p className="font-bold text-sm text-primary-900 leading-tight line-clamp-3">{meal.title}</p>
+                                                                    </div>
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Individual Meal Note */}
+                                                    <div className="px-2 mt-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Personal note..."
+                                                            className="w-full text-[10px] bg-transparent border-none p-0 focus:ring-0 text-gray-400 font-medium placeholder:text-gray-200 hover:text-gray-600 transition-colors"
+                                                            value={meal.note || ''}
+                                                            onChange={(e) => updateMealNote(dateStr, idx, e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            removeRecipeFromDate(dateStr, idx);
+                                                        }}
+                                                        className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 p-1.5 text-white bg-red-500 hover:bg-red-600 rounded-full transition-all shadow-lg z-20"
+                                                        title="Remove"
+                                                    >
+                                                        <X size={12} strokeWidth={4} />
+                                                    </button>
+                                                </motion.div>
+                                            );
+                                        })}
 
                                         {meals.length === 0 && (
                                             <div className="h-full flex flex-col items-center justify-center py-10 opacity-20 group">
@@ -400,6 +541,67 @@ export default function Planner() {
                                                 </div>
                                             </button>
                                         ))}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* All Occurrences Modal */}
+            <AnimatePresence>
+                {showAllOccurrences && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md" onClick={() => setShowAllOccurrences(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]"
+                        >
+                            <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-primary-50/30">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600">
+                                        <History size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">All Occurrences</h2>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary-500">History Search for "{plannerSearchQuery}"</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowAllOccurrences(false)} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                                <div className="grid grid-cols-1 gap-3">
+                                    {globalSearchResults.map((result, i) => (
+                                        <button
+                                            key={`${result.date}-${i}`}
+                                            onClick={() => { navigateToDate(result.date); setShowAllOccurrences(false); }}
+                                            className="group flex items-center gap-5 p-4 bg-gray-50/50 hover:bg-primary-50 border border-gray-100 hover:border-primary-100 rounded-3xl transition-all text-left"
+                                        >
+                                            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-white flex-shrink-0">
+                                                {result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-200">{result.title.substring(0, 2)}</div>}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="font-black text-gray-900 group-hover:text-primary-700 transition-colors">{result.title}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <CalendarIcon size={12} className="text-primary-500" />
+                                                    <p className="text-xs font-bold text-gray-500">{format(new Date(result.date), 'EEEE, MMMM d, yyyy')}</p>
+                                                </div>
+                                            </div>
+                                            <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-primary-500 group-hover:scale-110 transition-transform">
+                                                <ChevronRight size={20} />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                {globalSearchResults.length === 0 && (
+                                    <div className="text-center py-20 opacity-30">
+                                        <History size={48} className="mx-auto mb-4" />
+                                        <p className="font-black uppercase tracking-widest text-sm">No History Found</p>
                                     </div>
                                 )}
                             </div>

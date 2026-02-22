@@ -6,7 +6,6 @@ import Planner from './pages/Planner';
 import CreateRecipe from './pages/CreateRecipe';
 import Auth from './pages/Auth';
 import ShoppingCart from './pages/ShoppingCart';
-import ManageCategories from './pages/ManageCategories';
 import CategoryDetail from './pages/CategoryDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import Statistics from './pages/Statistics';
@@ -38,8 +37,7 @@ function App() {
                             <Route path="statistics" element={<Statistics />} />
                             <Route path="cart" element={<ShoppingCart />} />
                             <Route path="categories" element={<Categories />} />
-                            <Route path="admin/categories" element={<ManageCategories />} />
-                            <Route path="category/:slug" element={<CategoryDetail />} />
+                            <Route path="category/*" element={<CategoryDetail />} />
                             <Route path="profile" element={<Profile />} />
                             <Route path="activity" element={<Activity />} />
                         </Route>

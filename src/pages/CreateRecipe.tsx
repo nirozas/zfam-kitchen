@@ -1,15 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-  Plus, X, Upload, Loader2, Trash2,
-  AlignLeft, AlignCenter, AlignRight, Maximize,
-  Play, ExternalLink, Star, ArrowLeft
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
-import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import ImageCropper from '@/components/ImageCropper';
+import { generateSlug } from '@/lib/utils';
 
 interface RecipeStep {
   text: string;
@@ -22,54 +18,49 @@ interface GalleryItem {
   caption?: string;
 }
 
-const COOKING_UNITS = [
-  { label: 'Grams (g)', value: 'g' },
-  { label: 'Kilograms (kg)', value: 'kg' },
-  { label: 'Milligrams (mg)', value: 'mg' },
-  { label: 'Milliliters (ml)', value: 'ml' },
-  { label: 'Liters (l)', value: 'l' },
-  { label: 'Teaspoon (tsp)', value: 'tsp' },
-  { label: 'Tablespoon (tbsp)', value: 'tbsp' },
-  { label: 'Cup (cup)', value: 'cup' },
-  { label: 'Fluid Ounce (fl oz)', value: 'fl oz' },
-  { label: 'Ounce (oz)', value: 'oz' },
-  { label: 'Pound (lb)', value: 'lb' },
-  { label: 'Pint (pt)', value: 'pt' },
-  { label: 'Quart (qt)', value: 'qt' },
-  { label: 'Gallon (gal)', value: 'gal' },
-  { label: 'Piece (pcs)', value: 'pcs' },
-  { label: 'Slice (slice)', value: 'slice' },
-  { label: 'Clove (clove)', value: 'clove' },
-  { label: 'Pinch (pinch)', value: 'pinch' },
-  { label: 'Dash (dash)', value: 'dash' },
-  { label: 'Bunch (bunch)', value: 'bunch' },
-  { label: 'Sprig (sprig)', value: 'sprig' },
-  { label: 'Can (can)', value: 'can' },
-  { label: 'Jar (jar)', value: 'jar' },
-  { label: 'Package (pkg)', value: 'pkg' },
-  { label: 'Bag (bag)', value: 'bag' },
-  { label: 'Stalk (stalk)', value: 'stalk' },
-  { label: 'Head (head)', value: 'head' },
-  { label: 'Large (lg)', value: 'large' },
-  { label: 'Medium (md)', value: 'medium' },
-  { label: 'Small (sm)', value: 'small' },
-  { label: 'To taste', value: 'to taste' },
-];
+
+
+const UNIT_MAPPING: Record<string, string> = {
+  'كوب': 'cup', 'أكواب': 'cup', 'كاس': 'cup', 'كؤوس': 'cup',
+  'ملعقة كبيرة': 'tbsp', 'ملاعق كبيرة': 'tbsp', 'ملعقة صغيرة': 'tsp', 'ملاعق صغيرة': 'tsp',
+  'ملعقه كبيره': 'tbsp', 'ملعقه صغيره': 'tsp',
+  'غرام': 'g', 'جرام': 'g', 'غم': 'g',
+  'ملليلتر': 'ml', 'ملل': 'ml', 'مل': 'ml',
+  'لتر': 'l',
+  'حبة': 'pcs', 'حبات': 'pcs', 'قطعة': 'pcs', 'قطع': 'pcs',
+  'رشة': 'pinch', 'قرصة': 'pinch',
+  'فص': 'clove', 'فصوص': 'clove',
+  'ملعقة': 'tbsp',
+  'כוס': 'cup', 'כוסות': 'cup',
+  'כף': 'tbsp', 'כפות': 'tbsp',
+  'כפית': 'tsp', 'כפיות': 'tsp',
+  'גרם': 'g', 'ק"ג': 'kg', 'קג': 'kg',
+  'מ"ל': 'ml', 'מל': 'ml',
+  'ליטר': 'l',
+  'יחידה': 'pcs', 'יחידות': 'pcs',
+  'קורט': 'pinch',
+  'שן': 'clove', 'שיניים': 'clove',
+};
+
+const ARABIC_DIGITS_MAP: Record<string, string> = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+};
 
 export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const isEditing = !!id;
   const { categories } = useCategories();
-  const { refreshMealPlan } = useMealPlanner();
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    notes: '',
     image_url: '',
     video_url: '',
     source_url: '',
+    alternative_titles: '',
     category_id: 0,
     steps: [{ text: '', image_url: '', alignment: 'full' }] as RecipeStep[],
     gallery_urls: [] as GalleryItem[],
@@ -78,40 +69,48 @@ export default function CreateRecipe() {
     prep_time: '15',
     cook_time: '30',
     servings: '4',
-    nutrition: {
-      calories: '0',
-      protein: '0',
-      fat: '0',
-      carbs: '0'
-    }
+    nutrition: { calories: '0', protein: '0', fat: '0', carbs: '0' }
   });
 
   const [uploading, setUploading] = useState(false);
-  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
   const [showBulkAdd, setShowBulkAdd] = useState(false);
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
-  const [showBulkNutrition, setShowBulkNutrition] = useState(false);
-  const [bulkNutritionText, setBulkNutritionText] = useState('');
   const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
+  const [activeSection, setActiveSection] = useState('fundamentals');
+  const [completeness, setCompleteness] = useState(0);
+  const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
 
-  const ingredientRefs = useRef<Array<HTMLInputElement | null>>([]);
-  const stepRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
-
-  // Crop State
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<{ type: 'main' | 'step', index?: number } | null>(null);
 
-  const readFile = (file: File) => {
-    return new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.addEventListener('load', () => resolve(reader.result as string));
-      reader.readAsDataURL(file);
-    });
-  };
+  useEffect(() => {
+    let score = 0;
+    if (formData.title) score += 20;
+    if (formData.image_url) score += 20;
+    if (ingredients.some(i => i.name)) score += 20;
+    if (formData.steps.some(s => s.text)) score += 20;
+    if (formData.category_id) score += 20;
+    setCompleteness(score);
+  }, [formData, ingredients]);
+
+  const sections = [
+    { id: 'fundamentals', label: 'Story & Title', icon: '📝' },
+    { id: 'media', label: 'Media Assets', icon: '🖼️' },
+    { id: 'ingredients', label: 'Ingredients', icon: '🥗' },
+    { id: 'details', label: 'Recipe Details', icon: '⚙️' },
+    { id: 'nutrition', label: 'Nutrition', icon: '📊' },
+    { id: 'instructions', label: 'Cooking Steps', icon: '👨‍🍳' },
+    { id: 'notes', label: 'Notes', icon: '📌' },
+  ];
+
+  const readFile = (file: File) => new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(reader.result as string));
+    reader.readAsDataURL(file);
+  });
 
   const onSelectFile = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'step', index?: number) => {
     if (e.target.files?.[0]) {
@@ -120,78 +119,60 @@ export default function CreateRecipe() {
       setImageToCrop(imageDataUrl);
       setCropTarget({ type, index });
       setCropModalOpen(true);
-      e.target.value = ''; // Reset so same file can be selected again
+      e.target.value = '';
     }
+  };
+
+  const onEditImage = (url: string, type: 'main' | 'step', index?: number) => {
+    setImageToCrop(url);
+    setCropTarget({ type, index });
+    setCropModalOpen(true);
   };
 
   const handleCropComplete = async (croppedBlob: Blob) => {
     try {
       setUploading(true);
-      const fileExt = 'jpeg';
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${Math.random()}.jpeg`;
       const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
-
-      const { error: uploadError } = await supabase.storage
-        .from('recipes')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
+      await supabase.storage.from('recipes').upload(fileName, file);
       const { data } = supabase.storage.from('recipes').getPublicUrl(fileName);
       const url = data.publicUrl;
-
-      if (cropTarget?.type === 'main') {
-        setFormData(prev => ({ ...prev, image_url: url }));
-      } else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') {
-        updateStep(cropTarget.index, { image_url: url });
-      }
-
+      if (cropTarget?.type === 'main') setFormData(prev => ({ ...prev, image_url: url }));
+      else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') updateStep(cropTarget.index, { image_url: url });
       setCropModalOpen(false);
-      setImageToCrop(null);
-      setCropTarget(null);
-    } catch (error) {
-      alert('Upload failed: ' + (error as Error).message);
-    } finally {
-      setUploading(false);
-    }
+    } catch (error) { alert('Upload failed: ' + (error as Error).message); }
+    finally { setUploading(false); }
   };
+
   useEffect(() => {
     async function loadRecipe() {
       if (isEditing && id) {
         try {
-          const { data: recipe, error } = await supabase
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+          let query = supabase
             .from('recipes')
-            .select(`
-              *,
-              recipe_ingredients(
-                amount_in_grams,
-                unit,
-                ingredient:ingredients(name)
-              ),
-              recipe_tags(
-                tags(name)
-              )
-            `)
-            .eq('id', id)
-            .single();
+            .select('*, recipe_ingredients(amount_in_grams, unit, group_name, ingredient:ingredients(name)), recipe_tags(tags(name))');
 
+          if (isUuid) {
+            query = query.eq('id', id);
+          } else {
+            query = query.eq('slug', id);
+          }
+
+          const { data: recipe, error } = await query.single();
           if (error) throw error;
-
           if (recipe) {
-            // Migrating old steps format to new objects if necessary
-            const rawSteps = recipe.steps || [''];
-            const migratedSteps: RecipeStep[] = rawSteps.map((s: any) =>
-              typeof s === 'string' ? { text: s, image_url: '', alignment: 'full' } : s
-            );
-
+            setActualRecipeId(recipe.id);
             setFormData({
               title: recipe.title,
               description: recipe.description || '',
+              notes: recipe.notes || '',
               image_url: recipe.image_url || '',
               video_url: recipe.video_url || '',
               source_url: recipe.source_url || '',
+              alternative_titles: recipe.alternative_titles || '',
               category_id: recipe.category_id || 0,
-              steps: migratedSteps,
+              steps: recipe.steps.map((s: any) => typeof s === 'string' ? { text: s, image_url: '', alignment: 'full' } : s),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
               tags: recipe.recipe_tags?.map((rt: any) => `#${rt.tags?.name}`).join(' ') || '',
@@ -205,7 +186,6 @@ export default function CreateRecipe() {
                 carbs: (recipe.nutrition?.carbs || 0).toString()
               }
             });
-
             setIngredients(recipe.recipe_ingredients?.map((i: any) => ({
               name: i.ingredient?.name || '',
               amount: i.amount_in_grams.toString(),
@@ -213,98 +193,54 @@ export default function CreateRecipe() {
               group_name: i.group_name || 'Ingredients'
             })) || [{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
           }
-        } catch (error) {
-          console.error('Error loading recipe:', error);
-          alert('Failed to load recipe');
-        }
+        } catch (error) { console.error(error); alert('Failed to load recipe'); }
       }
     }
-
     loadRecipe();
-  }, [id, isEditing]);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate('/auth');
-    });
-  }, [navigate]);
-
-  // Pre-fill category or title from URL parameter
-  useEffect(() => {
-    if (!isEditing) {
-      const categoryParam = searchParams.get('category');
-      if (categoryParam) {
-        const categoryId = parseInt(categoryParam, 10);
-        if (!isNaN(categoryId)) {
-          setFormData(prev => ({ ...prev, category_id: categoryId }));
-        }
-      }
-
-      const titleParam = searchParams.get('title');
-      if (titleParam) {
-        setFormData(prev => ({ ...prev, title: titleParam }));
-      }
+    const params = new URLSearchParams(location.search);
+    const urlTitle = params.get('title');
+    if (urlTitle && !isEditing && !formData.title) {
+      setFormData(prev => ({ ...prev, title: urlTitle }));
     }
-  }, [searchParams, isEditing]);
+  }, [id, isEditing, location.search]);
 
   const handleFileUpload = async (file: File) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('recipes')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from('recipes').getPublicUrl(filePath);
+    const fileName = `${Math.random()}.${file.name.split('.').pop()}`;
+    await supabase.storage.from('recipes').upload(fileName, file);
+    const { data } = supabase.storage.from('recipes').getPublicUrl(fileName);
     return data.publicUrl;
   };
-
 
   const handleGalleryAdd = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!event.target.files) return;
-      const newFiles = Array.from(event.target.files);
-      const newUrls: GalleryItem[] = [];
-
-      for (const file of newFiles) {
+      const urls: GalleryItem[] = [];
+      for (const file of Array.from(event.target.files)) {
         const url = await handleFileUpload(file);
-        newUrls.push({ url });
+        urls.push({ url });
       }
-
-      setFormData({ ...formData, gallery_urls: [...formData.gallery_urls, ...newUrls] });
-    } catch (error) {
-      alert((error as Error).message);
-    } finally {
-      setUploading(false);
-    }
+      setFormData(prev => ({ ...prev, gallery_urls: [...prev.gallery_urls, ...urls] }));
+    } catch (error) { alert((error as Error).message); }
+    finally { setUploading(false); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       setUploading(true);
-
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('You must be logged in');
-        navigate('/auth');
-        return;
-      }
-
+      if (!session) { navigate('/auth'); return; }
       const prep = parseInt(formData.prep_time) || 0;
       const cook = parseInt(formData.cook_time) || 0;
-
       const recipeData = {
         title: formData.title,
         description: formData.description,
+        notes: formData.notes,
         image_url: formData.image_url || null,
         video_url: formData.video_url || null,
         source_url: formData.source_url || null,
+        alternative_titles: formData.alternative_titles || null,
         gallery_urls: formData.gallery_urls,
         category_id: formData.category_id || null,
         steps: formData.steps.filter((s: RecipeStep) => s.text.trim() !== ''),
@@ -320,761 +256,424 @@ export default function CreateRecipe() {
           carbs: parseInt(formData.nutrition.carbs) || 0
         },
         rating: formData.rating,
+        slug: generateSlug(formData.title),
       };
-
-      let recipeId: string;
-
+      let recipeIdForIngredients: string;
       if (isEditing) {
-        const { error } = await supabase.from('recipes').update(recipeData).eq('id', id);
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id!);
+        let query = supabase.from('recipes').update(recipeData);
+        if (isUuid) {
+          query = query.eq('id', id);
+        } else {
+          query = query.eq('slug', id);
+        }
+        const { error } = await query;
         if (error) throw error;
-        recipeId = id!;
+        recipeIdForIngredients = actualRecipeId || id!;
       } else {
         const { data, error } = await supabase.from('recipes').insert([recipeData]).select().single();
         if (error) throw error;
-        recipeId = data.id;
-
-        // Automatically link this new recipe to any custom entries in the meal planner with the same title
-        try {
-          await supabase
-            .from('meal_planner')
-            .update({
-              recipe_id: recipeId,
-              custom_title: null
-            })
-            .eq('user_id', session.user.id)
-            .ilike('custom_title', recipeData.title);
-
-          await refreshMealPlan();
-        } catch (plannerError) {
-          console.error('Error auto-linking to meal planner:', plannerError);
-          // Don't fail the whole recipe creation if this optional step fails
-        }
+        recipeIdForIngredients = data.id;
       }
-
-      // Sync Ingredients
       const currentIngredients = ingredients.filter(ing => ing.name.trim() !== '');
-      if (isEditing) {
-        await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeId);
-      }
-
+      if (isEditing) await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeIdForIngredients);
       for (const ing of currentIngredients) {
         let { data: existingIng } = await supabase.from('ingredients').select('id').eq('name', ing.name).single();
         let ingredientId: number;
         if (!existingIng) {
-          const { data: newIng, error } = await supabase.from('ingredients').insert([{ name: ing.name }]).select().single();
-          if (error) throw error;
+          const { data: newIng } = await supabase.from('ingredients').insert([{ name: ing.name }]).select().single();
           ingredientId = newIng.id;
-        } else {
-          ingredientId = existingIng.id;
-        }
+        } else ingredientId = existingIng.id;
         await supabase.from('recipe_ingredients').insert([{
-          recipe_id: recipeId,
+          recipe_id: recipeIdForIngredients,
           ingredient_id: ingredientId,
           amount_in_grams: parseFloat(ing.amount) || 0,
           unit: ing.unit || 'g',
           group_name: ing.group_name || 'Ingredients'
         }]);
       }
-
-      // Sync Tags
-      const tagsList = formData.tags.split(/\s+/).filter(t => t.startsWith('#')).map(t => t.toLowerCase());
-      if (isEditing) await supabase.from('recipe_tags').delete().eq('recipe_id', recipeId);
-      for (const tagName of tagsList) {
-        const cleanTagName = tagName.substring(1);
-        if (!cleanTagName) continue;
-        let { data: tag } = await supabase.from('tags').select('id').eq('name', cleanTagName).single();
-        if (!tag) {
-          const { data: newTag, error: tagErr } = await supabase.from('tags').insert([{ name: cleanTagName }]).select().single();
-          if (tagErr) throw tagErr;
-          tag = newTag;
-        }
-        if (tag) await supabase.from('recipe_tags').insert([{ recipe_id: recipeId, tag_id: tag.id }]);
-      }
-
       alert(isEditing ? 'Recipe updated!' : 'Recipe published!');
-      navigate(isEditing ? `/recipe/${id}` : '/');
-
-    } catch (error) {
-      console.error('Error saving recipe:', error);
-      alert('Failed to save recipe: ' + (error as Error).message);
-    } finally {
-      setUploading(false);
-    }
+      navigate(isEditing ? `/recipe/${recipeData.slug}` : `/recipe/${recipeData.slug}`);
+    } catch (error) { alert('Failed to save recipe: ' + (error as Error).message); }
+    finally { setUploading(false); }
   };
 
-  const handleDelete = async () => {
-    if (!id || !confirm('Are you sure you want to delete this recipe?')) return;
-    try {
-      setUploading(true);
-      const { error } = await supabase.from('recipes').delete().eq('id', id);
-      if (error) throw error;
-      navigate('/');
-    } catch (error) {
-      alert('Delete failed');
-    } finally {
-      setUploading(false);
-    }
-  };
 
-  const addStep = () => {
-    setFormData((prev: any) => ({ ...prev, steps: [...prev.steps, { text: '', image_url: '', alignment: 'full' }] }));
-    setTimeout(() => {
-      const lastIndex = formData.steps.length;
-      stepRefs.current[lastIndex]?.focus();
-    }, 0);
-  };
+  const addStep = () => setFormData(prev => ({ ...prev, steps: [...prev.steps, { text: '', image_url: '', alignment: 'full' }] }));
   const updateStep = (idx: number, updates: Partial<RecipeStep>) => {
     const newSteps = [...formData.steps];
     newSteps[idx] = { ...newSteps[idx], ...updates };
-    setFormData({ ...formData, steps: newSteps });
+    setFormData(prev => ({ ...prev, steps: newSteps }));
   };
-  const removeStep = (idx: number) => setFormData({ ...formData, steps: formData.steps.filter((_, i) => i !== idx) });
+  const removeStep = (idx: number) => setFormData(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
 
-  const addIngredient = (idx?: number) => {
-    const newIng = { name: '', amount: '', unit: 'g', group_name: idx !== undefined ? ingredients[idx].group_name : (ingredients[ingredients.length - 1]?.group_name || 'Ingredients') };
-    if (idx !== undefined) {
-      const next = [...ingredients];
-      next.splice(idx + 1, 0, newIng);
-      setIngredients(next);
-    } else {
-      setIngredients((prev: any) => [...prev, newIng]);
-    }
-    setTimeout(() => {
-      const targetIdx = idx !== undefined ? idx + 1 : ingredients.length;
-      ingredientRefs.current[targetIdx]?.focus();
-    }, 0);
-  };
-
-  const addIngredientGroup = () => {
-    setIngredients((prev: any) => [...prev, { name: '', amount: '', unit: 'g', group_name: 'New Group', is_special_header: true }]);
-  };
   const updateIngredient = (idx: number, field: string, val: string) => {
-    const newIngredients = [...ingredients];
+    const next = [...ingredients];
+    let finalVal = val;
+    if (field === 'unit' && UNIT_MAPPING[val.trim().toLowerCase()]) finalVal = UNIT_MAPPING[val.trim().toLowerCase()];
+    if (field === 'amount') finalVal = val.replace(/[٠-٩]/g, m => ARABIC_DIGITS_MAP[m] || m).replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75');
     // @ts-ignore
-    newIngredients[idx][field] = val;
-    setIngredients(newIngredients);
+    next[idx][field] = finalVal;
+    setIngredients(next);
   };
   const removeIngredient = (idx: number) => setIngredients(ingredients.filter((_, i) => i !== idx));
 
-  const parseBulkSteps = () => {
-    const lines = bulkStepsText.split('\n').filter((line: string) => line.trim() !== '');
-    const newSteps = lines.map((line: string) => ({ text: line.trim(), image_url: '', alignment: 'full' as any }));
-    setFormData((prev: any) => ({ ...prev, steps: [...prev.steps.filter((s: RecipeStep) => s.text !== ''), ...newSteps] }));
-    setBulkStepsText('');
-    setShowBulkSteps(false);
-  };
-
   const parseBulkIngredients = () => {
-    const lines = bulkIngredientsText.split('\n').filter(line => line.trim() !== '');
+    const lines = bulkIngredientsText.split('\n').filter(l => l.trim() !== '');
     let currentGroup = 'Ingredients';
-    const newIngredients: any[] = [];
-
+    const newIngs: any[] = [];
     lines.forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
-        currentGroup = trimmed.replace(/^#\s*|[:]$/g, '');
-        return;
+      let trimmed = line.trim().replace(/[٠-٩]/g, m => ARABIC_DIGITS_MAP[m] || m).replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75');
+      if (trimmed.startsWith('#') || trimmed.endsWith(':')) { currentGroup = trimmed.replace(/^#\s*|[:]$/g, ''); return; }
+      let amount = '1', unit = 'pcs', name = trimmed;
+      const sortedKeys = Object.keys(UNIT_MAPPING).sort((a, b) => b.length - a.length);
+      for (const key of sortedKeys) {
+        if (trimmed.includes(key)) {
+          unit = UNIT_MAPPING[key];
+          const parts = trimmed.split(key);
+          const amtMatch = parts[0].match(/[\d\/\.]+/);
+          if (amtMatch) amount = amtMatch[0];
+          name = parts.slice(1).join(key).trim() || parts[0].replace(amount, '').trim();
+          break;
+        }
       }
-
-      const match = line.match(/^([\d\/\.]+)?\s*(g|ml|pcs|cup|lb|oz|tbsp|tsp)?\s*(.*)$/i);
-      if (match) {
-        newIngredients.push({
-          amount: match[1] || '1',
-          unit: (match[2]?.toLowerCase() as any) || 'pcs',
-          name: match[3]?.trim() || trimmed,
-          group_name: currentGroup
-        });
-      } else {
-        newIngredients.push({ name: trimmed, amount: '1', unit: 'pcs', group_name: currentGroup });
-      }
+      newIngs.push({ amount, unit, name, group_name: currentGroup });
     });
-
-    setIngredients([...ingredients.filter(i => i.name !== ''), ...newIngredients]);
-    setBulkIngredientsText('');
+    setIngredients([...ingredients.filter(i => i.name), ...newIngs]);
     setShowBulkAdd(false);
   };
 
-  const parseBulkNutrition = () => {
-    const lines = bulkNutritionText.split('\n');
-    const newNutrition = { ...formData.nutrition };
-
-    lines.forEach(line => {
-      const lower = line.toLowerCase();
-      const match = line.match(/(\d+)/);
-      if (!match) return;
-      const val = match[1];
-
-      if (lower.includes('cal')) newNutrition.calories = val;
-      else if (lower.includes('prot')) newNutrition.protein = val;
-      else if (lower.includes('fat')) newNutrition.fat = val;
-      else if (lower.includes('carb')) newNutrition.carbs = val;
-    });
-
-    setFormData(prev => ({ ...prev, nutrition: newNutrition }));
-    setBulkNutritionText('');
-    setShowBulkNutrition(false);
-  };
-
-  const createNewCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    try {
-      const { data, error } = await supabase.from('categories').insert([{
-        name: newCategoryName,
-        slug: newCategoryName.toLowerCase().replace(/\s+/g, '-'),
-        image_url: null
-      }]).select().single();
-      if (error) throw error;
-      setFormData({ ...formData, category_id: data.id });
-      setNewCategoryName('');
-      setShowNewCategoryModal(false);
-      window.location.reload();
-    } catch (error) {
-      alert('Failed: ' + (error as Error).message);
-    }
+  const parseBulkSteps = () => {
+    const lines = bulkStepsText.split('\n').filter(l => l.trim() !== '');
+    const newSteps = lines.map(line => ({ text: line.trim(), image_url: '', alignment: 'full' as const }));
+    setFormData(prev => ({
+      ...prev,
+      steps: [...prev.steps.filter(s => s.text), ...newSteps]
+    }));
+    setShowBulkSteps(false);
   };
 
   return (
-    <div className="max-w-[1800px] mx-auto py-8 px-4 sm:px-6">
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl sm:text-5xl font-black text-gray-900 mb-4 tracking-tighter leading-none">{isEditing ? 'Edit Recipe' : 'New Recipe'}</h1>
-        <div className="h-1 w-12 bg-primary-600 mx-auto rounded-full"></div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="pb-20">
-        <div className="grid lg:grid-cols-2 gap-8 items-start">
-
-          {/* LEFT COLUMN */}
-          <div className="space-y-8">
-            {/* Section 1: Basic Info */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 shadow-inner">
-                  <span className="text-xl font-black">1</span>
-                </div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Fundamentals</h2>
-              </div>
-
-              <div className="space-y-8">
-                <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Recipe Identity</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="The name of your masterpiece..."
-                    className="w-full px-6 py-4 rounded-3xl border-gray-100 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-primary-500 text-2xl font-bold transition-all placeholder:text-gray-300"
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Story & Context</label>
-                  <textarea
-                    required
-                    rows={4}
-                    className="w-full px-6 py-4 rounded-3xl border-gray-100 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-primary-500 font-medium transition-all"
-                    placeholder="What inspired this dish? (e.g., 'Passed down from my grandmother...')"
-                    value={formData.description}
-                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Section 2: Media Assets */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-inner">
-                  <span className="text-xl font-black">2</span>
-                </div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Media Assets</h2>
-              </div>
-
-              <div className="space-y-12">
-                {/* Main Image */}
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Primary Cover Photo</label>
-                  <div className="relative aspect-[4/3] max-h-64 rounded-[2rem] bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden group transition-all hover:border-primary-200">
-                    {formData.image_url ? (
-                      <>
-                        <img src={formData.image_url} alt="Preview" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, image_url: '' })}
-                          className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-red-500 transition-colors shadow-lg"
-                        >
-                          <X size={16} />
-                        </button>
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-6 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">
-                          <Upload size={24} className="opacity-30" />
-                        </div>
-                        <p className="font-bold text-sm">Drop image or click</p>
-                        <p className="text-[9px] uppercase font-black tracking-widest mt-1 opacity-50">Landscape preferred</p>
-                      </div>
-                    )}
-                    <input type="file" accept="image/*" onChange={(e) => onSelectFile(e, 'main')} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Or paste image URL..."
-                    className="w-full px-4 py-2 rounded-xl border-gray-100 bg-gray-50 text-xs font-bold focus:bg-white focus:border-primary-500 focus:ring-primary-500"
-                    value={formData.image_url}
-                    onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                  />
-                </div>
-
-                {/* Gallery Section */}
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Photo Gallery (Extended views)</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {formData.gallery_urls.map((item, idx) => (
-                      <div key={idx} className="relative aspect-square rounded-3xl overflow-hidden border border-gray-100 group shadow-sm">
-                        <img src={item.url} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, gallery_urls: formData.gallery_urls.filter((_, i) => i !== idx) })}
-                          className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="relative aspect-square rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden">
-                      <Plus size={24} />
-                      <span className="text-[10px] font-black uppercase mt-1">Add More</span>
-                      <input type="file" multiple accept="image/*" onChange={handleGalleryAdd} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Video & Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-gray-50">
-                  <div className="space-y-4">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Video link (YT/TT/IG)</label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-500"><Play size={20} /></div>
-                      <input
-                        type="text"
-                        placeholder="URL for tutorial..."
-                        className="w-full pl-12 pr-6 py-4 rounded-2xl bg-gray-50 border-gray-100 font-bold focus:bg-white focus:border-primary-500 transition-all"
-                        value={formData.video_url}
-                        onChange={e => setFormData({ ...formData, video_url: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Source</label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><ExternalLink size={20} /></div>
-                      <input
-                        type="text"
-                        placeholder="Credit author..."
-                        className="w-full pl-12 pr-6 py-4 rounded-2xl bg-gray-50 border-gray-100 font-bold focus:bg-white focus:border-primary-500 transition-all"
-                        value={formData.source_url}
-                        onChange={e => setFormData({ ...formData, source_url: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Section 3: Configuration */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-6">
-              <div className="flex items-center gap-4 border-b border-gray-50 pb-6">
-                <div className="w-10 h-10 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-xl">⚙️</div>
-                <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Configuration</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Category</label>
-                  <select
-                    className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-gray-100 font-bold focus:bg-white focus:border-primary-500"
-                    value={formData.category_id}
-                    onChange={e => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                  >
-                    <option value="">Choose Path</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <button type="button" onClick={() => setShowNewCategoryModal(true)} className="text-[10px] font-black uppercase text-primary-600 tracking-widest ml-1 hover:underline">+ New Group</button>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Cook's Rating</label>
-                  <div className="flex gap-2 items-center bg-gray-50 h-[58px] px-6 rounded-2xl border border-gray-100">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button key={star} type="button" onClick={() => setFormData({ ...formData, rating: star })} className="transform hover:scale-125 transition-transform">
-                        <Star size={24} className={`${star <= formData.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-4 md:col-span-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Tags (Search terms)</label>
-                  <input
-                    type="text"
-                    placeholder="#vegan #dinner..."
-                    className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-gray-100 font-bold focus:bg-white"
-                    value={formData.tags}
-                    onChange={e => setFormData({ ...formData, tags: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Prep Time</label>
-                  <div className="relative">
-                    <input type="number" className="w-full px-6 py-4 pr-16 rounded-2xl bg-gray-50 border-gray-100 font-bold" value={formData.prep_time} onChange={e => setFormData({ ...formData, prep_time: e.target.value })} />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400 uppercase">min</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Cook Time</label>
-                  <div className="relative">
-                    <input type="number" className="w-full px-6 py-4 pr-16 rounded-2xl bg-gray-50 border-gray-100 font-bold" value={formData.cook_time} onChange={e => setFormData({ ...formData, cook_time: e.target.value })} />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400 uppercase">min</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 md:col-span-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest px-1">Servings</label>
-                  <div className="relative">
-                    <input type="number" className="w-full px-6 py-4 pr-16 rounded-2xl bg-gray-50 border-gray-100 font-bold" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm">👥</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
+    <div className="min-h-screen bg-gray-50/30 font-sans">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-6 py-4">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <button onClick={() => navigate(-1)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors text-gray-400"><ArrowLeft size={20} /></button>
+            <div>
+              <h1 className="text-xl font-black gradient-text tracking-tighter leading-none">{isEditing ? 'Edit Recipe' : 'New Recipe'}</h1>
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary-500 mt-1">{formData.title || 'Untitled'}</p>
+            </div>
           </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="space-y-8">
-            {/* Section 5: Ingredients */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-50 pb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-xl shadow-inner">🍏</div>
-                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Ingredients</h3>
-                </div>
-                <div className="flex gap-4">
-                  <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-primary-600">Bulk</button>
-                  <button type="button" onClick={() => addIngredientGroup()} className="text-orange-600 font-black text-[10px] uppercase tracking-widest">+ Section</button>
-                  <button type="button" onClick={() => addIngredient()} className="text-primary-600 font-black text-[10px] uppercase tracking-widest">+ Add</button>
-                </div>
+          <div className="flex items-center gap-8">
+            <div className="hidden md:flex flex-col items-end">
+              <span className="text-[10px] font-black uppercase text-gray-400">Completeness</span>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-24 h-1 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-primary-500 transition-all" style={{ width: `${completeness}%` }}></div></div>
+                <span className="text-xs font-bold">{completeness}%</span>
               </div>
-
-              <AnimatePresence>
-                {showBulkAdd && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-4 overflow-hidden"
-                  >
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Multiple Items (One per line)</label>
-                    <textarea
-                      rows={5}
-                      className="w-full px-5 py-4 rounded-2xl border-none focus:ring-2 focus:ring-primary-500 transition-all text-sm font-mono"
-                      placeholder="For Sauce:&#10;2 cups Milk&#10;300g Flour&#10;&#10;# For Topping:&#10;2 Eggs"
-                      value={bulkIngredientsText}
-                      onChange={e => setBulkIngredientsText(e.target.value)}
-                    />
-                    <div className="flex justify-end gap-3">
-                      <button type="button" onClick={() => setShowBulkAdd(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
-                      <button type="button" onClick={parseBulkIngredients} className="px-6 py-2 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Import</button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="space-y-4">
-                {ingredients.map((ing, idx) => {
-                  const showHeader = idx === 0 || ing.group_name !== ingredients[idx - 1].group_name;
-                  return (
-                    <div key={idx} className="space-y-3">
-                      {showHeader && (
-                        <div className="flex items-center gap-3 pt-4 first:pt-0">
-                          <input
-                            type="text"
-                            className="bg-transparent border-b border-gray-100 focus:border-primary-500 text-[10px] font-black uppercase tracking-widest text-gray-400 w-full outline-none py-1"
-                            value={ing.group_name}
-                            onChange={(e) => {
-                              const newGroupName = e.target.value;
-                              const next = [...ingredients];
-                              // Update all ingredients in this group
-                              const originalGroup = ing.group_name;
-                              for (let i = idx; i < next.length; i++) {
-                                if (next[i].group_name === originalGroup || (i === idx)) {
-                                  next[i] = { ...next[i], group_name: newGroupName };
-                                } else {
-                                  break;
-                                }
-                              }
-                              setIngredients(next);
-                            }}
-                            placeholder="Section Title..."
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 group">
-                        <input
-                          ref={el => ingredientRefs.current[idx] = el}
-                          type="text"
-                          placeholder="Item"
-                          className="flex-1 bg-gray-50 border-none rounded-xl text-xs font-bold px-3 py-1.5"
-                          value={ing.name}
-                          onChange={e => updateIngredient(idx, 'name', e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))}
-                        />
-                        <input type="text" placeholder="Q" className="w-12 bg-gray-50 border-none rounded-xl text-xs font-bold text-center" value={ing.amount} onChange={e => updateIngredient(idx, 'amount', e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))} />
-                        <div className="relative">
-                          <input
-                            list="unit-suggestions"
-                            placeholder="Unit"
-                            className="w-20 bg-gray-50 border-none rounded-xl text-[10px] font-black px-2 py-1.5"
-                            value={ing.unit}
-                            onChange={e => updateIngredient(idx, 'unit', e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIngredient(idx))}
-                          />
-                          <datalist id="unit-suggestions">
-                            {COOKING_UNITS.map(u => (
-                              <option key={u.value} value={u.value}>{u.label}</option>
-                            ))}
-                          </datalist>
-                        </div>
-                        <button type="button" onClick={() => removeIngredient(idx)} className="p-1 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"><X size={14} /></button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-            {/* Section 4: Advanced Instructions */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 shadow-inner">
-                    <span className="text-xl font-black">4</span>
-                  </div>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Instructions</h2>
-                </div>
-                <div className="flex gap-4">
-                  <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-primary-600">Bulk</button>
-                  <button type="button" onClick={addStep} className="px-4 py-2 bg-primary-50 text-primary-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-100 transition-all">+ Add Step</button>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {showBulkSteps && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-4 overflow-hidden"
-                  >
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Describe steps (One per line)</label>
-                    <textarea
-                      rows={5}
-                      className="w-full px-5 py-4 rounded-2xl border-none focus:ring-2 focus:ring-primary-500 transition-all text-sm"
-                      placeholder="First, boil the water...&#10;Then add salt..."
-                      value={bulkStepsText}
-                      onChange={e => setBulkStepsText(e.target.value)}
-                    />
-                    <div className="flex justify-end gap-3">
-                      <button type="button" onClick={() => setShowBulkSteps(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
-                      <button type="button" onClick={parseBulkSteps} className="px-6 py-2 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Import</button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="space-y-12">
-                {formData.steps.map((step, idx) => (
-                  <div key={idx} className="relative p-6 rounded-[2rem] bg-gray-50 border border-gray-100 group transition-all hover:bg-white hover:shadow-lg">
-                    <div className="absolute -left-4 top-6 w-10 h-10 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-lg shadow-xl">{idx + 1}</div>
-
-                    <div className="flex flex-col md:flex-row gap-8 items-start">
-                      <div className="flex-1 w-full space-y-6">
-                        <textarea
-                          ref={el => stepRefs.current[idx] = el}
-                          required
-                          className="w-full bg-transparent border-none focus:ring-0 text-xl font-bold p-0 min-h-[100px] placeholder:text-gray-200"
-                          placeholder={`Explain step ${idx + 1} in detail...`}
-                          value={step.text}
-                          onChange={e => updateStep(idx, { text: e.target.value })}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), addStep())}
-                        />
-
-                        <div className="flex items-center gap-4 pt-4 border-t border-gray-200/50">
-                          <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-100">
-                            {[
-                              { val: 'left', icon: <AlignLeft size={16} /> },
-                              { val: 'center', icon: <AlignCenter size={16} /> },
-                              { val: 'right', icon: <AlignRight size={16} /> },
-                              { val: 'full', icon: <Maximize size={16} /> }
-                            ].map(align => (
-                              <button
-                                key={align.val}
-                                type="button"
-                                onClick={() => updateStep(idx, { alignment: align.val as any })}
-                                className={`p-2 rounded-lg transition-all ${step.alignment === align.val ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-400 hover:text-gray-900'}`}
-                              >
-                                {align.icon}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="relative w-32 aspect-square rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex-shrink-0 cursor-pointer overflow-hidden group/img hover:border-primary-200 transition-colors">
-                        {step.image_url ? (
-                          <>
-                            <img src={step.image_url} className="w-full h-full object-cover" />
-                            <button type="button" onClick={() => updateStep(idx, { image_url: '' })} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center font-black text-[10px] uppercase">Remove</button>
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={16} className="text-gray-300" />
-                            <span className="text-[8px] font-black text-gray-400 mt-1 uppercase">Step Photo</span>
-                            <input type="file" accept="image/*" onChange={(e) => onSelectFile(e, 'step', idx)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeStep(idx)}
-                      className="absolute -right-3 -top-3 w-10 h-10 bg-white text-gray-400 hover:text-red-500 rounded-full shadow-lg flex items-center justify-center transition-all border border-gray-50 z-10"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Section 6: Nutrition Facts */}
-            <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-50 pb-6">
-                <div className="flex items-center gap-4">
-                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Nutrition Facts</h3>
-                </div>
-                <div className="flex gap-4 items-center">
-                  <button type="button" onClick={() => setShowBulkNutrition(!showBulkNutrition)} className="text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-primary-600">Bulk</button>
-                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">per serving</span>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {showBulkNutrition && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-4 overflow-hidden"
-                  >
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nutrition Details (One per line)</label>
-                    <textarea
-                      rows={4}
-                      className="w-full px-5 py-4 rounded-2xl border-none focus:ring-2 focus:ring-primary-500 transition-all text-sm font-mono"
-                      placeholder="Calories: 350&#10;Protein: 20g&#10;Fat: 12g&#10;Carbs: 45g"
-                      value={bulkNutritionText}
-                      onChange={e => setBulkNutritionText(e.target.value)}
-                    />
-                    <div className="flex justify-end gap-3">
-                      <button type="button" onClick={() => setShowBulkNutrition(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
-                      <button type="button" onClick={parseBulkNutrition} className="px-6 py-2 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Import</button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <div className="grid grid-cols-2 gap-4">
-                {Object.keys(formData.nutrition).map((key) => (
-                  <div key={key} className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">{key}</label>
-                    <input
-                      type="number"
-                      className="w-full bg-gray-50 border-none rounded-xl text-sm font-bold px-4 py-3"
-                      value={formData.nutrition[key as keyof typeof formData.nutrition]}
-                      onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, [key]: e.target.value } })}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
-      </form>
-
-      {/* Action Bar */}
-      <div className="fixed bottom-6 left-0 right-0 z-50 pointer-events-none px-6">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between pointer-events-auto">
-          <button type="button" onClick={() => navigate(-1)} className="p-5 bg-white rounded-full shadow-2xl border border-gray-100 text-gray-400 hover:text-gray-900 transition-all">
-            <ArrowLeft size={24} />
-          </button>
-
-          <div className="flex gap-3">
-            {isEditing && (
-              <button type="button" onClick={handleDelete} className="p-5 bg-white text-red-200 hover:text-red-500 rounded-full shadow-2xl border border-red-50 transition-all">
-                <Trash2 size={24} />
-              </button>
-            )}
-            <button
-              type="submit"
-              onClick={(e) => { e.preventDefault(); handleSubmit(e); }}
-              disabled={uploading}
-              className="px-8 py-4 bg-gray-900 text-white rounded-full font-black text-lg shadow-2xl shadow-gray-300 hover:bg-primary-600 hover:-translate-y-1 transition-all flex items-center gap-3 disabled:opacity-50 disabled:transform-none"
-            >
-              {uploading ? <Loader2 className="animate-spin" /> : <Plus size={20} />}
-              {isEditing ? 'Update Masterpiece' : 'Publish to Kitchen'}
+            </div>
+            <button onClick={handleSubmit} disabled={uploading} className="px-6 py-3 bg-gray-900 text-white rounded-2xl font-black text-sm shadow-xl hover:bg-primary-600 transition-all flex items-center gap-2">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={16} />} Save
             </button>
           </div>
         </div>
+      </header>
+
+      <div className="max-w-[1600px] mx-auto px-6 py-12 flex flex-col lg:flex-row gap-12">
+        <aside className="hidden lg:block w-64 sticky top-32 h-fit space-y-2">
+          {sections.map(s => (
+            <button key={s.id} onClick={() => { document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setActiveSection(s.id); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all ${activeSection === s.id ? 'bg-white shadow-xl text-gray-900 border border-gray-50' : 'text-gray-400 hover:bg-white/50'}`}>
+              <span className="text-xl">{s.icon}</span><span className="text-sm font-bold">{s.label}</span>
+            </button>
+          ))}
+        </aside>
+
+        <main className="flex-1 w-full pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+
+            {/* COLUMN 1 */}
+            <div className="space-y-4">
+              <section id="fundamentals" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-lg shadow-inner">📝</div><h2 className="text-xl font-black tracking-tighter">Fundamentals</h2></div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">Title</label>
+                    <input required type="text" placeholder="Recipe Name" className="w-full px-6 py-4 rounded-[1.5rem] bg-gray-50 focus:bg-white focus:border-primary-500 border-none text-2xl font-black transition-all tracking-tighter shadow-sm" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">Alternative Titles (comma separated)</label>
+                    <input type="text" placeholder="e.g. My Favorite Pasta, Grandma's Special" className="w-full px-6 py-4 rounded-[1.5rem] bg-gray-50 focus:bg-white text-sm" value={formData.alternative_titles} onChange={e => setFormData({ ...formData, alternative_titles: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 px-1">Description</label>
+                    <textarea required rows={3} className="w-full px-6 py-4 rounded-[1.5rem] bg-gray-50 focus:bg-white text-base" placeholder="The story behind this dish..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                  </div>
+                </div>
+              </section>
+
+              <section id="details" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg shadow-inner">⚙️</div><h2 className="text-xl font-black tracking-tighter">Recipe Details</h2></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Category</label>
+                    <select
+                      className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm"
+                      value={(() => {
+                        const cat = categories.find(c => c.id === formData.category_id);
+                        return cat?.parent_id ? cat.parent_id : formData.category_id;
+                      })()}
+                      onChange={e => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
+                    >
+                      <option value={0}>General</option>
+                      {categories.filter(c => !c.parent_id).map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Sub-Category</label>
+                    <select
+                      className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm"
+                      value={(() => {
+                        const cat = categories.find(c => c.id === formData.category_id);
+                        return cat?.parent_id ? formData.category_id : 0;
+                      })()}
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        if (val === 0) {
+                          // REVERT to parent category
+                          const cat = categories.find(c => c.id === formData.category_id);
+                          const parentId = cat?.parent_id ? cat.parent_id : formData.category_id;
+                          setFormData({ ...formData, category_id: parentId });
+                        } else {
+                          setFormData({ ...formData, category_id: val });
+                        }
+                      }}
+                      disabled={(() => {
+                        const cat = categories.find(c => c.id === formData.category_id);
+                        const parentId = cat?.parent_id ? cat.parent_id : formData.category_id;
+                        return !parentId || categories.filter(c => c.parent_id === parentId).length === 0;
+                      })()}
+                    >
+                      <option value={0}>None</option>
+                      {categories.filter(c => {
+                        const cat = categories.find(x => x.id === formData.category_id);
+                        const parentId = cat?.parent_id ? cat.parent_id : formData.category_id;
+                        return c.parent_id === parentId;
+                      }).map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 col-span-2"><label className="text-[10px] font-black uppercase text-gray-400">Rating</label><div className="flex items-center gap-2 h-10 px-4 bg-gray-50/50 rounded-lg">{[1, 2, 3, 4, 5].map(s => <button key={s} type="button" onClick={() => setFormData({ ...formData, rating: s })}><Star size={16} className={s <= formData.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} /></button>)}</div></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Servings</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Prep (Min)</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.prep_time} onChange={e => setFormData({ ...formData, prep_time: e.target.value })} /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Cook (Min)</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.cook_time} onChange={e => setFormData({ ...formData, cook_time: e.target.value })} /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Tags</label><input type="text" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" placeholder="#healthy" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} /></div>
+                </div>
+              </section>
+
+              <section id="ingredients" className="section-card space-y-4">
+                <div className="flex items-center justify-between group">
+                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: 'g', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => {
+                      const lastGroup = ingredients.length > 0 ? ingredients[ingredients.length - 1].group_name : 'Ingredients';
+                      setIngredients([...ingredients, { name: '', amount: '', unit: 'g', group_name: lastGroup }]);
+                    }} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
+                  </div>
+                </div>
+                {showBulkAdd && (
+                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3 shadow-inner">
+                    <textarea rows={4} className="w-full p-4 rounded-xl text-sm bg-white" placeholder="2 cups Milk&#10;1kg Flour..." value={bulkIngredientsText} onChange={e => setBulkIngredientsText(e.target.value)} />
+                    <button type="button" onClick={parseBulkIngredients} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Items</button>
+                  </div>
+                )}
+                <div className="space-y-4">
+                  {ingredients.reduce((acc: any[], ing, i) => {
+                    const prevIng = ingredients[i - 1];
+                    if (!prevIng || prevIng.group_name !== ing.group_name) {
+                      acc.push(
+                        <div key={`group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
+                            const next = [...ingredients];
+                            for (let j = i; j < next.length; j++) {
+                              if (next[j].group_name === ing.group_name) next[j].group_name = e.target.value;
+                              else break;
+                            }
+                            setIngredients(next);
+                          }} />
+                          <button type="button" onClick={() => {
+                            const next = [...ingredients];
+                            next.splice(i + 1, 0, { name: '', amount: '', unit: 'g', group_name: ing.group_name });
+                            setIngredients(next);
+                          }} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
+                        </div>
+                      );
+                    }
+                    acc.push(
+                      <div key={i} className="flex gap-2 group items-center">
+                        <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} />
+                        <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
+                        <input type="text" placeholder="Unit" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+                        <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"><X size={16} /></button>
+                      </div>
+                    );
+                    return acc;
+                  }, [])}
+
+                </div>
+              </section>
+            </div>
+
+            {/* COLUMN 2 */}
+            <div className="space-y-4">
+              <section id="nutrition" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-lg shadow-inner">📊</div><h2 className="text-xl font-black tracking-tighter">Nutrition Facts</h2></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Calories (kcal)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.calories} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, calories: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Protein (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.protein} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, protein: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Fat (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.fat} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, fat: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Carbs (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.carbs} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, carbs: e.target.value } })} />
+                  </div>
+                </div>
+              </section>
+
+              <section id="media" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg shadow-inner">🖼️</div><h2 className="text-xl font-black tracking-tighter">Media Assets</h2></div>
+                <div className="flex flex-col gap-4">
+                  <div className="space-y-2">
+                    <div className="h-32 rounded-[1.5rem] bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden relative group transition-all hover:bg-gray-100/50">
+                      {formData.image_url ? (
+                        <>
+                          <img src={formData.image_url} className="w-full h-full object-cover" />
+                          <div className="absolute top-4 right-4 flex gap-2">
+                            <button type="button" onClick={() => onEditImage(formData.image_url, 'main')} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-primary-500 transition-all"><Maximize2 size={20} /></button>
+                            <button type="button" onClick={() => setFormData({ ...formData, image_url: '' })} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center cursor-pointer">
+                          <div className="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center mb-3"><Upload className="text-primary-500 w-5 h-5" /></div>
+                          <p className="font-black text-xs">Cover Image</p><input type="file" accept="image/*" onChange={e => onSelectFile(e, 'main')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Image URL Input */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 px-1">Or Paste Image URL</label>
+                      <input type="text" placeholder="https://..." className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 px-1">Video URL</label>
+                      <input type="text" placeholder="YouTube/TikTok link" className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.video_url} onChange={e => setFormData({ ...formData, video_url: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 px-1">Source URL</label>
+                      <input type="text" placeholder="Original recipe link" className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.source_url} onChange={e => setFormData({ ...formData, source_url: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Gallery</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {formData.gallery_urls.map((g, i) => (
+                        <div key={i} className="aspect-square rounded-xl overflow-hidden relative group border border-gray-100">
+                          <img src={g.url} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => setFormData(p => ({ ...p, gallery_urls: p.gallery_urls.filter((_, idx) => idx !== i) }))} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
+                        </div>
+                      ))}
+                      <div className="aspect-square rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 relative hover:bg-gray-100 cursor-pointer overflow-hidden"><Plus size={16} /><input type="file" multiple accept="image/*" onChange={handleGalleryAdd} className="absolute inset-0 opacity-0 cursor-pointer" /></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="instructions" className="section-card space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg shadow-inner">👨‍🍳</div><h2 className="text-xl font-black tracking-tighter">Cooking Steps</h2></div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk</button>
+                    <button type="button" onClick={addStep} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Add step</button>
+                  </div>
+                </div>
+                {showBulkSteps && (
+                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3 shadow-inner">
+                    <textarea rows={6} className="w-full p-4 rounded-xl text-sm bg-white" placeholder="Preheat oven...&#10;Mix dry ingredients..." value={bulkStepsText} onChange={e => setBulkStepsText(e.target.value)} />
+                    <button type="button" onClick={parseBulkSteps} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Steps</button>
+                  </div>
+                )}
+                <div className="space-y-4">
+                  {formData.steps.map((s, i) => (
+                    <div key={i} className="relative group p-4 rounded-[1.5rem] bg-gray-50/50 border border-gray-50 transition-all hover:bg-white hover:shadow-xl hover:shadow-gray-100 flex gap-4 items-start">
+                      <div className="w-6 h-6 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">{i + 1}</div>
+
+                      <div className="flex-1 flex flex-col gap-3">
+                        <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[40px] pt-1" placeholder="Describe the process..." value={s.text} onChange={e => updateStep(i, { text: e.target.value })} />
+
+                        {/* Expandable Image Field */}
+                        <div className="flex items-center gap-3">
+                          {s.image_url ? (
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
+                              <img src={s.image_url} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
+                                <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-1 text-white hover:text-primary-400 transition-colors"><Maximize2 size={12} /></button>
+                                <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-1 text-white hover:text-red-400 transition-colors"><X size={12} /></button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-white border border-dashed border-gray-200 flex items-center justify-center relative overflow-hidden group/img shrink-0 hover:bg-gray-50 cursor-pointer">
+                              <ImageIcon size={16} className="text-gray-300" />
+                              <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                            </div>
+                          )}
+
+                          {/* Optional URL Input */}
+                          <input type="text" placeholder="Or Paste Step Image URL..." className="flex-1 px-3 py-2 rounded-lg bg-white focus:bg-gray-50 text-xs border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                        </div>
+                      </div>
+
+                      <button type="button" onClick={() => removeStep(i)} className="absolute -top-2 -right-2 w-6 h-6 bg-white shadow-lg rounded-full flex items-center justify-center text-gray-300 hover:text-red-500 transition-all"><X size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section id="notes" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center text-lg shadow-inner">📌</div><h2 className="text-xl font-black tracking-tighter">Notes</h2></div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 px-1">Additional Tips or Info</label>
+                  <textarea rows={4} className="w-full px-5 py-3 rounded-[1rem] bg-gray-50 focus:bg-white text-sm" placeholder="Any extra tips, variations or storage instructions..." value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </main>
       </div>
 
-      {/* Modern Category Modal */}
       <AnimatePresence>
-        {showNewCategoryModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-6">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl border border-gray-100 relative">
-              <button onClick={() => setShowNewCategoryModal(false)} className="absolute top-8 right-8 text-gray-300 hover:text-gray-900"><X size={24} /></button>
-              <h3 className="text-3xl font-black text-gray-900 tracking-tighter mb-8 leading-none">New Creation Path</h3>
-              <input
-                autoFocus
-                type="text"
-                placeholder="e.g., Healthy Morning"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full bg-gray-50 border-none rounded-2xl p-4 text-xl font-bold mb-8 placeholder:text-gray-200"
-                onKeyPress={(e) => e.key === 'Enter' && createNewCategory()}
-              />
-              <button type="button" onClick={createNewCategory} className="w-full py-5 bg-primary-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-primary-100 hover:bg-primary-700 transition-all">Create Path</button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {cropModalOpen && imageToCrop && (
-          <ImageCropper
-            imageSrc={imageToCrop}
-            onCropComplete={handleCropComplete}
-            onCancel={() => {
-              setCropModalOpen(false);
-              setImageToCrop(null);
-              setCropTarget(null);
-            }}
-            aspectRatio={cropTarget?.type === 'main' ? 4 / 3 : 1}
-          />
-        )}
+        {cropModalOpen && imageToCrop && <ImageCropper imageSrc={imageToCrop} onCropComplete={handleCropComplete} onCancel={() => setCropModalOpen(false)} aspectRatio={cropTarget?.type === 'main' ? 4 / 3 : 1} />}
       </AnimatePresence>
     </div>
   );

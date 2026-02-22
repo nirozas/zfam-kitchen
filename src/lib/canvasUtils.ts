@@ -32,7 +32,8 @@ export default async function getCroppedImg(
     imageSrc: string,
     pixelCrop: { x: number; y: number; width: number; height: number },
     rotation = 0,
-    flip = { horizontal: false, vertical: false }
+    flip = { horizontal: false, vertical: false },
+    backgroundColor = 'transparent'
 ): Promise<Blob | null> {
     const image = await createImage(imageSrc)
     const canvas = document.createElement('canvas')
@@ -64,23 +65,33 @@ export default async function getCroppedImg(
     // draw image
     ctx.drawImage(image, 0, 0)
 
-    const data = ctx.getImageData(
+    // Set canvas size to match the cropping area
+    const finalCanvas = document.createElement('canvas')
+    finalCanvas.width = pixelCrop.width
+    finalCanvas.height = pixelCrop.height
+    const finalCtx = finalCanvas.getContext('2d')
+    if (!finalCtx) return null
+
+    // Fill with background color
+    finalCtx.fillStyle = backgroundColor
+    finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height)
+
+    // Draw the rotated/scaled image from the first canvas onto the final canvas
+    finalCtx.drawImage(
+        canvas,
         pixelCrop.x,
         pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
         pixelCrop.width,
         pixelCrop.height
     )
 
-    // set canvas width to final desired crop size - this will clear existing context
-    canvas.width = pixelCrop.width
-    canvas.height = pixelCrop.height
-
-    // paste generated rotate image at the top left corner
-    ctx.putImageData(data, 0, 0)
-
     // As a blob
     return new Promise((resolve) => {
-        canvas.toBlob((file) => {
+        finalCanvas.toBlob((file) => {
             resolve(file)
         }, 'image/jpeg')
     })

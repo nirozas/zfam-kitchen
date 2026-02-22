@@ -42,6 +42,8 @@ export interface Database {
                     slug: string
                     image_url: string | null
                     created_at: string | null
+                    order_index: number | null
+                    parent_id: number | null
                 }
                 Insert: {
                     id?: number
@@ -49,6 +51,8 @@ export interface Database {
                     slug: string
                     image_url?: string | null
                     created_at?: string | null
+                    order_index?: number | null
+                    parent_id?: number | null
                 }
                 Update: {
                     id?: number
@@ -56,6 +60,8 @@ export interface Database {
                     slug?: string
                     image_url?: string | null
                     created_at?: string | null
+                    order_index?: number | null
+                    parent_id?: number | null
                 }
             }
             recipes: {
@@ -64,6 +70,7 @@ export interface Database {
                     author_id: string | null
                     category_id: number | null
                     title: string
+                    slug: string
                     image_url: string | null
                     video_url: string | null
                     source_url: string | null
@@ -73,34 +80,48 @@ export interface Database {
                     created_at: string | null
                     updated_at: string | null
                     rating: number | null
+                    notes: string | null
+                    gallery_urls: Json[] | null
+                    prep_time_minutes: number | null
+                    cook_time_minutes: number | null
+                    servings: number | null
+                    nutrition: Json | null
+                    alternative_titles: string | null
                 }
                 Insert: {
                     id?: string
                     author_id?: string | null
                     category_id?: number | null
                     title: string
+                    slug: string
                     image_url?: string | null
                     video_url?: string | null
                     time_minutes?: number
                     description?: string | null
                     steps: string[]
-                    created_at?: string | null
-                    updated_at?: string | null
-                    rating?: number | null
+                    alternative_titles?: string | null
                 }
                 Update: {
                     id?: string
                     author_id?: string | null
                     category_id?: number | null
                     title?: string
+                    slug?: string
                     image_url?: string | null
                     video_url?: string | null
                     time_minutes?: number
                     description?: string | null
                     steps?: string[]
+                    alternative_titles?: string | null
                     created_at?: string | null
                     updated_at?: string | null
                     rating?: number | null
+                    notes?: string | null
+                    gallery_urls?: Json[] | null
+                    prep_time_minutes?: number | null
+                    cook_time_minutes?: number | null
+                    servings?: number | null
+                    nutrition?: Json | null
                 }
             }
             ingredients: {

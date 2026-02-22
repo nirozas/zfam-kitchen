@@ -48,7 +48,7 @@ export default function Layout() {
     }, [location.pathname, navigate]);
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 pb-20 sm:pb-0 font-sans">
+        <div className="min-h-screen bg-gray-50 text-gray-900 pb-[calc(5rem+var(--safe-bottom))] sm:pb-0 font-sans pt-[var(--safe-top)]">
             <Navbar />
             <main className="pt-20 min-h-[calc(100vh-64px)]">
                 <Outlet />

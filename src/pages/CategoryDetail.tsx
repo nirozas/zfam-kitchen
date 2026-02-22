@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { useState, useMemo } from 'react';
 
 export default function CategoryDetail() {
-    const { slug } = useParams<{ slug: string }>();
+    const params = useParams();
+    const slug = params['*'] || '';
     const [searchParams, setSearchParams] = useSearchParams();
     const tagQuery = searchParams.get('q') || '';
 
@@ -24,8 +25,14 @@ export default function CategoryDetail() {
 
     // Filter and sort recipes
     const categoryRecipes = useMemo(() => {
+        if (!categoryId) return [];
+
+        // If this category has subcategories, we should include their recipes too!
+        const subCategories = categories.filter(c => c.parent_id === categoryId);
+        const categoryIdsToMatch = [categoryId, ...subCategories.map(c => c.id)];
+
         return recipes.filter(recipe => {
-            const matchesCategory = recipe.category && recipe.category.id === categoryId;
+            const matchesCategory = recipe.category && categoryIdsToMatch.includes(recipe.category.id);
             const matchesTag = !tagQuery || recipe.tags?.some(tag => tag.name.toLowerCase() === tagQuery.toLowerCase());
             const matchesSearch = !localQuery || recipe.title.toLowerCase().includes(localQuery.toLowerCase());
             return matchesCategory && matchesTag && matchesSearch;
@@ -116,7 +123,7 @@ export default function CategoryDetail() {
                                     {categoryRecipes.length} recipes
                                 </span>
 
-                                {/* Hashtags - Moved here */}
+                                {/* Hashtags */}
                                 <div className="flex flex-wrap gap-1.5 ml-2">
                                     {topTags.slice(0, 5).map((tag) => (
                                         <button
@@ -141,6 +148,15 @@ export default function CategoryDetail() {
                                     </button>
                                 )}
                             </div>
+
+                            {/* Back to Parent (if is subcategory) */}
+                            {category?.parent_id && (
+                                <div className="mt-4 flex justify-center md:justify-start border-t border-gray-100 pt-4">
+                                    <Link to={`/category/${categories.find(c => c.id === category.parent_id)?.slug}`} className="text-xs font-black text-gray-500 hover:text-primary-600 uppercase tracking-widest flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 transition-colors">
+                                        <ArrowLeft size={14} /> Back to {categories.find(c => c.id === category.parent_id)?.name}
+                                    </Link>
+                                </div>
+                            )}
                         </div>
 
                         {/* Search and Sort - Moved up and right */}
@@ -193,10 +209,31 @@ export default function CategoryDetail() {
                 </div>
             </div>
 
+            {/* Sub-Categories Grid */}
+            {category && categories.some(c => c.parent_id === category.id) && (
+                <div className="container mx-auto px-4 pt-8 pb-4 max-w-[1800px]">
+                    <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Sub-Categories</h2>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                        {categories.filter(c => c.parent_id === category.id).map(sub => (
+                            <Link key={sub.id} to={`/category/${sub.slug}`} className="group bg-white rounded-3xl p-5 text-center border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner shrink-0 border-2 border-white group-hover:border-primary-100 transition-colors">
+                                    {sub.image_url ? (
+                                        <img src={sub.image_url} alt={sub.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                    ) : (
+                                        <ChefHat className="text-gray-300" size={24} />
+                                    )}
+                                </div>
+                                <span className="text-[11px] font-black text-gray-700 leading-tight uppercase tracking-wider group-hover:text-primary-600 transition-colors">{sub.name}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Recipes Grid */}
-            <div className="container mx-auto px-4 py-12 max-w-[1800px]">
+            <div className="container mx-auto px-4 py-8 max-w-[1800px]">
                 {categoryRecipes.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-8">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-8">
                         {categoryRecipes.map((recipe) => (
                             <RecipeCard key={recipe.id} recipe={recipe} />
                         ))}

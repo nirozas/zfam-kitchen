@@ -9,6 +9,8 @@ interface MealPlannerContextType {
     addCustomMealToDate: (title: string, dateStr: string) => void;
     removeRecipeFromDate: (dateStr: string, index: number) => void;
     assignRecipeToMeal: (mealId: number | string, recipe: Recipe) => Promise<void>;
+    updateMealNote: (dateStr: string, mealIndex: number, note: string) => Promise<void>;
+    toggleMealCompleted: (dateStr: string, mealIndex: number) => Promise<void>;
     saveDailyNote: (dateStr: string, note: string) => Promise<void>;
     refreshMealPlan: () => Promise<void>;
     loading: boolean;
@@ -54,7 +56,9 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                     grouped[date].push({
                         id: item.id,
                         title: item.custom_title,
-                        isCustom: true
+                        isCustom: true,
+                        note: item.note || '',
+                        completed: item.completed || false
                     });
                 } else if (item.recipes) {
                     const rawRecipe = item.recipes;
@@ -70,10 +74,12 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                     };
 
                     grouped[date].push({
-                        id: recipe.id,
+                        id: item.id, // Consistent use of meal_planner.id
                         title: recipe.title,
                         image_url: recipe.image_url || undefined,
-                        recipe: recipe
+                        recipe: recipe,
+                        note: item.note || '',
+                        completed: item.completed || false
                     });
                 }
             });
@@ -108,27 +114,33 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Optimistic update
-        setPlannedMeals(prev => ({
-            ...prev,
-            [dateStr]: [...(prev[dateStr] || []), {
-                id: recipe.id,
-                title: recipe.title,
-                image_url: recipe.image_url || undefined,
-                recipe: recipe
-            }]
-        }));
-
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('meal_planner')
             .insert({
                 user_id: user.id,
                 recipe_id: recipe.id,
                 date: dateStr
-            });
+            })
+            .select()
+            .single();
 
         if (error) {
             console.error('Error saving meal to planner:', error);
+            return;
+        }
+
+        if (data) {
+            setPlannedMeals(prev => ({
+                ...prev,
+                [dateStr]: [...(prev[dateStr] || []), {
+                    id: data.id,
+                    title: recipe.title,
+                    image_url: recipe.image_url || undefined,
+                    recipe: recipe,
+                    note: '',
+                    completed: false
+                }]
+            }));
         }
     };
 
@@ -136,27 +148,32 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Optimistic update
-        const tempId = Date.now();
-        setPlannedMeals(prev => ({
-            ...prev,
-            [dateStr]: [...(prev[dateStr] || []), {
-                id: tempId,
-                title: title,
-                isCustom: true
-            }]
-        }));
-
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('meal_planner')
             .insert({
                 user_id: user.id,
                 custom_title: title,
                 date: dateStr
-            });
+            })
+            .select()
+            .single();
 
         if (error) {
             console.error('Error saving custom meal to planner:', error);
+            return;
+        }
+
+        if (data) {
+            setPlannedMeals(prev => ({
+                ...prev,
+                [dateStr]: [...(prev[dateStr] || []), {
+                    id: data.id,
+                    title: title,
+                    isCustom: true,
+                    note: '',
+                    completed: false
+                }]
+            }));
         }
     };
 
@@ -177,21 +194,10 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         });
 
         // Delete from DB
-        const matchCriteria: any = {
-            user_id: user.id,
-            date: dateStr
-        };
-
-        if (recipeToRemove.isCustom) {
-            matchCriteria.custom_title = recipeToRemove.title;
-        } else {
-            matchCriteria.recipe_id = recipeToRemove.id;
-        }
-
         const { error } = await supabase
             .from('meal_planner')
             .delete()
-            .match(matchCriteria);
+            .eq('id', recipeToRemove.id);
 
         if (error) {
             console.error('Error removing meal from planner:', error);
@@ -210,7 +216,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                 if (idx !== -1) {
                     next[date] = [...next[date]];
                     next[date][idx] = {
-                        id: recipe.id,
+                        ...next[date][idx],
+                        id: mealId,
                         title: recipe.title,
                         image_url: recipe.image_url || undefined,
                         recipe: recipe
@@ -233,6 +240,48 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         if (error) {
             console.error('Error assigning recipe to meal:', error);
         }
+    };
+
+    const updateMealNote = async (dateStr: string, mealIndex: number, note: string) => {
+        const meal = plannedMeals[dateStr][mealIndex];
+        if (!meal) return;
+
+        // Optimistic
+        setPlannedMeals(prev => {
+            const next = { ...prev };
+            next[dateStr] = [...next[dateStr]];
+            next[dateStr][mealIndex] = { ...next[dateStr][mealIndex], note };
+            return next;
+        });
+
+        const { error } = await supabase
+            .from('meal_planner')
+            .update({ note })
+            .eq('id', meal.id);
+
+        if (error) console.error('Error updating meal note:', error);
+    };
+
+    const toggleMealCompleted = async (dateStr: string, mealIndex: number) => {
+        const meal = plannedMeals[dateStr][mealIndex];
+        if (!meal) return;
+
+        const newCompleted = !meal.completed;
+
+        // Optimistic
+        setPlannedMeals(prev => {
+            const next = { ...prev };
+            next[dateStr] = [...next[dateStr]];
+            next[dateStr][mealIndex] = { ...next[dateStr][mealIndex], completed: newCompleted };
+            return next;
+        });
+
+        const { error } = await supabase
+            .from('meal_planner')
+            .update({ completed: newCompleted })
+            .eq('id', meal.id);
+
+        if (error) console.error('Error toggling meal completion:', error);
     };
 
     const saveDailyNote = async (dateStr: string, note: string) => {
@@ -258,7 +307,19 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <MealPlannerContext.Provider value={{ plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, loading, refreshMealPlan: fetchMealPlan }}>
+        <MealPlannerContext.Provider value={{
+            plannedMeals,
+            dailyNotes,
+            addRecipeToDate,
+            addCustomMealToDate,
+            removeRecipeFromDate,
+            assignRecipeToMeal,
+            updateMealNote,
+            toggleMealCompleted,
+            saveDailyNote,
+            loading,
+            refreshMealPlan: fetchMealPlan
+        }}>
             {children}
         </MealPlannerContext.Provider>
     );

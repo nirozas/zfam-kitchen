@@ -68,7 +68,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
             className="group bg-white rounded-3xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_40px_-12px_rgba(233,84,84,0.2)] transition-all duration-500 border border-gray-100 relative"
         >
-            <Link to={`/recipe/${recipe.id}`} className="block">
+            <Link to={`/recipe/${recipe.slug || recipe.id}`} className="block">
                 <div className="aspect-[3/2] overflow-hidden relative bg-gray-100 flex items-center justify-center">
                     {recipe.image_url ? (
                         <img
@@ -89,60 +89,60 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                         </span>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="absolute top-4 right-4 flex flex-col gap-2.5 z-10 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+                    {/* Action Buttons - Always visible on mobile, hover on desktop */}
+                    <div className="absolute top-3 right-3 flex flex-col gap-2 z-10 lg:translate-x-4 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-500">
                         <button
                             onClick={handleToggleLike}
-                            className={`p-2.5 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isLiked
-                                ? 'bg-rose-500 text-white border-rose-400 scale-110'
+                            className={`p-2 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isLiked
+                                ? 'bg-rose-500 text-white border-rose-400'
                                 : 'bg-white/90 text-gray-600 border-white hover:bg-white hover:text-rose-500'
                                 }`}
                             title={isLiked ? "Unlike" : "Like"}
                         >
-                            <Heart size={18} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "animate-pulse" : ""} />
+                            <Heart size={16} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "animate-pulse" : ""} />
                         </button>
                         <button
                             onClick={handleToggleFavorite}
-                            className={`p-2.5 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isFavorited
-                                ? 'bg-amber-500 text-white border-amber-400 scale-110'
+                            className={`p-2 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isFavorited
+                                ? 'bg-amber-500 text-white border-amber-400'
                                 : 'bg-white/90 text-gray-600 border-white hover:bg-white hover:text-amber-500'
                                 }`}
                             title={isFavorited ? "Remove from favorites" : "Favorite this recipe"}
                         >
-                            <Star size={18} fill={isFavorited ? "currentColor" : "none"} />
+                            <Star size={16} fill={isFavorited ? "currentColor" : "none"} />
                         </button>
                         <button
                             onClick={handleAddToCart}
-                            className={`p-2.5 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isInCart
-                                ? 'bg-green-500 text-white border-green-400 scale-110'
+                            className={`p-2 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isInCart
+                                ? 'bg-green-500 text-white border-green-400'
                                 : 'bg-white/90 text-gray-600 border-white hover:bg-white hover:text-primary-600'
                                 }`}
                             title={isInCart ? "Already in cart" : "Add all ingredients to cart"}
                         >
-                            <ShoppingCart size={18} />
+                            <ShoppingCart size={16} />
                         </button>
                     </div>
                 </div>
 
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1 text-yellow-500">
-                                <Star size={14} fill="currentColor" />
-                                <span className="text-sm font-bold text-gray-700">{recipe.rating || 0}</span>
+                                <Star size={12} fill="currentColor" />
+                                <span className="text-xs font-bold text-gray-700">{recipe.rating || 0}</span>
                             </div>
                             <div className="w-px h-3 bg-gray-200" />
                             <div className="flex items-center gap-1 text-rose-500">
-                                <Heart size={14} fill="currentColor" />
-                                <span className="text-sm font-bold text-gray-700">{likesCount}</span>
+                                <Heart size={12} fill="currentColor" />
+                                <span className="text-xs font-bold text-gray-700">{likesCount}</span>
                             </div>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-[10px] text-gray-400 truncate max-w-[80px]">
                             by {recipe.author?.username || 'Chef'}
                         </div>
                     </div>
 
-                    <h3 className="font-bold text-sm md:text-lg text-gray-900 mb-1 line-clamp-none md:line-clamp-1 group-hover:text-primary-600 transition-colors">
+                    <h3 className="font-bold text-sm md:text-lg text-gray-900 mb-1 line-clamp-2 md:line-clamp-1 group-hover:text-primary-600 transition-colors h-10 md:h-7">
                         {recipe.title}
                     </h3>
 
