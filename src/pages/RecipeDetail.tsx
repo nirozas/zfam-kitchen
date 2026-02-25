@@ -154,7 +154,7 @@ export default function RecipeDetail() {
         }
     };
 
-    const getVideoEmbedUrl = (url: string) => {
+    const getVideoData = (url: string) => {
         if (!url || typeof url !== 'string') return null;
         const trimmedUrl = url.trim();
         if (!trimmedUrl) return null;
@@ -162,21 +162,34 @@ export default function RecipeDetail() {
         try {
             // 1. YouTube
             const ytMatch = trimmedUrl.match(/(?:youtu\.be\/|youtube\.com\/|youtube-nocookie\.com\/)(?:embed\/|v\/|watch\?v=|shorts\/|live\/|watch\?.*?v=)?([\w-]{11})/);
-            if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+            if (ytMatch) return { type: 'embed', url: `https://www.youtube.com/embed/${ytMatch[1]}` };
 
             // 2. Vimeo
             const vimeoMatch = trimmedUrl.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-            if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+            if (vimeoMatch) return { type: 'embed', url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
 
             // 3. Instagram
             const igMatch = trimmedUrl.match(/instagram\.com\/(?:p|reels|reel)\/([^/?#&]+)/);
-            if (igMatch) return `https://www.instagram.com/p/${igMatch[1]}/embed`;
+            if (igMatch) return { type: 'embed', url: `https://www.instagram.com/p/${igMatch[1]}/embed` };
 
             // 4. TikTok
             const ttMatch = trimmedUrl.match(/tiktok\.com\/(?:@[\w.-]+\/video\/|v\/|t\/)(\d+)/);
-            if (ttMatch) return `https://www.tiktok.com/embed/v2/${ttMatch[1]}`;
+            if (ttMatch) return { type: 'embed', url: `https://www.tiktok.com/embed/v2/${ttMatch[1]}` };
 
-            if (trimmedUrl.includes('embed')) return trimmedUrl;
+            // 5. Google Drive
+            const gdMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+            if (gdMatch) return { type: 'embed', url: `https://drive.google.com/file/d/${gdMatch[1]}/preview` };
+
+            // 6. Box
+            const boxMatch = trimmedUrl.match(/app\.box\.com\/s\/([\w-]+)/);
+            if (boxMatch) return { type: 'embed', url: `https://app.box.com/embed/s/${boxMatch[1]}` };
+
+            // 7. Direct Video Files
+            if (trimmedUrl.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) {
+                return { type: 'direct', url: trimmedUrl };
+            }
+
+            if (trimmedUrl.includes('embed')) return { type: 'embed', url: trimmedUrl };
         } catch (e) {
             console.error('Error parsing video URL:', e);
         }
@@ -184,7 +197,7 @@ export default function RecipeDetail() {
         return null;
     };
 
-    const videoEmbedUrl = recipe?.video_url ? getVideoEmbedUrl(recipe.video_url) : null;
+    const videoData = recipe?.video_url ? getVideoData(recipe.video_url) : null;
 
     const baseCalories = recipe?.ingredients?.reduce((acc, curr) => {
         return acc + (curr.amount_in_grams * (curr.ingredient.calories_per_100g || 0) / 100);
@@ -654,16 +667,27 @@ export default function RecipeDetail() {
 
                     {/* Main Content Column: Video & Instructions */}
                     <div className="lg:col-span-2 space-y-12">
-                        {videoEmbedUrl && (
+                        {videoData && (
                             <section className="bg-white p-3 rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden group">
                                 <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden relative">
-                                    <iframe
-                                        src={videoEmbedUrl}
-                                        className="w-full h-full"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                        allowFullScreen
-                                        title="Recipe Video"
-                                    />
+                                    {videoData.type === 'embed' ? (
+                                        <iframe
+                                            src={videoData.url}
+                                            className="w-full h-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowFullScreen
+                                            title="Recipe Video"
+                                        />
+                                    ) : (
+                                        <video
+                                            src={videoData.url}
+                                            className="w-full h-full"
+                                            controls
+                                            playsInline
+                                        >
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    )}
                                 </div>
                                 <div className="p-6 flex items-center justify-between">
                                     <div className="flex items-center gap-4">

@@ -586,7 +586,7 @@ export default function CreateRecipe() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 px-1">Video URL</label>
-                      <input type="text" placeholder="YouTube/TikTok link" className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.video_url} onChange={e => setFormData({ ...formData, video_url: e.target.value })} />
+                      <input type="text" placeholder="YouTube, TikTok, Drive, Box, or MP4 link" className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.video_url} onChange={e => setFormData({ ...formData, video_url: e.target.value })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 px-1">Source URL</label>
