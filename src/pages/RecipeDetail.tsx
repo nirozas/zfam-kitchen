@@ -184,8 +184,20 @@ export default function RecipeDetail() {
             const boxMatch = trimmedUrl.match(/app\.box\.com\/s\/([\w-]+)/);
             if (boxMatch) return { type: 'embed', url: `https://app.box.com/embed/s/${boxMatch[1]}` };
 
-            // 7. Direct Video Files
-            if (trimmedUrl.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) {
+            // 7. Dropbox
+            const dbMatch = trimmedUrl.match(/dropbox\.com\/(?:scl\/fi\/|s\/)([\w.-]+)/);
+            if (dbMatch) {
+                let rawUrl = trimmedUrl;
+                if (rawUrl.includes('dl=0')) {
+                    rawUrl = rawUrl.replace('dl=0', 'raw=1');
+                } else if (!rawUrl.includes('raw=1') && !rawUrl.includes('dl=1')) {
+                    rawUrl += (rawUrl.includes('?') ? '&' : '?') + 'raw=1';
+                }
+                return { type: 'direct', url: rawUrl };
+            }
+
+            // 8. Direct Video Files
+            if (trimmedUrl.match(/\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i)) {
                 return { type: 'direct', url: trimmedUrl };
             }
 
