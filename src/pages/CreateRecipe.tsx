@@ -21,6 +21,7 @@ interface GalleryItem {
 
 
 const UNIT_MAPPING: Record<string, string> = {
+  // Arabic
   'كوب': 'cup', 'أكواب': 'cup', 'كاس': 'cup', 'كؤوس': 'cup',
   'ملعقة كبيرة': 'tbsp', 'ملاعق كبيرة': 'tbsp', 'ملعقة صغيرة': 'tsp', 'ملاعق صغيرة': 'tsp',
   'ملعقه كبيره': 'tbsp', 'ملعقه صغيره': 'tsp',
@@ -31,6 +32,7 @@ const UNIT_MAPPING: Record<string, string> = {
   'رشة': 'pinch', 'قرصة': 'pinch',
   'فص': 'clove', 'فصوص': 'clove',
   'ملعقة': 'tbsp',
+  // Hebrew
   'כוס': 'cup', 'כוסות': 'cup',
   'כף': 'tbsp', 'כפות': 'tbsp',
   'כפית': 'tsp', 'כפיות': 'tsp',
@@ -40,7 +42,22 @@ const UNIT_MAPPING: Record<string, string> = {
   'יחידה': 'pcs', 'יחידות': 'pcs',
   'קורט': 'pinch',
   'שן': 'clove', 'שיניים': 'clove',
+  // English
+  'cup': 'cup', 'cups': 'cup',
+  'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
+  'tsp': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
+  'g': 'g', 'gram': 'g', 'grams': 'g',
+  'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
+  'ml': 'ml', 'milliliter': 'ml', 'milliliters': 'ml',
+  'l': 'l', 'liter': 'l', 'liters': 'l',
+  'pcs': 'pcs', 'piece': 'pcs', 'pieces': 'pcs',
+  'pinch': 'pinch', 'pinches': 'pinch',
+  'clove': 'clove', 'cloves': 'clove',
+  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+  'lb': 'lb', 'pound': 'lb', 'pounds': 'lb',
 };
+
+const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb'];
 
 const ARABIC_DIGITS_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
@@ -77,7 +94,7 @@ export default function CreateRecipe() {
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
-  const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
+  const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
   const [activeSection, setActiveSection] = useState('fundamentals');
   const [completeness, setCompleteness] = useState(0);
   const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
@@ -189,9 +206,9 @@ export default function CreateRecipe() {
             setIngredients(recipe.recipe_ingredients?.map((i: any) => ({
               name: i.ingredient?.name || '',
               amount: i.amount_in_grams.toString(),
-              unit: i.unit || 'g',
+              unit: i.unit || '',
               group_name: i.group_name || 'Ingredients'
-            })) || [{ name: '', amount: '', unit: 'g', group_name: 'Ingredients' }]);
+            })) || [{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
           }
         } catch (error) { console.error(error); alert('Failed to load recipe'); }
       }
@@ -288,7 +305,7 @@ export default function CreateRecipe() {
           recipe_id: recipeIdForIngredients,
           ingredient_id: ingredientId,
           amount_in_grams: parseFloat(ing.amount) || 0,
-          unit: ing.unit || 'g',
+          unit: ing.unit || null,
           group_name: ing.group_name || 'Ingredients'
         }]);
       }
@@ -322,21 +339,41 @@ export default function CreateRecipe() {
     const lines = bulkIngredientsText.split('\n').filter(l => l.trim() !== '');
     let currentGroup = 'Ingredients';
     const newIngs: any[] = [];
+    const unitKeys = Object.keys(UNIT_MAPPING).sort((a, b) => b.length - a.length);
+
     lines.forEach(line => {
       let trimmed = line.trim().replace(/[٠-٩]/g, m => ARABIC_DIGITS_MAP[m] || m).replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75');
-      if (trimmed.startsWith('#') || trimmed.endsWith(':')) { currentGroup = trimmed.replace(/^#\s*|[:]$/g, ''); return; }
-      let amount = '1', unit = 'pcs', name = trimmed;
-      const sortedKeys = Object.keys(UNIT_MAPPING).sort((a, b) => b.length - a.length);
-      for (const key of sortedKeys) {
-        if (trimmed.includes(key)) {
+      if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
+        currentGroup = trimmed.replace(/^#\s*|[:]$/g, '');
+        return;
+      }
+
+      let amount = '';
+      let unit = '';
+      let name = trimmed;
+
+      let found = false;
+      for (const key of unitKeys) {
+        if (trimmed.toLowerCase().includes(key.toLowerCase())) {
           unit = UNIT_MAPPING[key];
-          const parts = trimmed.split(key);
+          const parts = trimmed.split(new RegExp(key, 'i'));
           const amtMatch = parts[0].match(/[\d\/\.]+/);
           if (amtMatch) amount = amtMatch[0];
-          name = parts.slice(1).join(key).trim() || parts[0].replace(amount, '').trim();
+          name = parts.slice(1).join(key).trim() || parts[0].replace(amount || '', '').trim();
+          found = true;
           break;
         }
       }
+
+      if (!found) {
+        const amtMatch = trimmed.match(/^[\d\/\.]+/);
+        if (amtMatch) {
+          amount = amtMatch[0];
+          name = trimmed.replace(amount, '').trim();
+          unit = ''; // Default to empty as requested
+        }
+      }
+
       newIngs.push({ amount, unit, name, group_name: currentGroup });
     });
     setIngredients([...ingredients.filter(i => i.name), ...newIngs]);
@@ -345,7 +382,12 @@ export default function CreateRecipe() {
 
   const parseBulkSteps = () => {
     const lines = bulkStepsText.split('\n').filter(l => l.trim() !== '');
-    const newSteps = lines.map(line => ({ text: line.trim(), image_url: '', alignment: 'full' as const }));
+    const newSteps = lines.map(line => {
+      let text = line.trim();
+      // Remove leading numbers/bullets like "1.", "1)", "Step 1:", "-", "*"
+      text = text.replace(/^\s*(\d+[\.\)\-]\s*|step\s*\d+[:\.\s\-]+|[\-\*]\s+)/i, '').trim();
+      return { text, image_url: '', alignment: 'full' as const };
+    });
     setFormData(prev => ({
       ...prev,
       steps: [...prev.steps.filter(s => s.text), ...newSteps]
@@ -482,10 +524,10 @@ export default function CreateRecipe() {
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: 'g', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => {
                       const lastGroup = ingredients.length > 0 ? ingredients[ingredients.length - 1].group_name : 'Ingredients';
-                      setIngredients([...ingredients, { name: '', amount: '', unit: 'g', group_name: lastGroup }]);
+                      setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: lastGroup }]);
                     }} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
                   </div>
                 </div>
@@ -511,7 +553,7 @@ export default function CreateRecipe() {
                           }} />
                           <button type="button" onClick={() => {
                             const next = [...ingredients];
-                            next.splice(i + 1, 0, { name: '', amount: '', unit: 'g', group_name: ing.group_name });
+                            next.splice(i + 1, 0, { name: '', amount: '', unit: '', group_name: ing.group_name });
                             setIngredients(next);
                           }} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
                         </div>
@@ -521,7 +563,7 @@ export default function CreateRecipe() {
                       <div key={i} className="flex gap-2 group items-center">
                         <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} />
                         <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-                        <input type="text" placeholder="Unit" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+                        <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
                         <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"><X size={16} /></button>
                       </div>
                     );
@@ -675,6 +717,12 @@ export default function CreateRecipe() {
       <AnimatePresence>
         {cropModalOpen && imageToCrop && <ImageCropper imageSrc={imageToCrop} onCropComplete={handleCropComplete} onCancel={() => setCropModalOpen(false)} aspectRatio={cropTarget?.type === 'main' ? 4 / 3 : 1} />}
       </AnimatePresence>
+
+      <datalist id="unit-options">
+        {COMMON_UNITS.map(u => (
+          <option key={u} value={u} />
+        ))}
+      </datalist>
     </div>
   );
 }
