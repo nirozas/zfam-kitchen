@@ -3,8 +3,9 @@ import { Clock, Flame, Star, ShoppingCart, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
-import { useFavorites, useLikes, useRecipeLikes } from '@/lib/hooks';
+import { useFavorites, useLikes } from '@/lib/hooks';
 import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react';
 
 interface RecipeCardProps {
     recipe: Recipe;
@@ -14,7 +15,14 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
     const { cartItems, addToCart } = useShoppingCart();
     const { favorites, toggleFavorite } = useFavorites();
     const { likes, toggleLike } = useLikes();
-    const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(recipe.id);
+    const [localLikesCount, setLocalLikesCount] = useState(recipe.likesCount || 0);
+
+    // Sync if parent updates the pre-fetched likesCount
+    useEffect(() => {
+        if (recipe.likesCount !== undefined) {
+            setLocalLikesCount(recipe.likesCount);
+        }
+    }, [recipe.likesCount]);
 
     // Check if any items from this recipe are in the cart
     const isInCart = cartItems.some(item => item.recipeIds.includes(recipe.id));
@@ -31,8 +39,11 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
     const handleToggleLike = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Optimistic UI
+        setLocalLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
+
         await toggleLike(recipe.id);
-        fetchLikesCount();
     };
 
     const handleAddToCart = (e: React.MouseEvent) => {
@@ -62,8 +73,10 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { opacity: 1, y: 0 }
+            }}
             whileHover={{ y: -8, scale: 1.02 }}
             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
             className="group bg-white rounded-3xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_40px_-12px_rgba(233,84,84,0.2)] transition-all duration-500 border border-gray-100 relative"
@@ -74,6 +87,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                         <img
                             src={recipe.image_url}
                             alt={recipe.title}
+                            loading="lazy"
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                     ) : (
@@ -134,7 +148,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                             <div className="w-px h-3 bg-gray-200" />
                             <div className="flex items-center gap-1 text-rose-500">
                                 <Heart size={12} fill="currentColor" />
-                                <span className="text-xs font-bold text-gray-700">{likesCount}</span>
+                                <span className="text-xs font-bold text-gray-700">{localLikesCount}</span>
                             </div>
                         </div>
                         <div className="text-[10px] text-gray-400 truncate max-w-[80px]">

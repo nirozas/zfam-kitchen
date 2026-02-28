@@ -25,6 +25,7 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     category: Category; // Joined category
     author?: Database['public']['Tables']['profiles']['Row']; // Joined author
     rating: number; // User rating from 1 to 5 stars
+    likesCount?: number; // Pre-fetched likes count
 }
 
 export interface RecipeIngredient {
@@ -53,3 +54,26 @@ export type PlannerMeal = {
     note?: string;
     completed?: boolean;
 };
+
+// Album Layouts Types
+export interface LayoutSlot {
+    id: string;
+    x: number; // percentage (0-100)
+    y: number; // percentage (0-100)
+    width: number; // percentage (0-100)
+    height: number; // percentage (0-100)
+    borderRadius?: string; // CSS valid unit e.g., '8px'
+}
+
+export interface AlbumLayoutConfig {
+    name: string;
+    columns: number;
+    gap?: number;
+    slots: LayoutSlot[];
+}
+
+export interface AlbumLayout {
+    id: string;
+    name: string;
+    config: AlbumLayoutConfig; // Mapped from the JSONB column
+}

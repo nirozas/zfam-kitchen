@@ -8,7 +8,8 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
-                display: ['Inter', 'sans-serif'], // Simplified mapping
+                display: ['Playfair Display', 'serif'], // High-contrast serif aesthetic
+                serif: ['Playfair Display', 'serif'],
             },
             colors: {
                 border: "hsl(var(--border))",

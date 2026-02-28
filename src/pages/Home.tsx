@@ -27,7 +27,7 @@ const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', siz
 };
 
 const Index = () => {
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes();
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 9 });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     useEffect(() => {
@@ -106,7 +106,19 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
+                    <motion.div
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={{
+                            hidden: { opacity: 0 },
+                            visible: {
+                                opacity: 1,
+                                transition: { staggerChildren: 0.1 }
+                            }
+                        }}
+                        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6"
+                    >
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
                                 <RecipeCardSkeleton key={i} />
@@ -116,7 +128,7 @@ const Index = () => {
                                 <RecipeCard key={recipe.id} recipe={recipe} />
                             ))
                         )}
-                    </div>
+                    </motion.div>
                 </div>
             </section>
 

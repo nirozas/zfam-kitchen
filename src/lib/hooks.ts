@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { Recipe } from './types';
 
-export function useRecipes() {
+export interface UseRecipesOptions {
+    limit?: number;
+}
+
+export function useRecipes(options?: UseRecipesOptions) {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -12,7 +16,7 @@ export function useRecipes() {
             try {
                 setLoading(true);
 
-                const { data, error } = await supabase
+                let query = supabase
                     .from('recipes')
                     .select(`
                         *,
@@ -22,6 +26,12 @@ export function useRecipes() {
                     `)
                     .order('created_at', { ascending: false });
 
+                if (options?.limit) {
+                    query = query.limit(options.limit);
+                }
+
+                const { data, error } = await query;
+
                 if (error) {
                     console.error('Supabase error:', error);
                     throw error;
@@ -29,8 +39,7 @@ export function useRecipes() {
 
                 console.log('Fetched recipes with relations:', data);
 
-                // Transform data to match Recipe type
-                const transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
+                let transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
                     ...recipe,
                     rating: recipe.rating || 3,
                     category: recipe.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
@@ -42,6 +51,24 @@ export function useRecipes() {
                     })).filter((ing: any) => ing.ingredient) || [],
                 }));
 
+                if (transformedRecipes.length > 0) {
+                    const recipeIds = transformedRecipes.map(r => r.id);
+                    const { data: likesData } = await supabase
+                        .from('likes')
+                        .select('recipe_id')
+                        .in('recipe_id', recipeIds);
+
+                    const likesCounts: Record<string, number> = {};
+                    likesData?.forEach(like => {
+                        likesCounts[like.recipe_id] = (likesCounts[like.recipe_id] || 0) + 1;
+                    });
+
+                    transformedRecipes = transformedRecipes.map(r => ({
+                        ...r,
+                        likesCount: likesCounts[r.id] || 0
+                    }));
+                }
+
                 setRecipes(transformedRecipes);
             } catch (err) {
                 console.error('Full error:', err);
@@ -52,7 +79,7 @@ export function useRecipes() {
         }
 
         fetchRecipes();
-    }, []);
+    }, [options?.limit]);
 
     return { recipes, loading, error };
 }
@@ -94,7 +121,7 @@ export function useRecipe(id: string | undefined) {
                 if (error) throw error;
 
                 if (data) {
-                    const transformedRecipe: Recipe = {
+                    let transformedRecipe: Recipe = {
                         ...data,
                         rating: data.rating || 3,
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
@@ -106,6 +133,14 @@ export function useRecipe(id: string | undefined) {
                             ingredient: ri.ingredients
                         })).filter((ing: any) => ing.ingredient) || [],
                     };
+
+                    const { count: likesCount } = await supabase
+                        .from('likes')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('recipe_id', transformedRecipe.id);
+
+                    transformedRecipe.likesCount = likesCount || 0;
+
                     setRecipe(transformedRecipe);
                 }
             } catch (err) {
@@ -550,4 +585,43 @@ export function useRecipeLikes(recipeId?: string) {
     }, [recipeId]);
 
     return { count, loading, fetchCount };
+}
+
+export function useBatchedRecipeLikes(recipeIds: string[]) {
+    const [counts, setCounts] = useState<Record<string, number>>({});
+    const [loading, setLoading] = useState(true);
+
+    const fetchCounts = async () => {
+        if (!recipeIds || recipeIds.length === 0) {
+            setCounts({});
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('likes')
+                .select('recipe_id')
+                .in('recipe_id', recipeIds);
+
+            if (error) throw error;
+
+            const newCounts: Record<string, number> = {};
+            data?.forEach((like) => {
+                newCounts[like.recipe_id] = (newCounts[like.recipe_id] || 0) + 1;
+            });
+
+            setCounts(newCounts);
+        } catch (err) {
+            console.error('Error fetching batched likes:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCounts();
+    }, [JSON.stringify(recipeIds)]); // depend on stringified array
+
+    return { counts, loading, fetchCounts };
 }
