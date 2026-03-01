@@ -8,9 +8,10 @@ import { supabase } from '@/lib/supabase';
 
 export default function RecipeDetail() {
     const { id } = useParams();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
     const navigate = useNavigate();
     const { recipe, loading } = useRecipe(id);
-    const { reviews, fetchReviews } = useReviews(id);
+    const { reviews, fetchReviews } = useReviews(isUuid ? id : recipe?.id);
     const { likes, toggleLike } = useLikes();
     const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(recipe?.id);
     const { stats: usageStats } = useDetailedRecipeStats(recipe?.id);
@@ -39,10 +40,21 @@ export default function RecipeDetail() {
         setMultiplier(1);
     }, [recipe]);
 
+    const [isAdmin, setIsAdmin] = useState(false);
+
     useEffect(() => {
         const checkUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setCurrentUserId(user?.id || null);
+
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                setIsAdmin(profile?.role === 'admin');
+            }
         };
         checkUser();
     }, []);
@@ -340,11 +352,11 @@ export default function RecipeDetail() {
                     </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10">
-                    <Link to="/" className="absolute top-6 left-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-colors z-10">
+                    <Link to="/" className="absolute top-6 left-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-colors z-30">
                         <ArrowLeft size={24} />
                     </Link>
 
-                    <div className="absolute top-6 right-6 flex items-center gap-2 z-10">
+                    <div className="absolute top-6 right-6 flex items-center gap-2 z-30">
                         <div className="hidden sm:flex items-center gap-2">
                             <Link
                                 to={`/category/${recipe.category?.slug || 'uncategorized'}`}
@@ -354,21 +366,21 @@ export default function RecipeDetail() {
                             </Link>
                         </div>
 
-                        {(isOwner || false) && (
-                            <div className="flex gap-2 print:hidden">
+                        {(isOwner || isAdmin) && (
+                            <div className="flex gap-2 print:hidden relative z-[40]">
                                 <Link
                                     to={`/edit/${recipe ? recipe.id : ''}`}
-                                    className="bg-white/20 backdrop-blur-md p-2 rounded-xl hover:bg-white/30 transition-colors text-white border border-white/10 shadow-lg"
+                                    className="bg-white/30 backdrop-blur-md p-3.5 rounded-2xl hover:bg-white/40 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
                                     title="Edit Recipe"
                                 >
-                                    <Pencil size={20} />
+                                    <Pencil size={24} strokeWidth={2.5} />
                                 </Link>
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="bg-red-500/20 backdrop-blur-md p-2 rounded-xl hover:bg-red-500/40 transition-colors text-white border border-white/10 shadow-lg"
+                                    className="bg-red-500/40 backdrop-blur-md p-3.5 rounded-2xl hover:bg-red-500/60 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
                                     title="Delete Recipe"
                                 >
-                                    <Trash2 size={20} />
+                                    <Trash2 size={24} strokeWidth={2.5} />
                                 </button>
                             </div>
                         )}

@@ -31,7 +31,7 @@
   }
 
   .section-card {
-    @apply bg-white rounded-[2.5rem] p-8 premium-shadow border border-gray-50/50;
+    @apply bg-white rounded-[2rem] p-6 premium-shadow border border-gray-50/50;
   }
 
   .gradient-text {

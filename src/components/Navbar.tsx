@@ -90,8 +90,16 @@ export default function Navbar() {
                                     <ChevronDown size={10} className={clsx("transition-transform duration-300", isLogoDropdownOpen && "rotate-180")} />
                                 </div>
                             </div>
+                            <div className="md:hidden flex flex-col items-start min-w-0">
+                                <span className="font-black text-sm xs:text-base tracking-tight text-gray-900 font-sans whitespace-nowrap truncate max-w-[120px]">
+                                    ZFAM Kitchen
+                                </span>
+                                <div className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-primary-600 leading-none">
+                                    Menu <ChevronDown size={8} className={clsx("transition-transform duration-300", isLogoDropdownOpen && "rotate-180")} />
+                                </div>
+                            </div>
                             <div className="hidden md:flex flex-col items-start">
-                                <span className="font-bold text-base lg:text-xl tracking-tight text-gray-900 font-serif whitespace-nowrap">
+                                <span className="font-bold text-base lg:text-xl tracking-tight text-gray-900 font-sans whitespace-nowrap">
                                     Zoabi Family Kitchen
                                 </span>
                                 <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary-600 leading-none">
@@ -154,7 +162,8 @@ export default function Navbar() {
 
                     <div className={clsx(
                         "flex-1 transition-all duration-300 ease-in-out px-1 sm:px-2",
-                        isSearchExpanded ? "max-w-xl" : "max-w-[32px] sm:max-w-xs md:max-w-md"
+                        isSearchExpanded ? "max-w-xl" : "max-w-[32px] sm:max-w-xs md:max-w-md",
+                        location.pathname === '/search' && !isSearchExpanded && "lg:opacity-0 lg:pointer-events-none"
                     )}>
                         <form
                             onSubmit={(e) => {
@@ -178,7 +187,7 @@ export default function Navbar() {
                                 onBlur={() => setIsSearchExpanded(false)}
                                 className={clsx(
                                     "block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-full leading-5 bg-gray-50/50 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-300 focus:border-primary-500 transition-all duration-300 sm:text-sm",
-                                    !isSearchExpanded && "sm:placeholder:text-gray-400 placeholder:text-transparent"
+                                    !isSearchExpanded && "placeholder:text-gray-400"
                                 )}
                                 placeholder="Search recipes..."
                             />

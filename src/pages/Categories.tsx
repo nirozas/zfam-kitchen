@@ -146,16 +146,18 @@ export default function Categories() {
                                         {isEditMode && (
                                             <div className="absolute top-4 right-4 flex gap-2 z-20">
                                                 <button
-                                                    onClick={() => { setSelectedCategory(parent); setShowModal(true); }}
-                                                    className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl"
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedCategory(parent); setShowModal(true); }}
+                                                    className="p-4 bg-white/95 backdrop-blur-sm rounded-2xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                    title="Edit Category"
                                                 >
-                                                    <Pencil size={16} />
+                                                    <Pencil size={20} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(parent.id)}
-                                                    className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(parent.id); }}
+                                                    className="p-4 bg-white/95 backdrop-blur-sm rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
+                                                    title="Delete Category"
                                                 >
-                                                    <Trash2 size={16} />
+                                                    <Trash2 size={20} />
                                                 </button>
                                             </div>
                                         )}
@@ -176,16 +178,18 @@ export default function Categories() {
                                                         {isEditMode && (
                                                             <div className="absolute top-2 right-2 flex flex-col gap-1 z-20 scale-125">
                                                                 <button
-                                                                    onClick={() => { setSelectedCategory(child); setShowModal(true); }}
-                                                                    className="p-2 bg-white/90 backdrop-blur-sm rounded-xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl"
+                                                                    onClick={(e) => { e.stopPropagation(); setSelectedCategory(child); setShowModal(true); }}
+                                                                    className="p-3 bg-white/95 backdrop-blur-sm rounded-xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                                    title="Edit Sub-Category"
                                                                 >
-                                                                    <Pencil size={12} />
+                                                                    <Pencil size={16} />
                                                                 </button>
                                                                 <button
-                                                                    onClick={() => handleDelete(child.id)}
-                                                                    className="p-2 bg-white/90 backdrop-blur-sm rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(child.id); }}
+                                                                    className="p-3 bg-white/95 backdrop-blur-sm rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
+                                                                    title="Delete Sub-Category"
                                                                 >
-                                                                    <Trash2 size={12} />
+                                                                    <Trash2 size={16} />
                                                                 </button>
                                                             </div>
                                                         )}

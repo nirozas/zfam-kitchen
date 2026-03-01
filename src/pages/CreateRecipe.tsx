@@ -11,6 +11,7 @@ interface RecipeStep {
   text: string;
   image_url?: string;
   alignment: 'left' | 'center' | 'right' | 'full';
+  group_name?: string;
 }
 
 interface GalleryItem {
@@ -79,7 +80,7 @@ export default function CreateRecipe() {
     source_url: '',
     alternative_titles: '',
     category_id: 0,
-    steps: [{ text: '', image_url: '', alignment: 'full' }] as RecipeStep[],
+    steps: [{ text: '', image_url: '', alignment: 'full', group_name: 'Main Steps' }] as RecipeStep[],
     gallery_urls: [] as GalleryItem[],
     rating: 3,
     tags: '',
@@ -97,6 +98,8 @@ export default function CreateRecipe() {
   const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
   const [activeSection, setActiveSection] = useState('fundamentals');
   const [completeness, setCompleteness] = useState(0);
+  const [lastFocusedIngredientIndex, setLastFocusedIngredientIndex] = useState<number | null>(null);
+  const [lastFocusedStepIndex, setLastFocusedStepIndex] = useState<number | null>(null);
   const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
 
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -115,12 +118,12 @@ export default function CreateRecipe() {
 
   const sections = [
     { id: 'fundamentals', label: 'Story & Title', icon: '📝' },
+    { id: 'details', label: 'Recipe Details', icon: '⚙️' },
     { id: 'media', label: 'Media Assets', icon: '🖼️' },
     { id: 'ingredients', label: 'Ingredients', icon: '🥗' },
-    { id: 'details', label: 'Recipe Details', icon: '⚙️' },
-    { id: 'nutrition', label: 'Nutrition', icon: '📊' },
-    { id: 'instructions', label: 'Cooking Steps', icon: '👨‍🍳' },
+    { id: 'instructions', label: 'Cooking Steps', icon: '👩‍🍳' },
     { id: 'notes', label: 'Notes', icon: '📌' },
+    { id: 'nutrition', label: 'Nutrition', icon: '📊' },
   ];
 
   const readFile = (file: File) => new Promise<string>((resolve) => {
@@ -189,7 +192,7 @@ export default function CreateRecipe() {
               source_url: recipe.source_url || '',
               alternative_titles: recipe.alternative_titles || '',
               category_id: recipe.category_id || 0,
-              steps: recipe.steps.map((s: any) => typeof s === 'string' ? { text: s, image_url: '', alignment: 'full' } : s),
+              steps: recipe.steps.map((s: any) => typeof s === 'string' ? { text: s, image_url: '', alignment: 'full', section: 'Main Steps' } : { ...s, section: s.section || 'Main Steps' }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
               tags: recipe.recipe_tags?.map((rt: any) => `#${rt.tags?.name}`).join(' ') || '',
@@ -316,7 +319,14 @@ export default function CreateRecipe() {
   };
 
 
-  const addStep = () => setFormData(prev => ({ ...prev, steps: [...prev.steps, { text: '', image_url: '', alignment: 'full' }] }));
+  const addStep = (index?: number) => {
+    const targetIdx = index !== undefined ? index : (lastFocusedStepIndex !== null ? lastFocusedStepIndex : formData.steps.length - 1);
+    const lastSection = formData.steps.length > 0 ? (formData.steps[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Main Steps') : 'Main Steps';
+    const newSteps = [...formData.steps];
+    newSteps.splice(targetIdx + 1, 0, { text: '', image_url: '', alignment: 'full', group_name: lastSection });
+    setFormData(prev => ({ ...prev, steps: newSteps }));
+    setLastFocusedStepIndex(targetIdx + 1);
+  };
   const updateStep = (idx: number, updates: Partial<RecipeStep>) => {
     const newSteps = [...formData.steps];
     newSteps[idx] = { ...newSteps[idx], ...updates };
@@ -324,6 +334,18 @@ export default function CreateRecipe() {
   };
   const removeStep = (idx: number) => setFormData(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
 
+  const addIngredient = (index?: number) => {
+    const targetIdx = index !== undefined ? index : (lastFocusedIngredientIndex !== null ? lastFocusedIngredientIndex : ingredients.length - 1);
+    const lastGroup = ingredients.length > 0 ? (ingredients[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Ingredients') : 'Ingredients';
+    const next = [...ingredients];
+    next.splice(targetIdx + 1, 0, { name: '', amount: '', unit: '', group_name: lastGroup });
+    setIngredients(next);
+    setLastFocusedIngredientIndex(targetIdx + 1);
+  };
+  const removeIngredient = (idx: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== idx));
+    setLastFocusedIngredientIndex(null);
+  };
   const updateIngredient = (idx: number, field: string, val: string) => {
     const next = [...ingredients];
     let finalVal = val;
@@ -333,7 +355,6 @@ export default function CreateRecipe() {
     next[idx][field] = finalVal;
     setIngredients(next);
   };
-  const removeIngredient = (idx: number) => setIngredients(ingredients.filter((_, i) => i !== idx));
 
   const parseBulkIngredients = () => {
     const lines = bulkIngredientsText.split('\n').filter(l => l.trim() !== '');
@@ -390,7 +411,7 @@ export default function CreateRecipe() {
     });
     setFormData(prev => ({
       ...prev,
-      steps: [...prev.steps.filter(s => s.text), ...newSteps]
+      steps: [...prev.steps.filter(s => s.text), ...newSteps.map(s => ({ ...s, group_name: 'Main Steps' }))]
     }));
     setShowBulkSteps(false);
   };
@@ -421,16 +442,16 @@ export default function CreateRecipe() {
         </div>
       </header>
 
-      <div className="max-w-[1600px] mx-auto px-6 py-12 flex flex-col lg:flex-row gap-12">
-        <aside className="hidden lg:block w-64 sticky top-32 h-fit space-y-2">
+      <div className="max-w-[1600px] mx-auto px-4 py-8 flex flex-col lg:flex-row gap-6">
+        <aside className="hidden lg:block w-48 sticky top-24 h-fit space-y-1">
           {sections.map(s => (
-            <button key={s.id} onClick={() => { document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setActiveSection(s.id); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all ${activeSection === s.id ? 'bg-white shadow-xl text-gray-900 border border-gray-50' : 'text-gray-400 hover:bg-white/50'}`}>
-              <span className="text-xl">{s.icon}</span><span className="text-sm font-bold">{s.label}</span>
+            <button key={s.id} onClick={() => { document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setActiveSection(s.id); }} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl transition-all ${activeSection === s.id ? 'bg-white shadow-md text-gray-900 border border-gray-100' : 'text-gray-400 hover:bg-white/50'}`}>
+              <span className="text-base">{s.icon}</span><span className="text-xs font-bold">{s.label}</span>
             </button>
           ))}
         </aside>
 
-        <main className="flex-1 w-full pb-20">
+        <main className="flex-1 w-full pb-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
             {/* COLUMN 1 */}
@@ -519,85 +540,6 @@ export default function CreateRecipe() {
                 </div>
               </section>
 
-              <section id="ingredients" className="section-card space-y-4">
-                <div className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
-                    <button type="button" onClick={() => {
-                      const lastGroup = ingredients.length > 0 ? ingredients[ingredients.length - 1].group_name : 'Ingredients';
-                      setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: lastGroup }]);
-                    }} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
-                  </div>
-                </div>
-                {showBulkAdd && (
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3 shadow-inner">
-                    <textarea rows={4} className="w-full p-4 rounded-xl text-sm bg-white" placeholder="2 cups Milk&#10;1kg Flour..." value={bulkIngredientsText} onChange={e => setBulkIngredientsText(e.target.value)} />
-                    <button type="button" onClick={parseBulkIngredients} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Items</button>
-                  </div>
-                )}
-                <div className="space-y-4">
-                  {ingredients.reduce((acc: any[], ing, i) => {
-                    const prevIng = ingredients[i - 1];
-                    if (!prevIng || prevIng.group_name !== ing.group_name) {
-                      acc.push(
-                        <div key={`group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
-                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
-                            const next = [...ingredients];
-                            for (let j = i; j < next.length; j++) {
-                              if (next[j].group_name === ing.group_name) next[j].group_name = e.target.value;
-                              else break;
-                            }
-                            setIngredients(next);
-                          }} />
-                          <button type="button" onClick={() => {
-                            const next = [...ingredients];
-                            next.splice(i + 1, 0, { name: '', amount: '', unit: '', group_name: ing.group_name });
-                            setIngredients(next);
-                          }} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
-                        </div>
-                      );
-                    }
-                    acc.push(
-                      <div key={i} className="flex gap-2 group items-center">
-                        <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} />
-                        <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-                        <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
-                        <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"><X size={16} /></button>
-                      </div>
-                    );
-                    return acc;
-                  }, [])}
-
-                </div>
-              </section>
-            </div>
-
-            {/* COLUMN 2 */}
-            <div className="space-y-4">
-              <section id="nutrition" className="section-card space-y-4">
-                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-lg shadow-inner">📊</div><h2 className="text-xl font-black tracking-tighter">Nutrition Facts</h2></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Calories (kcal)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.calories} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, calories: e.target.value } })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Protein (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.protein} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, protein: e.target.value } })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Fat (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.fat} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, fat: e.target.value } })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Carbs (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.carbs} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, carbs: e.target.value } })} />
-                  </div>
-                </div>
-              </section>
-
               <section id="media" className="section-card space-y-4">
                 <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg shadow-inner">🖼️</div><h2 className="text-xl font-black tracking-tighter">Media Assets</h2></div>
                 <div className="flex flex-col gap-4">
@@ -651,12 +593,72 @@ export default function CreateRecipe() {
                 </div>
               </section>
 
+            </div>
+
+            {/* COLUMN 2 */}
+            <div className="space-y-4">
+              <section id="ingredients" className="section-card space-y-4">
+                <div className="flex items-center justify-between group">
+                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => addIngredient()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
+                  </div>
+                </div>
+                {showBulkAdd && (
+                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3 shadow-inner">
+                    <textarea rows={4} className="w-full p-4 rounded-xl text-sm bg-white" placeholder="2 cups Milk&#10;1kg Flour..." value={bulkIngredientsText} onChange={e => setBulkIngredientsText(e.target.value)} />
+                    <button type="button" onClick={parseBulkIngredients} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Items</button>
+                  </div>
+                )}
+                <div className="space-y-4">
+                  {ingredients.reduce((acc: any[], ing, i) => {
+                    const prevIng = ingredients[i - 1];
+                    if (!prevIng || prevIng.group_name !== ing.group_name) {
+                      acc.push(
+                        <div key={`group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
+                            const next = [...ingredients];
+                            for (let j = i; j < next.length; j++) {
+                              if (next[j].group_name === ing.group_name) next[j].group_name = e.target.value;
+                              else break;
+                            }
+                            setIngredients(next);
+                          }} />
+                          <button type="button" onClick={() => addIngredient(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
+                        </div>
+                      );
+                    }
+                    acc.push(
+                      <div key={i} className="flex gap-2 group items-center">
+                        <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'name', e.target.value)} />
+                        <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
+                        <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-400 hover:text-primary-500 transition-colors" title="Add after this"><Plus size={16} /></button>
+                          <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors" title="Remove"><X size={16} /></button>
+                        </div>
+                      </div>
+                    );
+                    return acc;
+                  }, [])}
+
+                </div>
+              </section>
+
               <section id="instructions" className="section-card space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg shadow-inner">👨‍🍳</div><h2 className="text-xl font-black tracking-tighter">Cooking Steps</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk</button>
-                    <button type="button" onClick={addStep} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Add step</button>
+                    <button type="button" onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        steps: [...prev.steps, { text: '', image_url: '', alignment: 'full', group_name: 'New Section' }]
+                      }));
+                    }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
                   </div>
                 </div>
                 {showBulkSteps && (
@@ -665,39 +667,67 @@ export default function CreateRecipe() {
                     <button type="button" onClick={parseBulkSteps} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Steps</button>
                   </div>
                 )}
-                <div className="space-y-4">
-                  {formData.steps.map((s, i) => (
-                    <div key={i} className="relative group p-4 rounded-[1.5rem] bg-gray-50/50 border border-gray-50 transition-all hover:bg-white hover:shadow-xl hover:shadow-gray-100 flex gap-4 items-start">
-                      <div className="w-6 h-6 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black flex-shrink-0 mt-1">{i + 1}</div>
+                <div className="space-y-3">
+                  {formData.steps.reduce((acc: any[], s, i) => {
+                    const prevStep = formData.steps[i - 1];
+                    if (!prevStep || prevStep.group_name !== s.group_name) {
+                      acc.push(
+                        <div key={`step-group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Section Name (e.g. Preparation)" value={s.group_name} onChange={e => {
+                            const newSteps = [...formData.steps];
+                            const oldSection = s.group_name;
+                            for (let j = i; j < newSteps.length; j++) {
+                              if (newSteps[j].group_name === oldSection) newSteps[j].group_name = e.target.value;
+                              else break;
+                            }
+                            setFormData(prev => ({ ...prev, steps: newSteps }));
+                          }} />
+                          <button type="button" onClick={() => {
+                            const newSteps = [...formData.steps];
+                            newSteps.splice(i + 1, 0, { text: '', image_url: '', alignment: 'full', group_name: s.group_name });
+                            setFormData(prev => ({ ...prev, steps: newSteps }));
+                          }} className="text-[10px] font-black text-primary-600 uppercase">+ Step</button>
+                        </div>
+                      );
+                    }
+                    acc.push(
+                      <div key={i} className="relative group p-3 rounded-2xl bg-gray-50/50 border border-gray-100 transition-all hover:bg-white hover:shadow-lg flex gap-3 items-start">
+                        <div className="w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-1">{i + 1}</div>
 
-                      <div className="flex-1 flex flex-col gap-3">
-                        <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[40px] pt-1" placeholder="Describe the process..." value={s.text} onChange={e => updateStep(i, { text: e.target.value })} />
+                        <div className="flex-1 flex flex-col gap-2">
+                          <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[30px] pt-0.5 resize-none" rows={1} placeholder="Step description..." value={s.text} onFocus={() => setLastFocusedStepIndex(i)} onChange={e => updateStep(i, { text: e.target.value })} onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = target.scrollHeight + 'px';
+                          }} />
 
-                        {/* Expandable Image Field */}
-                        <div className="flex items-center gap-3">
-                          {s.image_url ? (
-                            <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
-                              <img src={s.image_url} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
-                                <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-1 text-white hover:text-primary-400 transition-colors"><Maximize2 size={12} /></button>
-                                <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-1 text-white hover:text-red-400 transition-colors"><X size={12} /></button>
+                          <div className="flex items-center gap-2">
+                            {s.image_url ? (
+                              <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
+                                <img src={s.image_url} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
+                                  <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-0.5 text-white hover:text-primary-400 transition-colors"><Maximize2 size={10} /></button>
+                                  <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-0.5 text-white hover:text-red-400 transition-colors"><X size={10} /></button>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-white border border-dashed border-gray-200 flex items-center justify-center relative overflow-hidden group/img shrink-0 hover:bg-gray-50 cursor-pointer">
-                              <ImageIcon size={16} className="text-gray-300" />
-                              <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                            </div>
-                          )}
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-white border border-dashed border-gray-200 flex items-center justify-center relative overflow-hidden group/img shrink-0 hover:bg-gray-50 cursor-pointer">
+                                <ImageIcon size={14} className="text-gray-300" />
+                                <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                              </div>
+                            )}
+                            <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                          </div>
+                        </div>
 
-                          {/* Optional URL Input */}
-                          <input type="text" placeholder="Or Paste Step Image URL..." className="flex-1 px-3 py-2 rounded-lg bg-white focus:bg-gray-50 text-xs border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => addStep(i)} className="p-1 text-gray-400 hover:text-primary-500 transition-all" title="Add after this"><Plus size={14} /></button>
+                          <button type="button" onClick={() => removeStep(i)} className="p-1 text-gray-300 hover:text-red-500 transition-all" title="Remove"><X size={14} /></button>
                         </div>
                       </div>
-
-                      <button type="button" onClick={() => removeStep(i)} className="absolute -top-2 -right-2 w-6 h-6 bg-white shadow-lg rounded-full flex items-center justify-center text-gray-300 hover:text-red-500 transition-all"><X size={12} /></button>
-                    </div>
-                  ))}
+                    );
+                    return acc;
+                  }, [])}
                 </div>
               </section>
 
@@ -705,10 +735,31 @@ export default function CreateRecipe() {
                 <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center text-lg shadow-inner">📌</div><h2 className="text-xl font-black tracking-tighter">Notes</h2></div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 px-1">Additional Tips or Info</label>
-                  <textarea rows={4} className="w-full px-5 py-3 rounded-[1rem] bg-gray-50 focus:bg-white text-sm" placeholder="Any extra tips, variations or storage instructions..." value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
+                  <textarea rows={3} className="w-full px-4 py-2 rounded-xl bg-gray-50 focus:bg-white text-sm" placeholder="Any extra tips..." value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
                 </div>
               </section>
 
+              <section id="nutrition" className="section-card space-y-4">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-lg shadow-inner">📊</div><h2 className="text-xl font-black tracking-tighter">Nutrition Facts</h2></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Calories (kcal)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.calories} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, calories: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Protein (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.protein} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, protein: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Fat (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.fat} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, fat: e.target.value } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Carbs (g)</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.carbs} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, carbs: e.target.value } })} />
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </main>

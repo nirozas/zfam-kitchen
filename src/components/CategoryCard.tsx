@@ -34,7 +34,7 @@ export default function CategoryCard({ category, index }: CategoryCardProps) {
 
                 {/* Compact Title */}
                 <div className="mt-2 px-1">
-                    <h3 className="text-[10px] sm:text-xs font-black text-gray-900 leading-tight group-hover:text-primary-600 transition-colors truncate">
+                    <h3 className="text-[10px] sm:text-[11px] font-black text-gray-900 leading-tight group-hover:text-primary-600 transition-colors line-clamp-2 h-7 flex items-center justify-center text-center">
                         {category.name}
                     </h3>
                 </div>

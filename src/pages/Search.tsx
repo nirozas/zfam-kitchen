@@ -73,7 +73,7 @@ export default function Search() {
                         {/* Title and Stats */}
                         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-100 pb-8">
                             <div>
-                                <h1 className="text-4xl font-black text-gray-900 font-display tracking-tight mb-2">
+                                <h1 className="text-4xl font-black text-gray-900 font-sans tracking-tight mb-2">
                                     {query ? 'Search Results' : 'Explore Recipes'}
                                 </h1>
                                 <p className="text-gray-500 font-medium italic">

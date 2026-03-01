@@ -7,7 +7,7 @@ export default function MobileNav() {
     const isActive = (path: string) => location.pathname === path;
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 lg:hidden glass z-[100] border-t border-gray-100 pb-[var(--safe-bottom)]">
+        <nav className="fixed bottom-0 left-0 right-0 md:hidden glass z-[100] border-t border-gray-100 pb-[var(--safe-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-around h-20 px-4">
                 <Link to="/" className={clsx("flex flex-col items-center gap-1", isActive('/') ? "text-primary-600" : "text-gray-400")}>
                     <Home size={24} />
@@ -18,7 +18,7 @@ export default function MobileNav() {
                     className={clsx("flex flex-col items-center gap-1 transition-colors", isActive('/search') ? "text-primary-600" : "text-gray-400")}
                 >
                     <Search size={22} />
-                    <span className="text-[9px] font-bold uppercase tracking-tight">Search</span>
+                    <span className="text-[10px] font-medium">Search</span>
                 </Link>
                 <Link
                     to="/create"
@@ -33,14 +33,14 @@ export default function MobileNav() {
                     className={clsx("flex flex-col items-center gap-1 transition-colors", isActive('/planner') ? "text-primary-600" : "text-gray-400")}
                 >
                     <Calendar size={22} />
-                    <span className="text-[9px] font-bold uppercase tracking-tight">Planner</span>
+                    <span className="text-[10px] font-medium">Planner</span>
                 </Link>
                 <Link
                     to="/profile"
                     className={clsx("flex flex-col items-center gap-1 transition-colors", isActive('/profile') ? "text-primary-600" : "text-gray-400 hover:text-gray-600")}
                 >
                     <User size={24} />
-                    <span className="text-[10px] font-black uppercase tracking-tighter">Profile</span>
+                    <span className="text-[10px] font-medium">Profile</span>
                 </Link>
             </div>
         </nav>

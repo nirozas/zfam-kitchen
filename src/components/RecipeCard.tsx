@@ -138,7 +138,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                     </div>
                 </div>
 
-                <div className="p-4 sm:p-5">
+                <div className="p-2 sm:p-3">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1 text-yellow-500">
@@ -156,21 +156,21 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                         </div>
                     </div>
 
-                    <h3 className="font-bold text-sm md:text-lg text-gray-900 mb-1 line-clamp-2 md:line-clamp-1 group-hover:text-primary-600 transition-colors h-10 md:h-7">
+                    <h3 className="font-extrabold text-[11px] sm:text-xs md:text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors min-h-[1.5rem] sm:min-h-[2.5rem] leading-tight flex items-center">
                         {recipe.title}
                     </h3>
 
-                    <p className="text-gray-500 text-sm line-clamp-2 mb-4 h-10">
+                    <p className="hidden sm:line-clamp-2 text-gray-500 text-[11px] mb-3 h-8">
                         {recipe.description}
                     </p>
 
-                    <div className="flex items-center gap-4 text-xs font-medium text-gray-500 pt-3 border-t border-gray-100">
-                        <div className="flex items-center gap-1.5">
-                            <Clock size={14} className="text-primary-500" />
-                            <span>{recipe.time_minutes || 30} min</span>
+                    <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-medium text-gray-500 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1">
+                            <Clock size={12} className="text-primary-500" />
+                            <span>{recipe.time_minutes || 30}m</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <Flame size={14} className="text-orange-500" />
+                        <div className="flex items-center gap-1">
+                            <Flame size={12} className="text-orange-500" />
                             <span>{Math.round(recipe.ingredients.reduce((acc, curr) => acc + (curr.amount_in_grams * (curr.ingredient.calories_per_100g || 0) / 100), 0))} kcal</span>
                         </div>
                     </div>

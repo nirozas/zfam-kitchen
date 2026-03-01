@@ -65,9 +65,9 @@ const Index = () => {
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link to="/create" className={buttonVariants('hero')}>
+                            <Link to="/categories" className={buttonVariants('hero')}>
                                 <Plus className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">New Recipe</span>
+                                <span className="hidden sm:inline">Add Category</span>
                             </Link>
                             <Link to="/categories" className={buttonVariants('outline')}>
                                 Explore All
@@ -76,7 +76,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 sm:gap-4">
+                    <div className="grid grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-24 gap-2 sm:gap-4">
                         {categoriesLoading ? (
                             Array.from({ length: 4 }).map((_, i) => (
                                 <CategoryCardSkeleton key={i} />
@@ -117,7 +117,7 @@ const Index = () => {
                                 transition: { staggerChildren: 0.1 }
                             }
                         }}
-                        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6"
+                        className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-2 sm:gap-6"
                     >
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
@@ -160,7 +160,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-6">
+                    <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-2 sm:gap-6">
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
                                 <RecipeCardSkeleton key={i} />
