@@ -33,6 +33,8 @@ const UNIT_MAPPING: Record<string, string> = {
   'رشة': 'pinch', 'قرصة': 'pinch',
   'فص': 'clove', 'فصوص': 'clove',
   'ملعقة': 'tbsp',
+  'عبوة': 'pack', 'باكيت': 'pack',
+  'حسب الرغبة': 'as liked', 'حسب الذوق': 'as liked',
   // Hebrew
   'כוס': 'cup', 'כוסות': 'cup',
   'כף': 'tbsp', 'כפות': 'tbsp',
@@ -43,6 +45,8 @@ const UNIT_MAPPING: Record<string, string> = {
   'יחידה': 'pcs', 'יחידות': 'pcs',
   'קורט': 'pinch',
   'שן': 'clove', 'שיניים': 'clove',
+  'אריזה': 'pack', 'חבילה': 'pack',
+  'לפי הטעם': 'as liked',
   // English
   'cup': 'cup', 'cups': 'cup',
   'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
@@ -56,9 +60,11 @@ const UNIT_MAPPING: Record<string, string> = {
   'clove': 'clove', 'cloves': 'clove',
   'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
   'lb': 'lb', 'pound': 'lb', 'pounds': 'lb',
+  'pack': 'pack', 'pkg': 'pack', 'package': 'pack',
+  'as liked': 'as liked', 'to taste': 'as liked'
 };
 
-const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb'];
+const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked'];
 
 const ARABIC_DIGITS_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'

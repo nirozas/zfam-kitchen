@@ -356,32 +356,44 @@ export default function RecipeDetail() {
                         <ArrowLeft size={24} />
                     </Link>
 
-                    <div className="absolute top-6 right-6 flex items-center gap-2 z-30">
-                        <div className="hidden sm:flex items-center gap-2">
-                            <Link
-                                to={`/category/${recipe.category?.slug || 'uncategorized'}`}
-                                className="px-4 py-1.5 bg-primary-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-black/20"
-                            >
-                                {recipe.category?.name || 'Uncategorized'}
-                            </Link>
+                    <div className="absolute top-6 right-6 flex flex-col items-end gap-3 z-30">
+                        <div className="flex items-center gap-2">
+                            <div className="hidden sm:flex items-center gap-2">
+                                <Link
+                                    to={`/category/${recipe.category?.slug || 'uncategorized'}`}
+                                    className="px-4 py-1.5 bg-primary-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-black/20"
+                                >
+                                    {recipe.category?.name || 'Uncategorized'}
+                                </Link>
+                            </div>
+
+                            {(isOwner || isAdmin) && (
+                                <div className="flex gap-2 print:hidden relative z-[40]">
+                                    <Link
+                                        to={`/edit/${recipe ? recipe.id : ''}`}
+                                        className="bg-white/30 backdrop-blur-md p-3.5 rounded-2xl hover:bg-white/40 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
+                                        title="Edit Recipe"
+                                    >
+                                        <Pencil size={24} strokeWidth={2.5} />
+                                    </Link>
+                                    <button
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="bg-red-500/40 backdrop-blur-md p-3.5 rounded-2xl hover:bg-red-500/60 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
+                                        title="Delete Recipe"
+                                    >
+                                        <Trash2 size={24} strokeWidth={2.5} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
-                        {(isOwner || isAdmin) && (
-                            <div className="flex gap-2 print:hidden relative z-[40]">
-                                <Link
-                                    to={`/edit/${recipe ? recipe.id : ''}`}
-                                    className="bg-white/30 backdrop-blur-md p-3.5 rounded-2xl hover:bg-white/40 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
-                                    title="Edit Recipe"
-                                >
-                                    <Pencil size={24} strokeWidth={2.5} />
-                                </Link>
-                                <button
-                                    onClick={() => setShowDeleteConfirm(true)}
-                                    className="bg-red-500/40 backdrop-blur-md p-3.5 rounded-2xl hover:bg-red-500/60 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
-                                    title="Delete Recipe"
-                                >
-                                    <Trash2 size={24} strokeWidth={2.5} />
-                                </button>
+                        {/* Square Cover Box */}
+                        {recipe.image_url && (
+                            <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-[2.5rem] overflow-hidden border-2 border-white/30 shadow-2xl shadow-black/80 transition-all duration-500 hover:scale-[1.03] cursor-zoom-in group" onClick={() => setSelectedImage(recipe.image_url || null)}>
+                                <img src={recipe.image_url} alt="Cover" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Maximize2 className="text-white" size={24} />
+                                </div>
                             </div>
                         )}
                     </div>
