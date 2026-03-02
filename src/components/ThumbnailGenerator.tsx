@@ -1,5 +1,4 @@
-import React from 'react';
-import { AlbumLayoutConfig, LayoutSlot } from '@/lib/types';
+import { AlbumLayoutConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
