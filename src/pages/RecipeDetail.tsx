@@ -389,7 +389,7 @@ export default function RecipeDetail() {
 
                         {/* Square Cover Box */}
                         {recipe.image_url && (
-                            <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-[2.5rem] overflow-hidden border-2 border-white/30 shadow-2xl shadow-black/80 transition-all duration-500 hover:scale-[1.03] cursor-zoom-in group" onClick={() => setSelectedImage(recipe.image_url || null)}>
+                            <div className="w-28 h-28 sm:w-64 sm:h-64 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border-2 border-white/30 shadow-2xl shadow-black/80 transition-all duration-500 hover:scale-[1.03] cursor-zoom-in group" onClick={() => setSelectedImage(recipe.image_url || null)}>
                                 <img src={recipe.image_url} alt="Cover" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <Maximize2 className="text-white" size={24} />
@@ -401,7 +401,7 @@ export default function RecipeDetail() {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="max-w-4xl relative z-10 pt-44 sm:pt-56 md:pt-64 lg:pt-40"
+                        className="max-w-4xl relative z-10 pt-52 sm:pt-56 md:pt-64 lg:pt-40"
                     >
                         <div className="flex flex-wrap items-center gap-4 mb-4 sm:hidden">
                             <Link

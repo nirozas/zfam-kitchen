@@ -117,7 +117,7 @@ const Index = () => {
                                 transition: { staggerChildren: 0.1 }
                             }
                         }}
-                        className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-2 sm:gap-6"
+                        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-6"
                     >
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
@@ -160,7 +160,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-2 sm:gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-6">
                         {recipesLoading ? (
                             Array.from({ length: 6 }).map((_, i) => (
                                 <RecipeCardSkeleton key={i} />
