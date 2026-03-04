@@ -17,6 +17,7 @@ export default function Planner() {
     const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
     const [assigningMealId, setAssigningMealId] = useState<number | string | null>(null);
     const [showAllOccurrences, setShowAllOccurrences] = useState(false);
+    const [gridDensity, setGridDensity] = useState(1); // 1 = normal, 2 = compact
 
     const today = new Date();
     const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
@@ -286,10 +287,30 @@ export default function Planner() {
                 </div>
             </div>
 
+            <div className="flex sm:hidden items-center gap-4 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm self-start mb-6">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Zoom</span>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setGridDensity(prev => Math.max(1, prev - 1))}
+                        disabled={gridDensity === 1}
+                        className="p-2 bg-gray-50 rounded-xl disabled:opacity-30"
+                    >
+                        <Plus size={16} />
+                    </button>
+                    <button
+                        onClick={() => setGridDensity(prev => Math.min(2, prev + 1))}
+                        disabled={gridDensity === 2}
+                        className="p-2 bg-gray-50 rounded-xl disabled:opacity-30"
+                    >
+                        <X size={16} className="rotate-45" />
+                    </button>
+                </div>
+            </div>
+
             <div className="w-full">
                 {/* Calendar Grid (Drop targets) */}
                 <div className="w-full">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+                    <div className={`grid ${gridDensity === 1 ? 'grid-cols-1' : 'grid-cols-2'} sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4`}>
                         {weekDays.map((day) => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const isToday = format(today, 'yyyy-MM-dd') === dateStr;
@@ -432,9 +453,10 @@ export default function Planner() {
                                     <div className="mt-4 pt-4 border-t border-gray-100">
                                         <textarea
                                             placeholder="Notes..."
-                                            className="w-full text-xs bg-gray-50 border-none rounded-xl p-3 min-h-[60px] resize-none focus:ring-1 focus:ring-primary-500 transition-all font-medium text-gray-600 placeholder:text-gray-300"
+                                            className="w-full text-xs bg-gray-50 border-none rounded-xl p-3 min-h-[60px] resize-none focus:ring-1 focus:ring-primary-500 transition-all font-medium text-gray-600 placeholder:text-gray-300 relative z-10 touch-auto"
                                             value={dailyNotes[dateStr] || ''}
                                             onChange={(e) => saveDailyNote(dateStr, e.target.value)}
+                                            onTouchStart={(e) => e.stopPropagation()} // Fix for mobile scroll/touch conflict
                                         />
                                     </div>
 

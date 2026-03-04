@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useCategories } from '@/lib/hooks';
 import CategoryCard from '@/components/CategoryCard';
 import CategoryModal from '@/components/CategoryModal';
-import { Search, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, Loader2, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function Categories() {
@@ -28,6 +28,33 @@ export default function Categories() {
         checkAdmin();
     }, []);
 
+    const handleMove = async (category: any, direction: 'up' | 'down') => {
+        const siblings = categories
+            .filter(c => c.parent_id === category.parent_id)
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+        const currentIndex = siblings.findIndex(s => s.id === category.id);
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+        if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+        const targetCategory = siblings[targetIndex];
+
+        // Swap order_index
+        const newCurrentOrder = targetCategory.order_index || 0;
+        const newTargetOrder = category.order_index || 0;
+
+        try {
+            const { error: err1 } = await supabase.from('categories').update({ order_index: newCurrentOrder }).eq('id', category.id);
+            const { error: err2 } = await supabase.from('categories').update({ order_index: newTargetOrder }).eq('id', targetCategory.id);
+
+            if (err1 || err2) throw err1 || err2;
+            refreshCategories();
+        } catch (err) {
+            alert('Move failed');
+        }
+    };
+
     const handleDelete = async (id: number) => {
         if (!confirm('Are you sure you want to delete this category?')) return;
         try {
@@ -40,9 +67,9 @@ export default function Categories() {
     };
 
     const sortedCategories = useMemo(() => {
-        const filtered = categories.filter(cat =>
-            cat.name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const filtered = categories
+            .filter(cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
         const parents = filtered.filter(c => !c.parent_id);
         const children = filtered.filter(c => c.parent_id);
@@ -145,6 +172,22 @@ export default function Categories() {
                                         <CategoryCard category={parent} index={0} />
                                         {isEditMode && (
                                             <div className="absolute top-4 right-4 flex gap-2 z-20">
+                                                <div className="flex flex-col gap-1 mr-2">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleMove(parent, 'up'); }}
+                                                        className="p-2 bg-white/95 backdrop-blur-sm rounded-xl text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                        title="Move Up"
+                                                    >
+                                                        <ChevronLeft className="rotate-90" size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleMove(parent, 'down'); }}
+                                                        className="p-2 bg-white/95 backdrop-blur-sm rounded-xl text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                        title="Move Down"
+                                                    >
+                                                        <ChevronLeft className="-rotate-90" size={16} />
+                                                    </button>
+                                                </div>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setSelectedCategory(parent); setShowModal(true); }}
                                                     className="p-4 bg-white/95 backdrop-blur-sm rounded-2xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
@@ -177,6 +220,22 @@ export default function Categories() {
                                                         <CategoryCard category={child} index={cIdx} />
                                                         {isEditMode && (
                                                             <div className="absolute top-2 right-2 flex flex-col gap-1 z-20 scale-125">
+                                                                <div className="flex gap-1 mb-1">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleMove(child, 'up'); }}
+                                                                        className="p-1.5 bg-white/95 backdrop-blur-sm rounded-lg text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                                        title="Move Left"
+                                                                    >
+                                                                        <ChevronLeft size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleMove(child, 'down'); }}
+                                                                        className="p-1.5 bg-white/95 backdrop-blur-sm rounded-lg text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
+                                                                        title="Move Right"
+                                                                    >
+                                                                        <ChevronLeft className="rotate-180" size={12} />
+                                                                    </button>
+                                                                </div>
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); setSelectedCategory(child); setShowModal(true); }}
                                                                     className="p-3 bg-white/95 backdrop-blur-sm rounded-xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"

@@ -108,6 +108,14 @@ export default function CreateRecipe() {
   const [lastFocusedStepIndex, setLastFocusedStepIndex] = useState<number | null>(null);
   const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const categoryFromUrl = searchParams.get('category');
+    if (categoryFromUrl && !isEditing) {
+      setFormData(prev => ({ ...prev, category_id: parseInt(categoryFromUrl) }));
+    }
+  }, [location.search, isEditing]);
+
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<{ type: 'main' | 'step', index?: number } | null>(null);

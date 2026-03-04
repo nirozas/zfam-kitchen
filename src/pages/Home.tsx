@@ -27,7 +27,7 @@ const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', siz
 };
 
 const Index = () => {
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 9 });
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 40 });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     useEffect(() => {
@@ -44,8 +44,8 @@ const Index = () => {
 
 
     // Use all recipes for now, or filter if we had "featured" flag
-    const featuredRecipes = recipes.slice(0, 3);
-    const popularRecipes = recipes.slice(3, 9);
+    const featuredRecipes = recipes.slice(0, 10);
+    const popularRecipes = recipes.slice(10, 40);
 
     return (
         <div className="min-h-screen bg-gray-50/50">

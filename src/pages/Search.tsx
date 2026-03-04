@@ -1,43 +1,55 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useRecipes, useTopTags, useRecipeStats } from '@/lib/hooks';
+import { useRecipes, useTopTags, useRecipeStats, useCategories } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
-import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Search() {
     const { recipes, loading, error } = useRecipes();
     const { tags: topTags } = useTopTags(12);
     const { stats: recipeStats } = useRecipeStats();
+    const { categories } = useCategories();
 
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
-    const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used'>('created_at');
+    const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used' | 'category'>('created_at');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [gridDensity, setGridDensity] = useState(2); // 1 = large, 2 = normal, 3 = compact
 
-    const filteredRecipes = recipes.filter(recipe => {
-        if (!query) return true;
-        const searchTerms = query.toLowerCase();
-        return (
-            recipe.title.toLowerCase().includes(searchTerms) ||
-            recipe.description?.toLowerCase().includes(searchTerms) ||
-            recipe.category?.name.toLowerCase().includes(searchTerms) ||
-            recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms)) ||
-            recipe.ingredients?.some(ing => ing.ingredient.name.toLowerCase().includes(searchTerms))
-        );
-    }).sort((a, b) => {
-        let comparison = 0;
-        if (sortBy === 'title') {
-            comparison = a.title.localeCompare(b.title);
-        } else if (sortBy === 'created_at') {
-            comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-        } else if (sortBy === 'rating') {
-            comparison = (a.rating || 0) - (b.rating || 0);
-        } else if (sortBy === 'times_used') {
-            comparison = (recipeStats[a.id] || 0) - (recipeStats[b.id] || 0);
-        }
-        return sortOrder === 'asc' ? comparison : -comparison;
-    });
+    const filteredRecipes = useMemo(() => {
+        return recipes.filter(recipe => {
+            const searchTerms = query.toLowerCase();
+            const matchesSearch = !query || (
+                recipe.title.toLowerCase().includes(searchTerms) ||
+                recipe.description?.toLowerCase().includes(searchTerms) ||
+                recipe.category?.name.toLowerCase().includes(searchTerms) ||
+                recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms)) ||
+                recipe.ingredients?.some(ing => ing.ingredient.name.toLowerCase().includes(searchTerms))
+            );
+
+            const matchesCategory = selectedCategories.length === 0 ||
+                (recipe.category && selectedCategories.includes(recipe.category.id));
+
+            return matchesSearch && matchesCategory;
+        }).sort((a, b) => {
+            let comparison = 0;
+            if (sortBy === 'title') {
+                comparison = a.title.localeCompare(b.title);
+            } else if (sortBy === 'created_at') {
+                comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+            } else if (sortBy === 'rating') {
+                comparison = (a.rating || 0) - (b.rating || 0);
+            } else if (sortBy === 'times_used') {
+                comparison = (recipeStats[a.id] || 0) - (recipeStats[b.id] || 0);
+            } else if (sortBy === 'category') {
+                comparison = (a.category?.name || '').localeCompare(b.category?.name || '');
+            }
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
+    }, [recipes, query, selectedCategories, sortBy, sortOrder, recipeStats]);
 
     const handleTagClick = (tagName: string) => {
         setSearchParams({ q: tagName });
@@ -79,6 +91,27 @@ export default function Search() {
                                 <p className="text-gray-500 font-medium italic">
                                     {filteredRecipes.length} {filteredRecipes.length === 1 ? 'masterpiece' : 'delightful recipes'} {query ? `found for "${query}"` : 'at your fingertips'}
                                 </p>
+                            </div>
+
+                            {/* Mobile Zoom Controls */}
+                            <div className="flex sm:hidden items-center gap-4 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm self-start">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Zoom</span>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setGridDensity(prev => Math.max(1, prev - 1))}
+                                        disabled={gridDensity === 1}
+                                        className="p-2 bg-gray-50 rounded-xl disabled:opacity-30"
+                                    >
+                                        <Plus size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setGridDensity(prev => Math.min(3, prev + 1))}
+                                        disabled={gridDensity === 3}
+                                        className="p-2 bg-gray-50 rounded-xl disabled:opacity-30"
+                                    >
+                                        <X size={16} className="rotate-45" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -143,6 +176,7 @@ export default function Search() {
                                 >
                                     <option value="created_at">Date Added</option>
                                     <option value="title">Name</option>
+                                    <option value="category">Category</option>
                                     <option value="rating">Rating</option>
                                     <option value="times_used">Times Used</option>
                                 </select>
@@ -153,39 +187,106 @@ export default function Search() {
                                 >
                                     {sortOrder === 'asc' ? <SortAsc size={20} /> : <SortDesc size={20} />}
                                 </button>
+
+                                <div className="h-4 w-px bg-gray-100" />
+
+                                <button
+                                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${selectedCategories.length > 0 || isFilterOpen ? 'bg-primary-600 text-white shadow-lg shadow-primary-100' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'}`}
+                                >
+                                    <Filter size={16} />
+                                    Categories {selectedCategories.length > 0 && `(${selectedCategories.length})`}
+                                </button>
                             </div>
                         </div>
+
+                        {/* Category Filter Dropdown */}
+                        <AnimatePresence>
+                            {isFilterOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xl"
+                                >
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Filter by Category</h3>
+                                        <div className="flex gap-4">
+                                            {selectedCategories.length > 0 && (
+                                                <button
+                                                    onClick={() => setSelectedCategories([])}
+                                                    className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                                                >
+                                                    Clear All
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setIsFilterOpen(false)}
+                                                className="text-gray-400 hover:text-gray-600"
+                                            >
+                                                <X size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {categories.map(cat => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => {
+                                                    setSelectedCategories(prev =>
+                                                        prev.includes(cat.id)
+                                                            ? prev.filter(id => id !== cat.id)
+                                                            : [...prev, cat.id]
+                                                    );
+                                                }}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedCategories.includes(cat.id)
+                                                    ? 'bg-primary-50 border-primary-200 text-primary-700 shadow-sm'
+                                                    : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
+                                                    }`}
+                                            >
+                                                {cat.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </header>
 
-                {filteredRecipes.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4 lg:gap-8">
-                        {filteredRecipes.map((recipe) => (
-                            <RecipeCard key={recipe.id} recipe={recipe} />
-                        ))}
-                    </div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-center py-24 bg-white rounded-[3rem] border border-gray-100 shadow-sm"
-                    >
-                        <div className="mb-6 inline-flex p-8 bg-gray-50 rounded-full text-gray-400">
-                            <Frown size={64} />
+                {
+                    filteredRecipes.length > 0 ? (
+                        <div className={`grid ${gridDensity === 1 ? 'grid-cols-1' :
+                                gridDensity === 2 ? 'grid-cols-2' :
+                                    'grid-cols-3'
+                            } md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4 lg:gap-8`}>
+                            {filteredRecipes.map((recipe) => (
+                                <RecipeCard key={recipe.id} recipe={recipe} />
+                            ))}
                         </div>
-                        <h2 className="text-3xl font-black text-gray-900 mb-2">No recipes found</h2>
-                        <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
-                            We couldn't find any recipes matching your search. Try different keywords or browse our categories.
-                        </p>
-                        <button
-                            onClick={() => setSearchParams({})}
-                            className="inline-flex items-center justify-center px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-center py-24 bg-white rounded-[3rem] border border-gray-100 shadow-sm"
                         >
-                            View All Recipes
-                        </button>
-                    </motion.div>
-                )}
-            </div>
-        </div>
+                            <div className="mb-6 inline-flex p-8 bg-gray-50 rounded-full text-gray-400">
+                                <Frown size={64} />
+                            </div>
+                            <h2 className="text-3xl font-black text-gray-900 mb-2">No recipes found</h2>
+                            <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
+                                We couldn't find any recipes matching your search. Try different keywords or browse our categories.
+                            </p>
+                            <button
+                                onClick={() => setSearchParams({})}
+                                className="inline-flex items-center justify-center px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
+                            >
+                                View All Recipes
+                            </button>
+                        </motion.div>
+                    )
+                }
+            </div >
+        </div >
     );
 }

@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { useRecipes, useCategories, useTopTags, useRecipeStats } from '@/lib/hooks';
+import { useRecipes, useCategories, useRecipeStats } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
 import { ArrowLeft, Frown, ChefHat, Plus, SortAsc, SortDesc, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -13,7 +13,6 @@ export default function CategoryDetail() {
 
     const { recipes, loading: recipesLoading, error: recipesError } = useRecipes();
     const { categories, loading: categoriesLoading } = useCategories();
-    const { tags: topTags } = useTopTags(12);
     const { stats: recipeStats } = useRecipeStats();
 
     const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used'>('created_at');
@@ -50,6 +49,20 @@ export default function CategoryDetail() {
             return sortOrder === 'asc' ? comparison : -comparison;
         });
     }, [recipes, categoryId, tagQuery, localQuery, sortBy, sortOrder, recipeStats]);
+
+    // Use category-specific tags instead of global top tags
+    const categoryTags = useMemo(() => {
+        const tagMap = new Map<string, number>();
+        // Only look at recipes in this category to find relevant tags
+        recipes.filter(r => r.category?.id === categoryId || categories.filter(c => c.parent_id === categoryId).some(sc => sc.id === r.category?.id)).forEach(recipe => {
+            recipe.tags?.forEach(tag => {
+                tagMap.set(tag.name, (tagMap.get(tag.name) || 0) + 1);
+            });
+        });
+        return Array.from(tagMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([name]) => ({ name }));
+    }, [recipes, categoryId, categories]);
 
     const handleTagClick = (tagName: string) => {
         if (tagQuery.toLowerCase() === tagName.toLowerCase()) {
@@ -125,7 +138,7 @@ export default function CategoryDetail() {
 
                                 {/* Hashtags */}
                                 <div className="flex flex-wrap gap-1.5 ml-2">
-                                    {topTags.slice(0, 5).map((tag) => (
+                                    {categoryTags.slice(0, 8).map((tag) => (
                                         <button
                                             key={tag.name}
                                             onClick={() => handleTagClick(tag.name)}

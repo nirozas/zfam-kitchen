@@ -71,7 +71,13 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                 const { error } = await supabase.from('categories').update(payload).eq('id', category.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('categories').insert([payload]);
+                // Find next order_index
+                const siblings = allCategories.filter(c => c.parent_id === formData.parent_id);
+                const nextOrder = siblings.length > 0
+                    ? Math.max(...siblings.map(s => s.order_index || 0)) + 1
+                    : 0;
+
+                const { error } = await supabase.from('categories').insert([{ ...payload, order_index: nextOrder }]);
                 if (error) throw error;
             }
 
