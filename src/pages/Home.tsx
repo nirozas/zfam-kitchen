@@ -1,7 +1,7 @@
 import RecipeCard from '@/components/RecipeCard';
 import CategoryCard from '@/components/CategoryCard';
 import { motion } from 'framer-motion';
-import { ArrowRight, Heart, Plus, Search } from 'lucide-react';
+import { ArrowRight, Heart, Plus, Search, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HeroSection } from '@/components/HeroSection';
 import { useRecipes, useCategories } from '@/lib/hooks';
@@ -145,6 +145,10 @@ const Index = () => {
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
+                            <Link to="/create?import=1" className={buttonVariants('outline')}>
+                                <Sparkles className="h-4 w-4 mr-2 text-primary-500" />
+                                <span className="hidden sm:inline">Magic Import</span>
+                            </Link>
                             <Link to="/create" className={buttonVariants('hero')}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">New Recipe</span>

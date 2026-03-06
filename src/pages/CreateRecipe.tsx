@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2, Sparkles } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
+import LinkImporterModal from '@/components/LinkImporterModal';
 import { generateSlug } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 interface RecipeStep {
   text: string;
@@ -86,6 +88,8 @@ export default function CreateRecipe() {
     source_url: '',
     alternative_titles: '',
     category_id: 0,
+    secondary_category_ids: [] as number[],
+    country_origin: '',
     steps: [{ text: '', image_url: '', alignment: 'full', group_name: 'Main Steps' }] as RecipeStep[],
     gallery_urls: [] as GalleryItem[],
     rating: 3,
@@ -98,6 +102,7 @@ export default function CreateRecipe() {
 
   const [uploading, setUploading] = useState(false);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [showImporter, setShowImporter] = useState(false);
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
@@ -113,6 +118,11 @@ export default function CreateRecipe() {
     const categoryFromUrl = searchParams.get('category');
     if (categoryFromUrl && !isEditing) {
       setFormData(prev => ({ ...prev, category_id: parseInt(categoryFromUrl) }));
+    }
+
+    const importFlag = searchParams.get('import');
+    if (importFlag === '1' && !isEditing) {
+      setShowImporter(true);
     }
   }, [location.search, isEditing]);
 
@@ -185,7 +195,7 @@ export default function CreateRecipe() {
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
           let query = supabase
             .from('recipes')
-            .select('*, recipe_ingredients(amount_in_grams, unit, group_name, ingredient:ingredients(name)), recipe_tags(tags(name))');
+            .select('*, recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredient:ingredients(name)), recipe_tags(tags(name)), recipe_categories(category_id)');
 
           if (isUuid) {
             query = query.eq('id', id);
@@ -206,6 +216,8 @@ export default function CreateRecipe() {
               source_url: recipe.source_url || '',
               alternative_titles: recipe.alternative_titles || '',
               category_id: recipe.category_id || 0,
+              secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id) || [],
+              country_origin: recipe.country_origin || '',
               steps: recipe.steps.map((s: any) => typeof s === 'string' ? { text: s, image_url: '', alignment: 'full', section: 'Main Steps' } : { ...s, section: s.section || 'Main Steps' }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
@@ -220,12 +232,14 @@ export default function CreateRecipe() {
                 carbs: (recipe.nutrition?.carbs || 0).toString()
               }
             });
-            setIngredients(recipe.recipe_ingredients?.map((i: any) => ({
-              name: i.ingredient?.name || '',
-              amount: i.amount_in_grams.toString(),
-              unit: i.unit || '',
-              group_name: i.group_name || 'Ingredients'
-            })) || [{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
+            setIngredients(recipe.recipe_ingredients
+              ?.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+              ?.map((i: any) => ({
+                name: i.ingredient?.name || '',
+                amount: i.amount_in_grams.toString(),
+                unit: i.unit || '',
+                group_name: i.group_name || 'Ingredients'
+              })) || [{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
           }
         } catch (error) { console.error(error); alert('Failed to load recipe'); }
       }
@@ -291,6 +305,7 @@ export default function CreateRecipe() {
         },
         rating: formData.rating,
         slug: generateSlug(formData.title),
+        country_origin: formData.country_origin || null,
       };
       let recipeIdForIngredients: string;
       if (isEditing) {
@@ -309,6 +324,17 @@ export default function CreateRecipe() {
         if (error) throw error;
         recipeIdForIngredients = data.id;
       }
+
+      // Handle secondary categories
+      if (isEditing) await supabase.from('recipe_categories').delete().eq('recipe_id', recipeIdForIngredients);
+      const categoryLinks = Array.from(new Set([formData.category_id, ...formData.secondary_category_ids]))
+        .filter(cid => cid > 0)
+        .map(cid => ({ recipe_id: recipeIdForIngredients, category_id: cid }));
+
+      if (categoryLinks.length > 0) {
+        await supabase.from('recipe_categories').upsert(categoryLinks);
+      }
+
       const currentIngredients = ingredients.filter(ing => ing.name.trim() !== '');
       if (isEditing) await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeIdForIngredients);
       for (const ing of currentIngredients) {
@@ -318,12 +344,14 @@ export default function CreateRecipe() {
           const { data: newIng } = await supabase.from('ingredients').insert([{ name: ing.name }]).select().single();
           ingredientId = newIng.id;
         } else ingredientId = existingIng.id;
+
         await supabase.from('recipe_ingredients').insert([{
           recipe_id: recipeIdForIngredients,
           ingredient_id: ingredientId,
           amount_in_grams: parseFloat(ing.amount) || 0,
           unit: ing.unit || null,
-          group_name: ing.group_name || 'Ingredients'
+          group_name: ing.group_name || 'Ingredients',
+          order_index: ingredients.indexOf(ing)
         }]);
       }
       alert(isEditing ? 'Recipe updated!' : 'Recipe published!');
@@ -378,54 +406,95 @@ export default function CreateRecipe() {
 
     lines.forEach(line => {
       let trimmed = line.trim().replace(/[٠-٩]/g, m => ARABIC_DIGITS_MAP[m] || m).replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75');
-      if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
-        currentGroup = trimmed.replace(/^#\s*|[:]$/g, '');
+
+      // SECTION DETECTION: Only if it ends with ":" (not in the middle)
+      if (trimmed.endsWith(':')) {
+        currentGroup = trimmed.replace(/[:]$/g, '').trim();
+        return;
+      }
+
+      if (trimmed.startsWith('#')) {
+        currentGroup = trimmed.replace(/^#\s*/, '').trim();
         return;
       }
 
       let amount = '';
       let unit = '';
-      let name = trimmed;
+      let name = '';
 
-      let found = false;
-      for (const key of unitKeys) {
-        if (trimmed.toLowerCase().includes(key.toLowerCase())) {
-          unit = UNIT_MAPPING[key];
-          const parts = trimmed.split(new RegExp(key, 'i'));
-          const amtMatch = parts[0].match(/[\d\/\.]+/);
-          if (amtMatch) amount = amtMatch[0];
-          name = parts.slice(1).join(key).trim() || parts[0].replace(amount || '', '').trim();
-          found = true;
-          break;
+      // Safer extraction: [Amount] [Unit] [Name]
+      const amountMatch = trimmed.match(/^([\d\/\.\s-]+)/);
+      if (amountMatch) {
+        const rawAmount = amountMatch[1].trim();
+        if (rawAmount.match(/[\d]/)) {
+          amount = rawAmount;
+          let remainder = trimmed.substring(amountMatch[0].length).trim();
+
+          let unitFound = false;
+          for (const key of unitKeys) {
+            // Search for unit as a FULL WORD boundary-safe
+            const unitRegex = new RegExp('^' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|$|(?=\\d))', 'i');
+            if (unitRegex.test(remainder)) {
+              unit = UNIT_MAPPING[key];
+              name = remainder.replace(unitRegex, '').trim();
+              unitFound = true;
+              break;
+            }
+          }
+
+          if (!unitFound) {
+            name = remainder;
+          }
+        } else {
+          name = trimmed;
         }
+      } else {
+        name = trimmed;
       }
 
-      if (!found) {
-        const amtMatch = trimmed.match(/^[\d\/\.]+/);
-        if (amtMatch) {
-          amount = amtMatch[0];
-          name = trimmed.replace(amount, '').trim();
-          unit = ''; // Default to empty as requested
-        }
+      if (name) {
+        newIngs.push({ amount, unit, name, group_name: currentGroup });
       }
-
-      newIngs.push({ amount, unit, name, group_name: currentGroup });
     });
+
     setIngredients([...ingredients.filter(i => i.name), ...newIngs]);
     setShowBulkAdd(false);
   };
 
   const parseBulkSteps = () => {
     const lines = bulkStepsText.split('\n').filter(l => l.trim() !== '');
-    const newSteps = lines.map(line => {
+    let currentGroup = 'Main Steps';
+    const newSteps: any[] = [];
+
+    lines.forEach(line => {
       let text = line.trim();
-      // Remove leading numbers/bullets like "1.", "1)", "Step 1:", "-", "*"
-      text = text.replace(/^\s*(\d+[\.\)\-]\s*|step\s*\d+[:\.\s\-]+|[\-\*]\s+)/i, '').trim();
-      return { text, image_url: '', alignment: 'full' as const };
+
+      // SECTION DETECTION: Only if it ends with ":"
+      if (text.endsWith(':')) {
+        currentGroup = text.replace(/[:]$/g, '').trim();
+        return;
+      }
+
+      if (text.startsWith('#')) {
+        currentGroup = text.replace(/^#\s*/, '').trim();
+        return;
+      }
+
+      const cleanedText = text.replace(/^\s*(\d+[\.\)\-]\s*|step\s*\d+[:\.\s\-]+|[\-\*]\s+)/i, '').trim();
+
+      if (cleanedText) {
+        newSteps.push({
+          text: cleanedText,
+          image_url: '',
+          alignment: 'full' as const,
+          group_name: currentGroup
+        });
+      }
     });
+
     setFormData(prev => ({
       ...prev,
-      steps: [...prev.steps.filter(s => s.text), ...newSteps.map(s => ({ ...s, group_name: 'Main Steps' }))]
+      steps: [...prev.steps.filter(s => s.text), ...newSteps]
     }));
     setShowBulkSteps(false);
   };
@@ -471,7 +540,21 @@ export default function CreateRecipe() {
             {/* COLUMN 1 */}
             <div className="space-y-4">
               <section id="fundamentals" className="section-card space-y-4">
-                <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-lg shadow-inner">📝</div><h2 className="text-xl font-black tracking-tighter">Fundamentals</h2></div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-lg shadow-inner">📝</div>
+                    <h2 className="text-xl font-black tracking-tighter">Fundamentals</h2>
+                  </div>
+                  {!isEditing && (
+                    <button
+                      onClick={() => setShowImporter(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg active:scale-95"
+                    >
+                      <Sparkles size={12} />
+                      Magic Import
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">Title</label>
@@ -545,6 +628,41 @@ export default function CreateRecipe() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Additional Categories</label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {formData.secondary_category_ids.filter(id => id !== formData.category_id).map(id => {
+                        const cat = categories.find(c => c.id === id);
+                        return (
+                          <div key={id} className="flex items-center gap-2 px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-bold border border-primary-100">
+                            {cat?.name}
+                            <button type="button" onClick={() => setFormData(f => ({ ...f, secondary_category_ids: f.secondary_category_ids.filter(x => x !== id) }))} className="hover:text-red-500"><X size={12} /></button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-[10px] font-bold uppercase tracking-widest"
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          if (val > 0 && !formData.secondary_category_ids.includes(val)) {
+                            setFormData(f => ({ ...f, secondary_category_ids: [...f.secondary_category_ids, val] }));
+                          }
+                          e.target.value = "0";
+                        }}
+                      >
+                        <option value="0">+ Add Category</option>
+                        {categories.map(c => (
+                          <option key={c.id} value={c.id}>{c.parent_id ? `${categories.find(p => p.id === c.parent_id)?.name} > ` : ''}{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Country of Origin</label>
+                    <input type="text" placeholder="e.g. Italy, Lebanon, Mexico" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm font-bold" value={formData.country_origin} onChange={e => setFormData({ ...formData, country_origin: e.target.value })} />
                   </div>
                   <div className="space-y-1 col-span-2"><label className="text-[10px] font-black uppercase text-gray-400">Rating</label><div className="flex items-center gap-2 h-10 px-4 bg-gray-50/50 rounded-lg">{[1, 2, 3, 4, 5].map(s => <button key={s} type="button" onClick={() => setFormData({ ...formData, rating: s })}><Star size={16} className={s <= formData.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} /></button>)}</div></div>
                   <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Servings</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} /></div>
@@ -788,6 +906,44 @@ export default function CreateRecipe() {
           <option key={u} value={u} />
         ))}
       </datalist>
+      <LinkImporterModal
+        isOpen={showImporter}
+        onClose={() => setShowImporter(false)}
+        onImportSuccess={(data) => {
+          setFormData(prev => ({
+            ...prev,
+            title: data.title || prev.title,
+            description: data.description || prev.description,
+            image_url: data.image_url || prev.image_url,
+            source_url: data.original_url || prev.source_url,
+            prep_time: String(data.prep_time || 15),
+            cook_time: String(data.cook_time || 30),
+            servings: String(data.servings || 4),
+            nutrition: data.nutrition ? {
+              calories: String(data.nutrition.calories || 0),
+              protein: String(data.nutrition.protein || 0),
+              fat: String(data.nutrition.fat || 0),
+              carbs: String(data.nutrition.carbs || 0),
+            } : prev.nutrition,
+            steps: data.steps ? data.steps.map((s: string) => ({
+              text: s,
+              alignment: 'full',
+              group_name: 'Main Steps'
+            })) : prev.steps
+          }));
+
+          if (data.ingredients) {
+            setIngredients(data.ingredients.map((ing: any) => ({
+              name: ing.name,
+              amount: String(ing.amount || ''),
+              unit: ing.unit || 'g',
+              group_name: ing.group_name || 'Main'
+            })));
+          }
+
+          toast.success('Fields populated! Preview and save.');
+        }}
+      />
     </div>
   );
 }

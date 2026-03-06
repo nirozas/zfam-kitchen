@@ -188,6 +188,12 @@ export default function RecipeDetail() {
             const ttMatch = trimmedUrl.match(/tiktok\.com\/(?:@[\w.-]+\/video\/|v\/|t\/)(\d+)/);
             if (ttMatch) return { type: 'embed', url: `https://www.tiktok.com/embed/v2/${ttMatch[1]}` };
 
+            // 4b. Facebook
+            const fbMatch = trimmedUrl.match(/(?:facebook\.com|fb\.watch)\/(?:watch\?v=|videos\/|reel\/|reel\/)?([\w.]+)/);
+            if (fbMatch && (trimmedUrl.includes('facebook') || trimmedUrl.includes('fb.watch'))) {
+                return { type: 'embed', url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmedUrl)}&show_text=0&width=560` };
+            }
+
             // 5. Google Drive
             const gdMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
             if (gdMatch) return { type: 'embed', url: `https://drive.google.com/file/d/${gdMatch[1]}/preview` };
@@ -359,12 +365,34 @@ export default function RecipeDetail() {
                     <div className="absolute top-6 right-6 flex flex-col items-end gap-3 z-30">
                         <div className="flex items-center gap-2">
                             <div className="hidden sm:flex items-center gap-2">
-                                <Link
-                                    to={`/category/${recipe.category?.slug || 'uncategorized'}`}
-                                    className="px-4 py-1.5 bg-primary-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-black/20"
-                                >
-                                    {recipe.category?.name || 'Uncategorized'}
-                                </Link>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Link
+                                        to={`/category/${recipe.category?.slug || 'uncategorized'}`}
+                                        className="px-4 py-1.5 bg-primary-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-black/20"
+                                    >
+                                        {recipe.category?.name || 'Uncategorized'}
+                                    </Link>
+                                    {recipe.all_categories && recipe.all_categories.length > 0 && recipe.all_categories.filter(c => c.id !== recipe.category?.id).map((cat) => (
+                                        <div key={cat.id} className="flex items-center gap-2">
+                                            <span className="text-white/40 font-black">+</span>
+                                            <Link
+                                                to={`/category/${cat.slug}`}
+                                                className="px-4 py-1.5 bg-white/10 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-white/20 transition-colors border border-white/10"
+                                            >
+                                                {cat.name}
+                                            </Link>
+                                        </div>
+                                    ))}
+
+                                    {recipe.country_origin && (
+                                        <div className="flex items-center gap-2 ml-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                            <span className="px-4 py-1.5 bg-indigo-500/80 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full shadow-lg border border-white/20">
+                                                📍 {recipe.country_origin}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {(isOwner || isAdmin) && (
@@ -404,12 +432,30 @@ export default function RecipeDetail() {
                         className="max-w-4xl relative z-10 pt-52 sm:pt-56 md:pt-64 lg:pt-40"
                     >
                         <div className="flex flex-wrap items-center gap-4 mb-4 sm:hidden">
-                            <Link
-                                to={`/category/${recipe.category?.slug || 'uncategorized'}`}
-                                className="px-3 py-1 bg-primary-500 text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full shadow-lg"
-                            >
-                                {recipe.category?.name || 'Uncategorized'}
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link
+                                    to={`/category/${recipe.category?.slug || 'uncategorized'}`}
+                                    className="px-3 py-1 bg-primary-500 text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full shadow-lg"
+                                >
+                                    {recipe.category?.name || 'Uncategorized'}
+                                </Link>
+                                {recipe.all_categories && recipe.all_categories.length > 0 && recipe.all_categories.filter(c => c.id !== recipe.category?.id).map((cat) => (
+                                    <div key={cat.id} className="flex items-center gap-1">
+                                        <span className="text-white/40 font-black text-[10px]">+</span>
+                                        <Link
+                                            to={`/category/${cat.slug}`}
+                                            className="px-3 py-1 bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full border border-white/10"
+                                        >
+                                            {cat.name}
+                                        </Link>
+                                    </div>
+                                ))}
+                                {recipe.country_origin && (
+                                    <span className="px-3 py-1 bg-indigo-500/80 text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full shadow-lg border border-white/10">
+                                        📍 {recipe.country_origin}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <h1 className="text-3xl sm:text-5xl md:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9]">
@@ -616,14 +662,19 @@ export default function RecipeDetail() {
                             </div>
 
                             <div className="space-y-6 mb-12">
-                                {Object.entries(
-                                    recipe.ingredients.reduce((groups, ing, index) => {
+                                {(() => {
+                                    const groups: { name: string, items: any[] }[] = [];
+                                    recipe.ingredients.forEach((ing, index) => {
                                         const groupName = ing.group_name || 'Ingredients';
-                                        if (!groups[groupName]) groups[groupName] = [];
-                                        groups[groupName].push({ ...ing, originalIndex: index });
-                                        return groups;
-                                    }, {} as Record<string, any[]>)
-                                ).map(([groupName, ings]) => (
+                                        let group = groups.find(g => g.name === groupName);
+                                        if (!group) {
+                                            group = { name: groupName, items: [] };
+                                            groups.push(group);
+                                        }
+                                        group.items.push({ ...ing, originalIndex: index });
+                                    });
+                                    return groups;
+                                })().map(({ name: groupName, items: ings }) => (
                                     <div key={groupName} className="space-y-3">
                                         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-500 mb-2 px-2">{groupName}</h3>
                                         <div className="space-y-2">
@@ -735,6 +786,20 @@ export default function RecipeDetail() {
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                                         Full-width cinematic view
                                     </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {recipe.notes && (
+                            <section className="bg-amber-50/50 p-8 sm:p-12 rounded-[3.5rem] border-2 border-dashed border-amber-200 shadow-sm">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl shadow-inner">📝</div>
+                                    <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Chef's Notes</h2>
+                                </div>
+                                <div className="max-w-none">
+                                    <p className="text-gray-800 font-bold leading-relaxed italic whitespace-pre-wrap text-lg">
+                                        "{recipe.notes}"
+                                    </p>
                                 </div>
                             </section>
                         )}
@@ -907,7 +972,7 @@ export default function RecipeDetail() {
                                     href={recipe.source_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-4 px-10 py-5 bg-gray-50 text-gray-400 rounded-[2rem] hover:bg-gray-900 hover:text-white transition-all font-black border border-gray-100 shadow-sm uppercase tracking-[0.2em] text-[10px]"
+                                    className="inline-flex items-center gap-4 px-10 py-5 bg-primary-600 text-white rounded-[2rem] hover:bg-primary-700 hover:scale-105 transition-all font-black shadow-xl shadow-primary-200 uppercase tracking-[0.2em] text-[10px]"
                                 >
                                     <ExternalLink size={20} />
                                     <span>Original Recipe Source</span>

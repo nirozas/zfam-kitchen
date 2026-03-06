@@ -7,7 +7,7 @@ export type Tag = Database['public']['Tables']['tags']['Row'];
 // Recipe with joined data (as used in the UI)
 type RecipeRow = Database['public']['Tables']['recipes']['Row'];
 
-export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 'cook_time_minutes' | 'servings' | 'nutrition' | 'gallery_urls' | 'rating'> {
+export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 'cook_time_minutes' | 'servings' | 'nutrition' | 'gallery_urls' | 'rating' | 'notes'> {
     // Inherited from Row: id, slug, title, image_url, video_url, source_url, time_minutes, etc.
     prep_time_minutes?: number;
     cook_time_minutes?: number;
@@ -22,7 +22,10 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     steps: Array<{ text: string; image_url?: string; alignment?: 'left' | 'center' | 'right' | 'full'; group_name?: string }>;
     gallery_urls?: Array<{ url: string; caption?: string; alignment?: string }>;
     tags: Tag[]; // Joined tags
-    category: Category; // Joined category
+    category: Category; // Main Joined category
+    all_categories?: Category[]; // All associated categories
+    country_origin?: string;
+    notes?: string;
     author?: Database['public']['Tables']['profiles']['Row']; // Joined author
     rating: number; // User rating from 1 to 5 stars
     likesCount?: number; // Pre-fetched likes count

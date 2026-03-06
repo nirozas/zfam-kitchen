@@ -21,8 +21,9 @@ export function useRecipes(options?: UseRecipesOptions) {
                     .select(`
                         *,
                         category:category_id(id, name, slug),
+                        recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, ingredients(*))
+                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredients(*))
                     `)
                     .order('created_at', { ascending: false });
 
@@ -37,18 +38,20 @@ export function useRecipes(options?: UseRecipesOptions) {
                     throw error;
                 }
 
-                console.log('Fetched recipes with relations:', data);
-
                 let transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
                     ...recipe,
                     rating: recipe.rating || 3,
                     category: recipe.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
+                    all_categories: recipe.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                     tags: recipe.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
-                    ingredients: recipe.recipe_ingredients?.map((ri: any) => ({
-                        amount_in_grams: ri.amount_in_grams,
-                        unit: ri.unit || 'g',
-                        ingredient: ri.ingredients
-                    })).filter((ing: any) => ing.ingredient) || [],
+                    ingredients: (recipe.recipe_ingredients || [])
+                        .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                        .map((ri: any) => ({
+                            amount_in_grams: ri.amount_in_grams,
+                            unit: ri.unit || 'g',
+                            group_name: ri.group_name || 'Main',
+                            ingredient: ri.ingredients
+                        })).filter((ing: any) => ing.ingredient) || [],
                 }));
 
                 if (transformedRecipes.length > 0) {
@@ -106,8 +109,9 @@ export function useRecipe(id: string | undefined) {
                     .select(`
                         *,
                         category:category_id(id, name, slug),
+                        recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, group_name, ingredients(*))
+                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredients(*))
                     `);
 
                 if (isUuid) {
@@ -125,13 +129,16 @@ export function useRecipe(id: string | undefined) {
                         ...data,
                         rating: data.rating || 3,
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
+                        all_categories: data.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                         tags: data.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
-                        ingredients: data.recipe_ingredients?.map((ri: any) => ({
-                            amount_in_grams: ri.amount_in_grams,
-                            unit: ri.unit || 'g',
-                            group_name: ri.group_name || 'Main',
-                            ingredient: ri.ingredients
-                        })).filter((ing: any) => ing.ingredient) || [],
+                        ingredients: data.recipe_ingredients
+                            ?.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                            .map((ri: any) => ({
+                                amount_in_grams: ri.amount_in_grams,
+                                unit: ri.unit || 'g',
+                                group_name: ri.group_name || 'Main',
+                                ingredient: ri.ingredients
+                            })).filter((ing: any) => ing.ingredient) || [],
                     };
 
                     const { count: likesCount } = await supabase
@@ -166,19 +173,19 @@ export function useCategories() {
             setLoading(true);
             let { data, error: fetchError } = await supabase
                 .from('categories')
-                .select('*')
-                .order('order_index', { ascending: true });
+                .select('*');
 
-            if (fetchError) {
-                const fallback = await supabase
-                    .from('categories')
-                    .select('*')
-                    .order('name');
-                if (fallback.error) throw fallback.error;
-                data = fallback.data;
-            }
+            if (fetchError) throw fetchError;
 
-            setCategories(data || []);
+            // Sort in memory if order_index is present, else by name
+            const sortedData = (data || []).sort((a: any, b: any) => {
+                if ('order_index' in a && 'order_index' in b && a.order_index !== null && b.order_index !== null) {
+                    return a.order_index - b.order_index;
+                }
+                return (a.name || '').localeCompare(b.name || '');
+            });
+
+            setCategories(sortedData);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch categories');
         } finally {
