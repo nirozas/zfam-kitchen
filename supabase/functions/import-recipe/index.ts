@@ -65,17 +65,23 @@ serve(async (req) => {
             }
         }
 
-        // 3. Fallback to AI refinement if no structured data OR if it's a social media platform
+        // 3. Fallback to AI refinement
         const isSocial = /instagram\.com|tiktok\.com|youtube\.com|facebook\.com/.test(url)
-        const needsRefinement = !recipeData || isSocial || !recipeData.ingredients?.length || recipeData.ingredients.some((i: any) => i.amount === null);
+        // Refine if unparsed ingredients exist (name has numbers/units)
+        const unparsed = recipeData?.ingredients?.some((i: any) =>
+            i.name && /\d|cup|tbsp|tsp|gram|clove|lb|oz/i.test(i.name)
+        );
+        const needsRefinement = !recipeData || isSocial || !recipeData.ingredients?.length || unparsed;
 
         // We ALWAYS use AI for social media or if we didn't get perfectly structured data
         if (needsRefinement) {
             const openaiKey = Deno.env.get('OPENAI_API_KEY')
 
             if (openaiKey) {
-                // Clean HTML to reduce tokens - focus on meta tags and potential recipe blocks
-                const bodyText = doc?.body?.innerText?.replace(/\s+/g, ' ').substring(0, 8000) || html.substring(0, 8000)
+                // Focus on potential recipe content
+                const cleanBody = doc?.body?.innerText || ''
+                const recipeMatch = cleanBody.match(/(Ingredients|Steps|Instructions|Directions):?.*?(Directions|Instructions|Notes|Yields|$)/si)
+                const bodyText = recipeMatch ? recipeMatch[0] : cleanBody.substring(0, 8000)
 
                 const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
@@ -88,38 +94,33 @@ serve(async (req) => {
                         messages: [
                             {
                                 role: 'system',
-                                content: `You are a professional chef and data extraction expert. 
-                            Extract recipe details from the provided text into a CLEAN JSON format.
+                                content: `You are a Senior Full-Stack Engineer and Data Extraction Specialist. 
+                            Your task is to take raw recipe text and return a perfectly structured JSON.
                             
-                            JSON Schema to return:
+                            JSON Schema:
                             {
                                 "title": "string",
-                                "description": "string (max 200 chars)",
+                                "description": "string",
                                 "time_minutes": number,
                                 "image_url": "string",
-                                "video_url": "string (optional)",
-                                "all_images": ["string"],
-                                "steps": [
-                                    {"text": "string", "image_url": "string (optional)"}
-                                ],
+                                "video_url": "string",
+                                "steps": [{"text": "string", "image_url": "string"}],
                                 "ingredients": [
-                                    {"name": "string", "amount": "string|number", "unit": "string", "note": "string (optional)"}
-                                ],
-                                "nutrition": {"calories": number, "protein": number, "fat": number, "carbs": number}
+                                    {"name": "string", "amount": "string", "unit": "string", "note": "string"}
+                                ]
                             }
 
-                            NORMALIZATION RULES:
-                            - Normalize units to exactly: 'cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked'.
-                            - If unit is not one of these, use 'pcs' or null.
-                            - 'amount' should be the quantity (e.g. "1.5", "1/2").
-                            - 'note' should contain extra details (e.g. "chopped", "melted", "at room temperature").
-                            - If the URL is from TikTok, Instagram, or Facebook and is a video post, set 'video_url' to the original URL or the extracted video URL.
-                            - If multiple images found, return the most representative one as image_url.
-                            - For 'steps', if you find relevant images in the content for specific steps, include them in 'image_url'.`
+                            SMART PARSING RULES:
+                            - NEVER leave quantity or units in the 'name' field. 
+                            - "1 1/2 cups flour" -> name: "flour", amount: "1.5", unit: "cup"
+                            - "Finely chopped onions (2 cups)" -> name: "onions", amount: "2", unit: "cup", note: "finely chopped"
+                            - "3 cloves garlic, minced" -> name: "garlic", amount: "3", unit: "clove", note: "minced"
+                            - Normalize units to: 'cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked'.
+                            - Use 'amount' for the number only. Convert fractions to decimals if easy, or keep as "1 1/2".`
                             },
                             {
                                 role: 'user',
-                                content: `URL: ${url}\n\nContent:\n${bodyText}`
+                                content: `Source URL: ${url}\n\nRecipe Content:\n${bodyText}`
                             }
                         ],
                         response_format: { type: "json_object" }
@@ -130,13 +131,13 @@ serve(async (req) => {
                 if (aiResult.choices?.[0]?.message?.content) {
                     const refinedRecipe = JSON.parse(aiResult.choices[0].message.content)
 
-                    // Normalize steps to our internal format {text, image_url}
+                    // Normalize steps to our internal format {id, text, image_url, alignment, group_name}
                     const normalizedSteps = (refinedRecipe.steps || []).map((s: any) => {
-                        if (typeof s === 'string') return { id: crypto.randomUUID(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps' };
+                        const base = typeof s === 'string' ? { text: s, image_url: '' } : s;
                         return {
                             id: crypto.randomUUID(),
-                            text: s.text || '',
-                            image_url: s.image_url || '',
+                            text: base.text || '',
+                            image_url: base.image_url || '',
                             alignment: 'full',
                             group_name: 'Main Steps'
                         };
@@ -148,11 +149,17 @@ serve(async (req) => {
                         description: refinedRecipe.description || recipeData?.description || '',
                         time_minutes: refinedRecipe.time_minutes || recipeData?.time_minutes || 30,
                         image_url: refinedRecipe.image_url || recipeData?.image_url,
-                        video_url: refinedRecipe.video_url || refinedRecipe.original_url || url, // Social media fallback
+                        video_url: refinedRecipe.video_url || url,
                         all_images: refinedRecipe.all_images || [],
                         original_url: url,
                         steps: normalizedSteps.length ? normalizedSteps : (recipeData?.steps || []),
-                        ingredients: refinedRecipe.ingredients || recipeData?.ingredients || [],
+                        ingredients: refinedRecipe.ingredients?.map((ing: any) => ({
+                            name: ing.name || '',
+                            amount: String(ing.amount || ''),
+                            unit: ing.unit === 'null' ? '' : (ing.unit || ''),
+                            note: ing.note || '',
+                            group_name: 'Main'
+                        })) || recipeData?.ingredients || [],
                         nutrition: refinedRecipe.nutrition || recipeData?.nutrition
                     }
                 }
@@ -200,13 +207,39 @@ function parseSteps(instructions: any) {
 
 function parseIngredientsFromSchema(ingredients: any) {
     if (!ingredients) return []
-    // Schema usually gives an array of strings like ["2 cups flour", "1 tsp salt"]
-    if (Array.isArray(ingredients)) {
-        return ingredients.map(ing => ({
-            name: String(ing),
+    const rawList = Array.isArray(ingredients) ? ingredients : [ingredients]
+
+    return rawList.map(ing => {
+        const line = String(ing).trim()
+        // Try to capture: "2 1/2 cups flour", "1 tsp salt", "3 cloves garlic"
+        // Also handles "Salt to taste"
+        const match = line.match(/^([\d\s\/\.¼½¾]+)\s*(cup|tbsp|tsp|g|kg|ml|l|pcs|pinch|clove|oz|lb|pack|can|bottle|bag)s?\b\s*(.*)/i)
+
+        if (match) {
+            return {
+                amount: match[1].trim(),
+                unit: match[2].toLowerCase(),
+                name: match[3].trim(),
+                note: null
+            }
+        }
+
+        // Try just number + name
+        const numOnlyMatch = line.match(/^([\d\s\/\.¼½¾]+)\s+(.*)/i)
+        if (numOnlyMatch) {
+            return {
+                amount: numOnlyMatch[1].trim(),
+                unit: null,
+                name: numOnlyMatch[2].trim(),
+                note: null
+            }
+        }
+
+        return {
+            name: line,
             amount: null,
-            unit: null
-        }))
-    }
-    return []
+            unit: null,
+            note: null
+        }
+    })
 }

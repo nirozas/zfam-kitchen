@@ -73,6 +73,53 @@ const ARABIC_DIGITS_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
 };
 
+const parseAmount = (val: string): number => {
+  if (!val) return 0;
+  // Handle space-separated fractions like "1 1/2"
+  if (val.includes(' ')) {
+    const parts = val.split(/\s+/);
+    return parts.reduce((acc, part) => acc + parseAmount(part), 0);
+  }
+  // Handle fractions like "1/2"
+  if (val.includes('/')) {
+    const [num, den] = val.split('/').map(n => parseFloat(n));
+    if (den) return num / den;
+  }
+  return parseFloat(val) || 0;
+};
+
+const cleanIngData = (ing: any) => {
+  const line = (ing.name || '').trim();
+  // If name already looks parsed (short and no numbers), return as is
+  if (line.length < 20 && !/\d/.test(line)) return ing;
+
+  // Basic regex fallback for "2 1/2 cups flour"
+  const units = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'can', 'bottle', 'bag'];
+  const unitRegex = new RegExp(`^([\\d\\s\\/\\.\\u00BC-\\u00BE]+)\\s*(${units.join('|')})s?\\b\\s*(.*)`, 'i');
+  const match = line.match(unitRegex);
+
+  if (match) {
+    return {
+      ...ing,
+      amount: match[1].trim(),
+      unit: match[2].toLowerCase(),
+      name: match[3].trim()
+    };
+  }
+
+  // Number only fallback "3 garlic cloves"
+  const numMatch = line.match(/^([\d\s\/\.\u00BC-\u00BE]+)\s+(.*)/i);
+  if (numMatch) {
+    return {
+      ...ing,
+      amount: numMatch[1].trim(),
+      name: numMatch[2].trim()
+    };
+  }
+
+  return ing;
+};
+
 export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -353,7 +400,7 @@ export default function CreateRecipe() {
         await supabase.from('recipe_ingredients').insert([{
           recipe_id: recipeIdForIngredients,
           ingredient_id: ingredientId,
-          amount_in_grams: parseFloat(ing.amount) || 0,
+          amount_in_grams: parseAmount(ing.amount),
           unit: ing.unit || null,
           note: ing.note || null,
           group_name: ing.group_name || 'Ingredients',
@@ -964,14 +1011,17 @@ export default function CreateRecipe() {
           }));
 
           if (data.ingredients) {
-            setIngredients(data.ingredients.map((ing: any) => ({
-              id: Math.random().toString(),
-              name: ing.name,
-              amount: String(ing.amount || ''),
-              unit: ing.unit || '',
-              note: ing.note || '',
-              group_name: ing.group_name || 'Main'
-            })));
+            setIngredients(data.ingredients.map((ing: any) => {
+              const cleaned = cleanIngData(ing);
+              return {
+                id: Math.random().toString(),
+                name: cleaned.name || '',
+                amount: String(cleaned.amount || ''),
+                unit: cleaned.unit || '',
+                note: cleaned.note || '',
+                group_name: cleaned.group_name || 'Main'
+              };
+            }));
           }
 
           toast.success('Fields populated! Preview and save.');
