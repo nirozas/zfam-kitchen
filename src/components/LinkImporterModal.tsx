@@ -29,6 +29,7 @@ export default function LinkImporterModal({ isOpen, onClose, onImportSuccess }: 
 
             if (functionError) throw functionError;
             if (!data) throw new Error('No data returned from importer');
+            if (data.error) throw new Error(data.error);
 
             if (data.all_images && data.all_images.length > 1) {
                 setImportedData(data);
