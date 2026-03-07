@@ -107,7 +107,7 @@ export default function CreateRecipe() {
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
-  const [ingredients, setIngredients] = useState([{ id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
+  const [ingredients, setIngredients] = useState([{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients' }]);
   const [activeSection, setActiveSection] = useState('fundamentals');
   const [completeness, setCompleteness] = useState(0);
   const [lastFocusedIngredientIndex, setLastFocusedIngredientIndex] = useState<number | null>(null);
@@ -196,7 +196,7 @@ export default function CreateRecipe() {
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
           let query = supabase
             .from('recipes')
-            .select('*, recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredient:ingredients(name)), recipe_tags(tags(name)), recipe_categories(category_id)');
+            .select('*, recipe_ingredients(amount_in_grams, unit, note, group_name, order_index, ingredient:ingredients(name)), recipe_tags(tags(name)), recipe_categories(category_id)');
 
           if (isUuid) {
             query = query.eq('id', id);
@@ -242,8 +242,9 @@ export default function CreateRecipe() {
                 name: i.ingredient?.name || '',
                 amount: i.amount_in_grams.toString(),
                 unit: i.unit || '',
+                note: i.note || '',
                 group_name: i.group_name || 'Ingredients'
-              })) || [{ id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
+              })) || [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients' }]);
           }
         } catch (error) { console.error(error); alert('Failed to load recipe'); }
       }
@@ -354,6 +355,7 @@ export default function CreateRecipe() {
           ingredient_id: ingredientId,
           amount_in_grams: parseFloat(ing.amount) || 0,
           unit: ing.unit || null,
+          note: ing.note || null,
           group_name: ing.group_name || 'Ingredients',
           order_index: ingredients.indexOf(ing)
         }]);
@@ -384,7 +386,7 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : (lastFocusedIngredientIndex !== null ? lastFocusedIngredientIndex : ingredients.length - 1);
     const lastGroup = ingredients.length > 0 ? (ingredients[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Ingredients') : 'Ingredients';
     const next = [...ingredients];
-    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', group_name: lastGroup });
+    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: lastGroup });
     setIngredients(next);
     setLastFocusedIngredientIndex(targetIdx + 1);
   };
@@ -457,7 +459,7 @@ export default function CreateRecipe() {
       }
 
       if (name) {
-        newIngs.push({ id: Math.random().toString(), amount, unit, name, group_name: currentGroup });
+        newIngs.push({ id: Math.random().toString(), amount, unit, name, note: '', group_name: currentGroup });
       }
     });
 
@@ -738,7 +740,7 @@ export default function CreateRecipe() {
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addIngredient()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
                   </div>
                 </div>
@@ -769,16 +771,27 @@ export default function CreateRecipe() {
                             <button type="button" onClick={() => addIngredient(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
                           </div>
                         )}
-                        <div className="flex gap-2 group items-center bg-white p-1 rounded-xl">
-                          <div className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-500">
-                            <GripVertical size={16} />
+                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 space-y-2">
+                          <div className="flex gap-2 group items-center">
+                            <div className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-500">
+                              <GripVertical size={16} />
+                            </div>
+                            <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'name', e.target.value)} />
+                            <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
+                            <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-400 hover:text-primary-500 transition-colors" title="Add after this"><Plus size={16} /></button>
+                              <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors" title="Remove"><X size={16} /></button>
+                            </div>
                           </div>
-                          <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'name', e.target.value)} />
-                          <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-                          <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
-                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-400 hover:text-primary-500 transition-colors" title="Add after this"><Plus size={16} /></button>
-                            <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors" title="Remove"><X size={16} /></button>
+                          <div className="pl-9 pr-12 pb-1">
+                            <input
+                              type="text"
+                              placeholder="Add a note for this ingredient (e.g. finely chopped, room temperature...)"
+                              className="w-full bg-transparent text-[10px] font-bold text-gray-400 border-none outline-none focus:text-primary-500 placeholder:text-gray-200"
+                              value={ing.note || ''}
+                              onChange={e => updateIngredient(i, 'note', e.target.value)}
+                            />
                           </div>
                         </div>
                       </Reorder.Item>
@@ -921,9 +934,10 @@ export default function CreateRecipe() {
             title: data.title || prev.title,
             description: data.description || prev.description,
             image_url: data.image_url || prev.image_url,
+            video_url: data.video_url || data.original_url || prev.video_url,
             source_url: data.original_url || prev.source_url,
-            prep_time: String(data.prep_time || 15),
-            cook_time: String(data.cook_time || 30),
+            prep_time: String(data.time_minutes || 30),
+            cook_time: '0',
             servings: String(data.servings || 4),
             nutrition: data.nutrition ? {
               calories: String(data.nutrition.calories || 0),
@@ -931,12 +945,22 @@ export default function CreateRecipe() {
               fat: String(data.nutrition.fat || 0),
               carbs: String(data.nutrition.carbs || 0),
             } : prev.nutrition,
-            steps: data.steps ? data.steps.map((s: string) => ({
-              id: Math.random().toString(),
-              text: s,
-              alignment: 'full',
-              group_name: 'Main Steps'
-            })) : prev.steps
+            steps: data.steps ? data.steps.map((s: any) => {
+              if (typeof s === 'string') return {
+                id: Math.random().toString(),
+                text: s,
+                image_url: '',
+                alignment: 'full',
+                group_name: 'Main Steps'
+              };
+              return {
+                id: Math.random().toString(),
+                text: s.text || '',
+                image_url: s.image_url || '',
+                alignment: 'full',
+                group_name: 'Main Steps'
+              };
+            }) : prev.steps
           }));
 
           if (data.ingredients) {
@@ -944,7 +968,8 @@ export default function CreateRecipe() {
               id: Math.random().toString(),
               name: ing.name,
               amount: String(ing.amount || ''),
-              unit: ing.unit || 'g',
+              unit: ing.unit || '',
+              note: ing.note || '',
               group_name: ing.group_name || 'Main'
             })));
           }

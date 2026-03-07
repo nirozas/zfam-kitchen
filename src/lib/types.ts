@@ -36,6 +36,7 @@ export interface RecipeIngredient {
     amount_in_grams: number;
     unit?: string; // 'g', 'ml', 'cup', 'lb', or 'pcs'
     group_name?: string;
+    note?: string;
 }
 
 export interface MealPlanEntry {

@@ -699,9 +699,16 @@ export default function RecipeDetail() {
                                                         onClick={() => toggleCrossed(ing.originalIndex)}
                                                         className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors"
                                                     >
-                                                        <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
-                                                            {ing.ingredient.name}
-                                                        </span>
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
+                                                                {ing.ingredient.name}
+                                                            </span>
+                                                            {ing.note && (
+                                                                <span className="text-[10px] font-bold text-gray-400 mt-0.5 leading-tight">
+                                                                    {ing.note}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
                                                             {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
                                                         </span>
