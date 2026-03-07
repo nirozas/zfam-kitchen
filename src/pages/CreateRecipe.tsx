@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2, Sparkles } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2, Sparkles, GripVertical } from 'lucide-react';
+import { AnimatePresence, Reorder } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
@@ -10,6 +10,7 @@ import { generateSlug } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface RecipeStep {
+  id: string;
   text: string;
   image_url?: string;
   alignment: 'left' | 'center' | 'right' | 'full';
@@ -90,7 +91,7 @@ export default function CreateRecipe() {
     category_id: 0,
     secondary_category_ids: [] as number[],
     country_origin: '',
-    steps: [{ text: '', image_url: '', alignment: 'full', group_name: 'Main Steps' }] as RecipeStep[],
+    steps: [{ id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'Main Steps' }] as RecipeStep[],
     gallery_urls: [] as GalleryItem[],
     rating: 3,
     tags: '',
@@ -106,7 +107,7 @@ export default function CreateRecipe() {
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
-  const [ingredients, setIngredients] = useState([{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
+  const [ingredients, setIngredients] = useState([{ id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
   const [activeSection, setActiveSection] = useState('fundamentals');
   const [completeness, setCompleteness] = useState(0);
   const [lastFocusedIngredientIndex, setLastFocusedIngredientIndex] = useState<number | null>(null);
@@ -218,7 +219,9 @@ export default function CreateRecipe() {
               category_id: recipe.category_id || 0,
               secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id) || [],
               country_origin: recipe.country_origin || '',
-              steps: recipe.steps.map((s: any) => typeof s === 'string' ? { text: s, image_url: '', alignment: 'full', section: 'Main Steps' } : { ...s, section: s.section || 'Main Steps' }),
+              steps: recipe.steps.map((s: any) => typeof s === 'string' ?
+                { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps' } :
+                { ...s, id: s.id || Math.random().toString(), group_name: s.group_name || s.section || 'Main Steps' }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
               tags: recipe.recipe_tags?.map((rt: any) => `#${rt.tags?.name}`).join(' ') || '',
@@ -235,11 +238,12 @@ export default function CreateRecipe() {
             setIngredients(recipe.recipe_ingredients
               ?.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
               ?.map((i: any) => ({
+                id: Math.random().toString(),
                 name: i.ingredient?.name || '',
                 amount: i.amount_in_grams.toString(),
                 unit: i.unit || '',
                 group_name: i.group_name || 'Ingredients'
-              })) || [{ name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
+              })) || [{ id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'Ingredients' }]);
           }
         } catch (error) { console.error(error); alert('Failed to load recipe'); }
       }
@@ -365,7 +369,7 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : (lastFocusedStepIndex !== null ? lastFocusedStepIndex : formData.steps.length - 1);
     const lastSection = formData.steps.length > 0 ? (formData.steps[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Main Steps') : 'Main Steps';
     const newSteps = [...formData.steps];
-    newSteps.splice(targetIdx + 1, 0, { text: '', image_url: '', alignment: 'full', group_name: lastSection });
+    newSteps.splice(targetIdx + 1, 0, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: lastSection });
     setFormData(prev => ({ ...prev, steps: newSteps }));
     setLastFocusedStepIndex(targetIdx + 1);
   };
@@ -380,7 +384,7 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : (lastFocusedIngredientIndex !== null ? lastFocusedIngredientIndex : ingredients.length - 1);
     const lastGroup = ingredients.length > 0 ? (ingredients[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Ingredients') : 'Ingredients';
     const next = [...ingredients];
-    next.splice(targetIdx + 1, 0, { name: '', amount: '', unit: '', group_name: lastGroup });
+    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', group_name: lastGroup });
     setIngredients(next);
     setLastFocusedIngredientIndex(targetIdx + 1);
   };
@@ -453,7 +457,7 @@ export default function CreateRecipe() {
       }
 
       if (name) {
-        newIngs.push({ amount, unit, name, group_name: currentGroup });
+        newIngs.push({ id: Math.random().toString(), amount, unit, name, group_name: currentGroup });
       }
     });
 
@@ -734,7 +738,7 @@ export default function CreateRecipe() {
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', group_name: 'New Section' }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addIngredient()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
                   </div>
                 </div>
@@ -744,39 +748,43 @@ export default function CreateRecipe() {
                     <button type="button" onClick={parseBulkIngredients} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Items</button>
                   </div>
                 )}
-                <div className="space-y-4">
-                  {ingredients.reduce((acc: any[], ing, i) => {
+                <Reorder.Group axis="y" values={ingredients} onReorder={setIngredients} className="space-y-4">
+                  {ingredients.map((ing, i) => {
                     const prevIng = ingredients[i - 1];
-                    if (!prevIng || prevIng.group_name !== ing.group_name) {
-                      acc.push(
-                        <div key={`group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
-                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
-                            const next = [...ingredients];
-                            for (let j = i; j < next.length; j++) {
-                              if (next[j].group_name === ing.group_name) next[j].group_name = e.target.value;
-                              else break;
-                            }
-                            setIngredients(next);
-                          }} />
-                          <button type="button" onClick={() => addIngredient(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
-                        </div>
-                      );
-                    }
-                    acc.push(
-                      <div key={i} className="flex gap-2 group items-center">
-                        <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'name', e.target.value)} />
-                        <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-                        <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-400 hover:text-primary-500 transition-colors" title="Add after this"><Plus size={16} /></button>
-                          <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors" title="Remove"><X size={16} /></button>
-                        </div>
-                      </div>
-                    );
-                    return acc;
-                  }, [])}
+                    const showHeader = !prevIng || prevIng.group_name !== ing.group_name;
 
-                </div>
+                    return (
+                      <Reorder.Item key={ing.id} value={ing} className="space-y-4">
+                        {showHeader && (
+                          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+                            <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
+                              const next = [...ingredients];
+                              const oldGroup = ing.group_name;
+                              for (let j = i; j < next.length; j++) {
+                                if (next[j].group_name === oldGroup) next[j].group_name = e.target.value;
+                                else break;
+                              }
+                              setIngredients(next);
+                            }} />
+                            <button type="button" onClick={() => addIngredient(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
+                          </div>
+                        )}
+                        <div className="flex gap-2 group items-center bg-white p-1 rounded-xl">
+                          <div className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-500">
+                            <GripVertical size={16} />
+                          </div>
+                          <input type="text" placeholder="Item" className="flex-1 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.name} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'name', e.target.value)} />
+                          <input type="text" placeholder="Qty" className="w-16 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-center text-sm font-medium border-none" value={ing.amount} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
+                          <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 text-sm font-medium border-none" value={ing.unit} onFocus={() => setLastFocusedIngredientIndex(i)} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-400 hover:text-primary-500 transition-colors" title="Add after this"><Plus size={16} /></button>
+                            <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors" title="Remove"><X size={16} /></button>
+                          </div>
+                        </div>
+                      </Reorder.Item>
+                    );
+                  })}
+                </Reorder.Group>
               </section>
 
               <section id="instructions" className="section-card space-y-4">
@@ -787,7 +795,7 @@ export default function CreateRecipe() {
                     <button type="button" onClick={() => {
                       setFormData(prev => ({
                         ...prev,
-                        steps: [...prev.steps, { text: '', image_url: '', alignment: 'full', group_name: 'New Section' }]
+                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section' }]
                       }));
                     }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
@@ -799,68 +807,66 @@ export default function CreateRecipe() {
                     <button type="button" onClick={parseBulkSteps} className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-black text-xs uppercase shadow-lg">Import Steps</button>
                   </div>
                 )}
-                <div className="space-y-3">
-                  {formData.steps.reduce((acc: any[], s, i) => {
+                <Reorder.Group axis="y" values={formData.steps} onReorder={(newSteps) => setFormData(p => ({ ...p, steps: newSteps }))} className="space-y-3">
+                  {formData.steps.map((s, i) => {
                     const prevStep = formData.steps[i - 1];
-                    if (!prevStep || prevStep.group_name !== s.group_name) {
-                      acc.push(
-                        <div key={`step-group-${i}`} className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
-                          <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Section Name (e.g. Preparation)" value={s.group_name} onChange={e => {
-                            const newSteps = [...formData.steps];
-                            const oldSection = s.group_name;
-                            for (let j = i; j < newSteps.length; j++) {
-                              if (newSteps[j].group_name === oldSection) newSteps[j].group_name = e.target.value;
-                              else break;
-                            }
-                            setFormData(prev => ({ ...prev, steps: newSteps }));
-                          }} />
-                          <button type="button" onClick={() => {
-                            const newSteps = [...formData.steps];
-                            newSteps.splice(i + 1, 0, { text: '', image_url: '', alignment: 'full', group_name: s.group_name });
-                            setFormData(prev => ({ ...prev, steps: newSteps }));
-                          }} className="text-[10px] font-black text-primary-600 uppercase">+ Step</button>
-                        </div>
-                      );
-                    }
-                    acc.push(
-                      <div key={i} className="relative group p-3 rounded-2xl bg-gray-50/50 border border-gray-100 transition-all hover:bg-white hover:shadow-lg flex gap-3 items-start">
-                        <div className="w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-1">{i + 1}</div>
+                    const showHeader = !prevStep || prevStep.group_name !== s.group_name;
+                    return (
+                      <Reorder.Item key={s.id} value={s} className="space-y-3">
+                        {showHeader && (
+                          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+                            <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Section Name (e.g. Preparation)" value={s.group_name} onChange={e => {
+                              const newSteps = [...formData.steps];
+                              const oldSection = s.group_name;
+                              for (let j = i; j < newSteps.length; j++) {
+                                if (newSteps[j].group_name === oldSection) newSteps[j].group_name = e.target.value;
+                                else break;
+                              }
+                              setFormData(prev => ({ ...prev, steps: newSteps }));
+                            }} />
+                            <button type="button" onClick={() => addStep(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Step</button>
+                          </div>
+                        )}
+                        <div className="relative group p-3 rounded-2xl bg-white border border-gray-100 transition-all hover:shadow-lg flex gap-3 items-start">
+                          <div className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-500 mt-1">
+                            <GripVertical size={16} />
+                          </div>
+                          <div className="w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-1">{i + 1}</div>
 
-                        <div className="flex-1 flex flex-col gap-2">
-                          <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[30px] pt-0.5 resize-none" rows={1} placeholder="Step description..." value={s.text} onFocus={() => setLastFocusedStepIndex(i)} onChange={e => updateStep(i, { text: e.target.value })} onInput={(e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = 'auto';
-                            target.style.height = target.scrollHeight + 'px';
-                          }} />
+                          <div className="flex-1 flex flex-col gap-2">
+                            <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[30px] pt-0.5 resize-none" rows={1} placeholder="Step description..." value={s.text} onFocus={() => setLastFocusedStepIndex(i)} onChange={e => updateStep(i, { text: e.target.value })} onInput={(e) => {
+                              const target = e.target as HTMLTextAreaElement;
+                              target.style.height = 'auto';
+                              target.style.height = target.scrollHeight + 'px';
+                            }} />
 
-                          <div className="flex items-center gap-2">
-                            {s.image_url ? (
-                              <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
-                                <img src={s.image_url} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
-                                  <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-0.5 text-white hover:text-primary-400 transition-colors"><Maximize2 size={10} /></button>
-                                  <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-0.5 text-white hover:text-red-400 transition-colors"><X size={10} /></button>
+                            <div className="flex items-center gap-2">
+                              {s.image_url ? (
+                                <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
+                                  <img src={s.image_url} className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
+                                    <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-0.5 text-white hover:text-primary-400 transition-colors"><Maximize2 size={10} /></button>
+                                    <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-0.5 text-white hover:text-red-400 transition-colors"><X size={10} /></button>
+                                  </div>
                                 </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-white border border-dashed border-gray-200 flex items-center justify-center relative overflow-hidden group/img shrink-0 hover:bg-gray-50 cursor-pointer">
+                                  <ImageIcon size={14} className="text-gray-300" />
+                                  <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                </div>
+                              )}
+                              <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                              <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                <button type="button" onClick={() => addStep(i)} className="p-1 text-gray-400 hover:text-primary-500 transition-all" title="Add after this"><Plus size={14} /></button>
+                                <button type="button" onClick={() => removeStep(i)} className="p-1 text-gray-300 hover:text-red-500 transition-all" title="Remove"><X size={14} /></button>
                               </div>
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-white border border-dashed border-gray-200 flex items-center justify-center relative overflow-hidden group/img shrink-0 hover:bg-gray-50 cursor-pointer">
-                                <ImageIcon size={14} className="text-gray-300" />
-                                <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                              </div>
-                            )}
-                            <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                            </div>
                           </div>
                         </div>
-
-                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button type="button" onClick={() => addStep(i)} className="p-1 text-gray-400 hover:text-primary-500 transition-all" title="Add after this"><Plus size={14} /></button>
-                          <button type="button" onClick={() => removeStep(i)} className="p-1 text-gray-300 hover:text-red-500 transition-all" title="Remove"><X size={14} /></button>
-                        </div>
-                      </div>
+                      </Reorder.Item>
                     );
-                    return acc;
-                  }, [])}
-                </div>
+                  })}
+                </Reorder.Group>
               </section>
 
               <section id="notes" className="section-card space-y-4">
@@ -926,6 +932,7 @@ export default function CreateRecipe() {
               carbs: String(data.nutrition.carbs || 0),
             } : prev.nutrition,
             steps: data.steps ? data.steps.map((s: string) => ({
+              id: Math.random().toString(),
               text: s,
               alignment: 'full',
               group_name: 'Main Steps'
@@ -934,6 +941,7 @@ export default function CreateRecipe() {
 
           if (data.ingredients) {
             setIngredients(data.ingredients.map((ing: any) => ({
+              id: Math.random().toString(),
               name: ing.name,
               amount: String(ing.amount || ''),
               unit: ing.unit || 'g',
