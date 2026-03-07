@@ -35,7 +35,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         const [mealsResult, notesResult] = await Promise.all([
             supabase
                 .from('meal_planner')
-                .select('*, recipes(*, categories(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
+                .select('*, recipes(*, category:category_id(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
                 .eq('user_id', user.id)
                 .order('id', { ascending: true }),
             supabase
@@ -69,7 +69,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                             amount_in_grams: ri.amount_in_grams,
                             unit: ri.unit
                         })),
-                        category: rawRecipe.categories,
+                        category: rawRecipe.category,
                         tags: rawRecipe.recipe_tags.map((rt: any) => rt.tags)
                     };
 
