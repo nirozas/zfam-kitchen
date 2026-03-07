@@ -217,7 +217,7 @@ export default function Categories() {
                                             >
                                                 {children.map((child, cIdx) => (
                                                     <div key={child.id} className="w-48 scale-[0.6] origin-top-left -mr-16 -mb-16 relative group/child">
-                                                        <CategoryCard category={child} index={cIdx} />
+                                                        <CategoryCard category={child} index={cIdx} isSubcategory={true} />
                                                         {isEditMode && (
                                                             <div className="absolute top-2 right-2 flex flex-col gap-1 z-20 scale-125">
                                                                 <div className="flex gap-1 mb-1">

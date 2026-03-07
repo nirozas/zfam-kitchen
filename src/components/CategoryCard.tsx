@@ -5,9 +5,10 @@ import { Link } from 'react-router-dom';
 interface CategoryCardProps {
     category: Category;
     index: number;
+    isSubcategory?: boolean;
 }
 
-export default function CategoryCard({ category, index }: CategoryCardProps) {
+export default function CategoryCard({ category, index, isSubcategory }: CategoryCardProps) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -34,7 +35,8 @@ export default function CategoryCard({ category, index }: CategoryCardProps) {
 
                 {/* Compact Title */}
                 <div className="mt-2 px-1">
-                    <h3 className="text-[10px] sm:text-[11px] font-black text-gray-900 leading-tight group-hover:text-primary-600 transition-colors line-clamp-2 h-7 flex items-center justify-center text-center">
+                    <h3 className={`font-black text-gray-900 leading-tight group-hover:text-primary-600 transition-colors line-clamp-2 h-7 flex items-center justify-center text-center ${isSubcategory ? 'text-[18px]' : 'text-[10px] sm:text-[11px]'
+                        }`}>
                         {category.name}
                     </h3>
                 </div>
