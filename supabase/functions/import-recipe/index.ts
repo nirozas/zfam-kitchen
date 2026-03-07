@@ -130,47 +130,47 @@ serve(async (req) => {
                 if (!aiResponse.ok) {
                     const errorText = await aiResponse.text();
                     console.error('OpenAI API Error:', errorText);
-                    throw new Error(`AI extraction failed: ${aiResponse.statusText}`);
-                }
+                    // Do not throw, allow function to return existing recipeData if AI fails
+                } else {
+                    const aiResult = await aiResponse.json()
+                    if (aiResult.choices?.[0]?.message?.content) {
+                        try {
+                            const refinedRecipe = JSON.parse(aiResult.choices[0].message.content)
 
-                const aiResult = await aiResponse.json()
-                if (aiResult.choices?.[0]?.message?.content) {
-                    try {
-                        const refinedRecipe = JSON.parse(aiResult.choices[0].message.content)
+                            // Normalize steps to our internal format {id, text, image_url, alignment, group_name}
+                            const normalizedSteps = (refinedRecipe.steps || []).map((s: any) => {
+                                const base = typeof s === 'string' ? { text: s, image_url: '' } : s;
+                                return {
+                                    id: crypto.randomUUID(),
+                                    text: base.text || '',
+                                    image_url: base.image_url || '',
+                                    alignment: 'full',
+                                    group_name: 'Main Steps'
+                                };
+                            });
 
-                        // Normalize steps to our internal format {id, text, image_url, alignment, group_name}
-                        const normalizedSteps = (refinedRecipe.steps || []).map((s: any) => {
-                            const base = typeof s === 'string' ? { text: s, image_url: '' } : s;
-                            return {
-                                id: crypto.randomUUID(),
-                                text: base.text || '',
-                                image_url: base.image_url || '',
-                                alignment: 'full',
-                                group_name: 'Main Steps'
-                            };
-                        });
-
-                        // Merge
-                        recipeData = {
-                            title: refinedRecipe.title || recipeData?.title || 'Imported Recipe',
-                            description: refinedRecipe.description || recipeData?.description || '',
-                            time_minutes: refinedRecipe.time_minutes || recipeData?.time_minutes || 30,
-                            image_url: refinedRecipe.image_url || recipeData?.image_url,
-                            video_url: refinedRecipe.video_url || url,
-                            steps: normalizedSteps.length ? normalizedSteps : (recipeData?.steps || []),
-                            ingredients: (refinedRecipe.ingredients || []).map((ing: any) => ({
-                                name: ing.name || '',
-                                amount: String(ing.amount || ''),
-                                unit: ing.unit === 'null' ? '' : (ing.unit || ''),
-                                note: ing.note || '',
-                                group_name: 'Main'
-                            })) || recipeData?.ingredients || [],
-                            nutrition: refinedRecipe.nutrition || recipeData?.nutrition,
-                            original_url: url
+                            // Merge
+                            recipeData = {
+                                title: refinedRecipe.title || recipeData?.title || 'Imported Recipe',
+                                description: refinedRecipe.description || recipeData?.description || '',
+                                time_minutes: refinedRecipe.time_minutes || recipeData?.time_minutes || 30,
+                                image_url: refinedRecipe.image_url || recipeData?.image_url,
+                                video_url: refinedRecipe.video_url || url,
+                                steps: normalizedSteps.length ? normalizedSteps : (recipeData?.steps || []),
+                                ingredients: (refinedRecipe.ingredients || []).map((ing: any) => ({
+                                    name: ing.name || '',
+                                    amount: String(ing.amount || ''),
+                                    unit: ing.unit === 'null' ? '' : (ing.unit || ''),
+                                    note: ing.note || '',
+                                    group_name: 'Main'
+                                })) || recipeData?.ingredients || [],
+                                nutrition: refinedRecipe.nutrition || recipeData?.nutrition,
+                                original_url: url
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse AI JSON:', e);
+                            // don't throw, maybe LD+JSON was enough
                         }
-                    } catch (e) {
-                        console.error('Failed to parse AI JSON:', e);
-                        // don't throw, maybe LD+JSON was enough
                     }
                 }
             }
