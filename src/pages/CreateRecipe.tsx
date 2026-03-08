@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
-import { generateSlug } from '@/lib/utils';
+import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface RecipeStep {
@@ -243,7 +243,18 @@ export default function CreateRecipe() {
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
           let query = supabase
             .from('recipes')
-            .select('*, recipe_ingredients(amount_in_grams, unit, note, group_name, order_index, ingredient:ingredients(name)), recipe_tags(tags(name)), recipe_categories(category_id)');
+            .select(`
+              *,
+              recipe_ingredients(
+                amount_in_grams, 
+                unit, 
+                group_name, 
+                order_index, 
+                ingredients(*)
+              ),
+              recipe_tags(tags(id, name)),
+              recipe_categories(category_id)
+            `);
 
           if (isUuid) {
             query = query.eq('id', id);
@@ -252,11 +263,15 @@ export default function CreateRecipe() {
           }
 
           const { data: recipe, error } = await query.single();
-          if (error) throw error;
+          if (error) {
+            console.error('Fetch error:', error);
+            throw error;
+          }
+          
           if (recipe) {
             setActualRecipeId(recipe.id);
             setFormData({
-              title: recipe.title,
+              title: recipe.title || '',
               description: recipe.description || '',
               notes: recipe.notes || '',
               image_url: recipe.image_url || '',
@@ -264,14 +279,14 @@ export default function CreateRecipe() {
               source_url: recipe.source_url || '',
               alternative_titles: recipe.alternative_titles || '',
               category_id: recipe.category_id || 0,
-              secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id) || [],
+              secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id).filter(Boolean) || [],
               country_origin: recipe.country_origin || '',
-              steps: recipe.steps.map((s: any) => typeof s === 'string' ?
+              steps: (recipe.steps || []).map((s: any) => typeof s === 'string' ?
                 { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps' } :
-                { ...s, id: s.id || Math.random().toString(), group_name: s.group_name || s.section || 'Main Steps' }),
+                { ...s, id: s.id || Math.random().toString(), text: s.text || '', group_name: s.group_name || s.section || 'Main Steps' }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
-              tags: recipe.recipe_tags?.map((rt: any) => `#${rt.tags?.name}`).join(' ') || '',
+              tags: recipe.recipe_tags?.map((rt: any) => rt.tags?.name ? `#${rt.tags.name}` : '').filter(Boolean).join(' ') || '',
               prep_time: (recipe.prep_time_minutes || 0).toString(),
               cook_time: (recipe.cook_time_minutes || 0).toString(),
               servings: (recipe.servings || 1).toString(),
@@ -282,18 +297,24 @@ export default function CreateRecipe() {
                 carbs: (recipe.nutrition?.carbs || 0).toString()
               }
             });
-            setIngredients(recipe.recipe_ingredients
-              ?.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
-              ?.map((i: any) => ({
+
+            const loadedIngredients = (recipe.recipe_ingredients || [])
+              .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+              .map((i: any) => ({
                 id: Math.random().toString(),
-                name: i.ingredient?.name || '',
-                amount: i.amount_in_grams.toString(),
+                name: i.ingredients?.name || '',
+                amount: (i.amount_in_grams || 0).toString(),
                 unit: i.unit || '',
                 note: i.note || '',
                 group_name: i.group_name || 'Ingredients'
-              })) || [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients' }]);
+              }));
+
+            setIngredients(loadedIngredients.length > 0 ? loadedIngredients : [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients' }]);
           }
-        } catch (error) { console.error(error); alert('Failed to load recipe'); }
+        } catch (error) { 
+          console.error('Load recipe error:', error); 
+          alert('Failed to load recipe. Please check console for details.'); 
+        }
       }
     }
     loadRecipe();
@@ -402,14 +423,37 @@ export default function CreateRecipe() {
           ingredient_id: ingredientId,
           amount_in_grams: parseAmount(ing.amount),
           unit: ing.unit || null,
-          note: ing.note || null,
           group_name: ing.group_name || 'Ingredients',
           order_index: ingredients.indexOf(ing)
         }]);
       }
+
+      // Handle tags
+      if (isEditing) await supabase.from('recipe_tags').delete().eq('recipe_id', recipeIdForIngredients);
+      const tagList = formData.tags.split(/[ ,#]+/).filter(t => t.trim() !== '');
+      for (const tagName of tagList) {
+        let { data: tag } = await supabase.from('tags').select('id').eq('name', tagName.replace('#', '')).single();
+        if (!tag) {
+          const { data: newTag, error: tagError } = await supabase.from('tags').insert({ name: tagName.replace('#', '') }).select().single();
+          if (tagError) {
+             // Tag might have been inserted by someone else just now
+             const { data: retryTag } = await supabase.from('tags').select('id').eq('name', tagName.replace('#', '')).single();
+             tag = retryTag;
+          } else {
+             tag = newTag;
+          }
+        }
+        if (tag) {
+          await supabase.from('recipe_tags').upsert({ recipe_id: recipeIdForIngredients, tag_id: tag.id });
+        }
+      }
+
       alert(isEditing ? 'Recipe updated!' : 'Recipe published!');
       navigate(isEditing ? `/recipe/${recipeData.slug}` : `/recipe/${recipeData.slug}`);
-    } catch (error) { alert('Failed to save recipe: ' + (error as Error).message); }
+    } catch (error) { 
+      console.error('Save error:', error);
+      alert('Failed to save recipe: ' + (error as Error).message); 
+    }
     finally { setUploading(false); }
   };
 
@@ -732,7 +776,7 @@ export default function CreateRecipe() {
                     <div className="h-32 rounded-[1.5rem] bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden relative group transition-all hover:bg-gray-100/50">
                       {formData.image_url ? (
                         <>
-                          <img src={formData.image_url} className="w-full h-full object-cover" />
+                          <img src={getOptimizedImageUrl(formData.image_url)} className="w-full h-full object-cover" />
                           <div className="absolute top-4 right-4 flex gap-2">
                             <button type="button" onClick={() => onEditImage(formData.image_url, 'main')} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-primary-500 transition-all"><Maximize2 size={20} /></button>
                             <button type="button" onClick={() => setFormData({ ...formData, image_url: '' })} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
@@ -748,7 +792,7 @@ export default function CreateRecipe() {
                     {/* Image URL Input */}
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 px-1">Or Paste Image URL</label>
-                      <input type="text" placeholder="https://..." className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} />
+                      <input type="text" placeholder="https://..." className="w-full px-4 py-2.5 rounded-lg bg-gray-50 focus:bg-white text-sm border-none" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: fixImageUrl(e.target.value) || '' })} />
                     </div>
                   </div>
 
@@ -768,7 +812,7 @@ export default function CreateRecipe() {
                     <div className="grid grid-cols-5 gap-2">
                       {formData.gallery_urls.map((g, i) => (
                         <div key={i} className="aspect-square rounded-xl overflow-hidden relative group border border-gray-100">
-                          <img src={g.url} className="w-full h-full object-cover" />
+                          <img src={getOptimizedImageUrl(g.url)} className="w-full h-full object-cover" />
                           <button type="button" onClick={() => setFormData(p => ({ ...p, gallery_urls: p.gallery_urls.filter((_, idx) => idx !== i) }))} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
                         </div>
                       ))}
@@ -903,7 +947,7 @@ export default function CreateRecipe() {
                             <div className="flex items-center gap-2">
                               {s.image_url ? (
                                 <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative group/img shrink-0">
-                                  <img src={s.image_url} className="w-full h-full object-cover" />
+                                  <img src={getOptimizedImageUrl(s.image_url)} className="w-full h-full object-cover" />
                                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1 opacity-0 group-hover/img:opacity-100 transition-all">
                                     <button type="button" onClick={() => s.image_url && onEditImage(s.image_url, 'step', i)} className="p-0.5 text-white hover:text-primary-400 transition-colors"><Maximize2 size={10} /></button>
                                     <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-0.5 text-white hover:text-red-400 transition-colors"><X size={10} /></button>
@@ -915,7 +959,7 @@ export default function CreateRecipe() {
                                   <input type="file" accept="image/*" onChange={e => onSelectFile(e, 'step', i)} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </div>
                               )}
-                              <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: e.target.value })} />
+                              <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: fixImageUrl(e.target.value) || '' })} />
                               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                                 <button type="button" onClick={() => addStep(i)} className="p-1 text-gray-400 hover:text-primary-500 transition-all" title="Add after this"><Plus size={14} /></button>
                                 <button type="button" onClick={() => removeStep(i)} className="p-1 text-gray-300 hover:text-red-500 transition-all" title="Remove"><X size={14} /></button>

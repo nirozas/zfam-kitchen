@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
+import { getOptimizedImageUrl } from '@/lib/utils';
 
 export default function RecipeDetail() {
     const { id } = useParams();
@@ -335,7 +336,7 @@ export default function RecipeDetail() {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            src={selectedImage}
+                            src={getOptimizedImageUrl(selectedImage)}
                             alt="Full view"
                             className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
                         />
@@ -347,7 +348,7 @@ export default function RecipeDetail() {
             <div className="relative h-[50vh] md:h-[65vh] w-full overflow-hidden">
                 {recipe.image_url ? (
                     <img
-                        src={recipe.image_url}
+                        src={getOptimizedImageUrl(recipe.image_url)}
                         alt={recipe.title}
                         className="w-full h-full object-cover cursor-zoom-in transition-transform duration-700 hover:scale-105"
                         onClick={() => setSelectedImage(recipe.image_url || null)}
@@ -418,7 +419,7 @@ export default function RecipeDetail() {
                         {/* Square Cover Box */}
                         {recipe.image_url && (
                             <div className="w-28 h-28 sm:w-64 sm:h-64 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border-2 border-white/30 shadow-2xl shadow-black/80 transition-all duration-500 hover:scale-[1.03] cursor-zoom-in group" onClick={() => setSelectedImage(recipe.image_url || null)}>
-                                <img src={recipe.image_url} alt="Cover" className="w-full h-full object-cover" />
+                                <img src={getOptimizedImageUrl(recipe.image_url)} alt="Cover" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <Maximize2 className="text-white" size={24} />
                                 </div>
@@ -614,7 +615,7 @@ export default function RecipeDetail() {
                                     className="relative aspect-square rounded-[2rem] overflow-hidden group border border-gray-100 shadow-sm cursor-zoom-in"
                                     onClick={() => setSelectedImage(image.url)}
                                 >
-                                    <img src={image.url} alt={image.caption || `Gallery ${idx}`} className="w-full h-full object-cover" />
+                                    <img src={getOptimizedImageUrl(image.url)} alt={image.caption || `Gallery ${idx}`} className="w-full h-full object-cover" />
                                     {image.caption && (
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                                             <p className="text-white text-[10px] font-bold uppercase tracking-widest">{image.caption}</p>
@@ -853,7 +854,7 @@ export default function RecipeDetail() {
                                                         onClick={() => setSelectedImage(stepData.image_url || null)}
                                                     >
                                                         <img
-                                                            src={stepData.image_url}
+                                                            src={getOptimizedImageUrl(stepData.image_url)}
                                                             alt={`Step ${index + 1}`}
                                                             className="w-full h-full object-cover max-h-[400px]"
                                                         />

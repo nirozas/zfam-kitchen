@@ -6,6 +6,7 @@ import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContex
 import { useFavorites, useLikes } from '@/lib/hooks';
 import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
+import { getOptimizedImageUrl } from '@/lib/utils';
 
 interface RecipeCardProps {
     recipe: Recipe;
@@ -85,7 +86,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                 <div className="aspect-[3/2] overflow-hidden relative bg-gray-100 flex items-center justify-center">
                     {recipe.image_url ? (
                         <img
-                            src={recipe.image_url}
+                            src={getOptimizedImageUrl(recipe.image_url)}
                             alt={recipe.title}
                             loading="lazy"
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
