@@ -4,6 +4,7 @@ import { Recipe } from './types';
 
 export interface UseRecipesOptions {
     limit?: number;
+    minimal?: boolean;
 }
 
 export function useRecipes(options?: UseRecipesOptions) {
@@ -16,16 +17,25 @@ export function useRecipes(options?: UseRecipesOptions) {
             try {
                 setLoading(true);
 
-                let query = supabase
-                    .from('recipes')
-                    .select(`
+                let query;
+
+                if (options?.minimal) {
+                    query = supabase.from('recipes').select(`
+                        id, slug, title, image_url, created_at, rating, category_id,
+                        category:category_id(id, name, slug),
+                        recipe_tags(tags(id, name))
+                    `);
+                } else {
+                    query = supabase.from('recipes').select(`
                         *,
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredients(*))
-                    `)
-                    .order('created_at', { ascending: false });
+                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, note, ingredients(*))
+                    `);
+                }
+
+                query = query.order('created_at', { ascending: false });
 
                 if (options?.limit) {
                     query = query.limit(options.limit);
@@ -44,14 +54,16 @@ export function useRecipes(options?: UseRecipesOptions) {
                     category: recipe.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
                     all_categories: recipe.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                     tags: recipe.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
-                    ingredients: (recipe.recipe_ingredients || [])
+                    ingredients: options?.minimal ? [] : (recipe.recipe_ingredients || [])
                         .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
                         .map((ri: any) => ({
                             amount_in_grams: ri.amount_in_grams,
                             unit: ri.unit || 'g',
                             group_name: ri.group_name || 'Main',
+                            note: ri.note,
                             ingredient: ri.ingredients
                         })).filter((ing: any) => ing.ingredient) || [],
+                    steps: recipe.steps || [],
                 }));
 
                 if (transformedRecipes.length > 0) {
@@ -111,7 +123,7 @@ export function useRecipe(id: string | undefined) {
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, ingredients(*))
+                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, note, ingredients(*))
                     `);
 
                 if (isUuid) {
@@ -137,6 +149,7 @@ export function useRecipe(id: string | undefined) {
                                 amount_in_grams: ri.amount_in_grams,
                                 unit: ri.unit || 'g',
                                 group_name: ri.group_name || 'Main',
+                                note: ri.note,
                                 ingredient: ri.ingredients
                             })).filter((ing: any) => ing.ingredient) || [],
                     };

@@ -27,7 +27,7 @@ const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', siz
 };
 
 const Index = () => {
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 40 });
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 40, minimal: true });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     useEffect(() => {

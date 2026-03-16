@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
@@ -825,14 +825,25 @@ export default function RecipeDetail() {
                             <div className="space-y-16">
                                 {recipe.steps.map((step, index) => {
                                     // Handle both old string steps and new object steps
-                                    const stepData = typeof step === 'string' ? { text: step } : step;
+                                    const stepData = typeof step === 'string' ? { text: step } : (step as any);
+                                    
+                                    // Logic for section headers
+                                    const prevStep = index > 0 ? (typeof recipe.steps[index - 1] === 'string' ? null : (recipe.steps[index - 1] as any)) : null;
+                                    const isNewSection = stepData.group_name && stepData.group_name !== (prevStep?.group_name);
 
                                     return (
-                                        <div
-                                            key={index}
-                                            className="flex flex-col gap-8 group cursor-pointer"
-                                            onClick={() => toggleStepCrossed(index)}
-                                        >
+                                        <React.Fragment key={index}>
+                                            {isNewSection && (
+                                                <div className="pt-8 pb-4 border-b-2 border-gray-100 mb-8">
+                                                    <h3 className="text-xl font-black text-primary-600 uppercase tracking-[0.2em]">
+                                                        {stepData.group_name}
+                                                    </h3>
+                                                </div>
+                                            )}
+                                            <div
+                                                className="flex flex-col gap-8 group cursor-pointer"
+                                                onClick={() => toggleStepCrossed(index)}
+                                            >
                                             <div className="flex items-start gap-8">
                                                 <div className={`flex-shrink-0 w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-2xl font-black transition-all shadow-inner ${crossedSteps.includes(index)
                                                     ? 'bg-gray-100 text-gray-300'
@@ -896,8 +907,9 @@ export default function RecipeDetail() {
                                                 </div>
                                             )}
                                         </div>
-                                    );
-                                })}
+                                    </React.Fragment>
+                                );
+                            })}
                             </div>
                         </section>
 
