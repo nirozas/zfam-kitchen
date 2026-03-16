@@ -114,7 +114,7 @@ export default function LinkImporterModal({ isOpen, onClose, onImportSuccess }: 
                                         <ul className="space-y-3">
                                             <li className="flex items-center gap-3 text-xs font-bold text-gray-600">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-primary-400" />
-                                                Supports TikTok, Instagram, YouTube & Blogs
+                                                Supports websites and Blogs
                                             </li>
                                             <li className="flex items-center gap-3 text-xs font-bold text-gray-600">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-primary-400" />

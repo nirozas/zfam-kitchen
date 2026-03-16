@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2, Sparkles, GripVertical } from 'lucide-react';
-import { AnimatePresence, Reorder } from 'framer-motion';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, ImageIcon, Maximize2, Sparkles, GripVertical, Link as LinkIcon } from 'lucide-react';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
+import RecipeSelectorModal from '@/components/RecipeSelectorModal';
 import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -15,6 +16,8 @@ interface RecipeStep {
   image_url?: string;
   alignment: 'left' | 'center' | 'right' | 'full';
   group_name?: string;
+  linked_recipe_id?: string | null;
+  linked_recipe?: { id: string; title: string; image_url: string | null; slug: string | null };
 }
 
 interface GalleryItem {
@@ -138,7 +141,7 @@ export default function CreateRecipe() {
     category_id: 0,
     secondary_category_ids: [] as number[],
     country_origin: '',
-    steps: [{ id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'Main Steps' }] as RecipeStep[],
+    steps: [{ id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipe_id: null, linked_recipe: undefined }] as any[],
     gallery_urls: [] as GalleryItem[],
     rating: 3,
     tags: '',
@@ -160,6 +163,11 @@ export default function CreateRecipe() {
   const [lastFocusedIngredientIndex, setLastFocusedIngredientIndex] = useState<number | null>(null);
   const [lastFocusedStepIndex, setLastFocusedStepIndex] = useState<number | null>(null);
   const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
+  const [isMagicFilling, setIsMagicFilling] = useState(false);
+  const [importedImages, setImportedImages] = useState<string[]>([]);
+  const [aiEstimatedFields, setAiEstimatedFields] = useState<string[]>([]);
+
+  const [activeRecipeLinkIndex, setActiveRecipeLinkIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -282,7 +290,7 @@ export default function CreateRecipe() {
               secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id).filter(Boolean) || [],
               country_origin: recipe.country_origin || '',
               steps: (recipe.steps || []).map((s: any) => typeof s === 'string' ?
-                { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps' } :
+                { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipe_id: null, linked_recipe: undefined } :
                 { ...s, id: s.id || Math.random().toString(), text: s.text || '', group_name: s.group_name || s.section || 'Main Steps' }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
@@ -462,7 +470,7 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : (lastFocusedStepIndex !== null ? lastFocusedStepIndex : formData.steps.length - 1);
     const lastSection = formData.steps.length > 0 ? (formData.steps[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Main Steps') : 'Main Steps';
     const newSteps = [...formData.steps];
-    newSteps.splice(targetIdx + 1, 0, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: lastSection });
+    newSteps.splice(targetIdx + 1, 0, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: lastSection, linked_recipe_id: null, linked_recipe: undefined });
     setFormData(prev => ({ ...prev, steps: newSteps }));
     setLastFocusedStepIndex(targetIdx + 1);
   };
@@ -584,7 +592,9 @@ export default function CreateRecipe() {
           text: cleanedText,
           image_url: '',
           alignment: 'full' as const,
-          group_name: currentGroup
+          group_name: currentGroup,
+          linked_recipe_id: null,
+          linked_recipe: undefined
         });
       }
     });
@@ -594,6 +604,25 @@ export default function CreateRecipe() {
       steps: [...prev.steps.filter(s => s.text), ...newSteps]
     }));
     setShowBulkSteps(false);
+  };
+
+  const normalizeIngredients = async (importedIngs: any[]) => {
+    const normalized = [];
+    for (const ing of importedIngs) {
+      const cleaned = cleanIngData(ing);
+      // Logic to check database for existing ingredients could go here, 
+      // but for now we follow the existing pattern in handleSubmit with a flag/note.
+      normalized.push({
+        id: Math.random().toString(),
+        name: cleaned.name || '',
+        amount: String(cleaned.amount || ''),
+        unit: cleaned.unit || '',
+        note: cleaned.note || '',
+        group_name: cleaned.group_name || ing.group_name || 'Ingredients',
+        isNewSuggestion: true // Visual indicator if wanted
+      });
+    }
+    return normalized;
   };
 
   return (
@@ -653,9 +682,24 @@ export default function CreateRecipe() {
                   )}
                 </div>
                 <div className="space-y-4">
+                  {formData.source_url && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="inline-flex items-center gap-2 px-3 py-1 bg-primary-50 text-primary-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-primary-100"
+                    >
+                      <Sparkles size={10} />
+                      Magic Link: {new URL(formData.source_url).hostname}
+                    </motion.div>
+                  )}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">Title</label>
-                    <input required type="text" placeholder="Recipe Name" className="w-full px-6 py-4 rounded-[1.5rem] bg-gray-50 focus:bg-white focus:border-primary-500 border-none text-2xl font-black transition-all tracking-tighter shadow-sm" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                    <motion.div
+                       animate={isMagicFilling ? { scale: [1, 1.02, 1] } : {}}
+                       transition={{ duration: 0.5 }}
+                    >
+                      <input required type="text" placeholder="Recipe Name" className="w-full px-6 py-4 rounded-[1.5rem] bg-gray-50 focus:bg-white focus:border-primary-500 border-none text-2xl font-black transition-all tracking-tighter shadow-sm" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                    </motion.div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-gray-400 px-1">Alternative Titles (comma separated)</label>
@@ -761,11 +805,48 @@ export default function CreateRecipe() {
                     <label className="text-[10px] font-black uppercase text-gray-400">Country of Origin</label>
                     <input type="text" placeholder="e.g. Italy, Lebanon, Mexico" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm font-bold" value={formData.country_origin} onChange={e => setFormData({ ...formData, country_origin: e.target.value })} />
                   </div>
-                  <div className="space-y-1 col-span-2"><label className="text-[10px] font-black uppercase text-gray-400">Rating</label><div className="flex items-center gap-2 h-10 px-4 bg-gray-50/50 rounded-lg">{[1, 2, 3, 4, 5].map(s => <button key={s} type="button" onClick={() => setFormData({ ...formData, rating: s })}><Star size={16} className={s <= formData.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} /></button>)}</div></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Servings</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} /></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Prep (Min)</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.prep_time} onChange={e => setFormData({ ...formData, prep_time: e.target.value })} /></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Cook (Min)</label><input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.cook_time} onChange={e => setFormData({ ...formData, cook_time: e.target.value })} /></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Tags</label><input type="text" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" placeholder="#healthy" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} /></div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Rating</label>
+                    <div className="flex items-center gap-2 h-10 px-4 bg-gray-50/50 rounded-lg">
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <button key={s} type="button" onClick={() => setFormData({ ...formData, rating: s })}>
+                          <Star size={16} className={s <= formData.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Servings</label>
+                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} />
+                  </div>
+                  <div className="space-y-1 relative group">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Prep (Min)</label>
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('prep_time') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.prep_time} 
+                      onChange={e => setFormData({ ...formData, prep_time: e.target.value })} 
+                    />
+                    {aiEstimatedFields.includes('prep_time') && (
+                      <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated - Please verify" />
+                    )}
+                  </div>
+                  <div className="space-y-1 relative">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Cook (Min)</label>
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('cook_time') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.cook_time} 
+                      onChange={e => setFormData({ ...formData, cook_time: e.target.value })} 
+                    />
+                    {aiEstimatedFields.includes('cook_time') && (
+                      <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated - Please verify" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Tags</label>
+                    <input type="text" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" placeholder="#healthy" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} />
+                  </div>
                 </div>
               </section>
 
@@ -773,7 +854,7 @@ export default function CreateRecipe() {
                 <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg shadow-inner">🖼️</div><h2 className="text-xl font-black tracking-tighter">Media Assets</h2></div>
                 <div className="flex flex-col gap-4">
                   <div className="space-y-2">
-                    <div className="h-32 rounded-[1.5rem] bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden relative group transition-all hover:bg-gray-100/50">
+                    <div className="h-48 rounded-[1.5rem] bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden relative group transition-all hover:bg-gray-100/50">
                       {formData.image_url ? (
                         <>
                           <img src={getOptimizedImageUrl(formData.image_url)} className="w-full h-full object-cover" />
@@ -789,6 +870,32 @@ export default function CreateRecipe() {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Horizontal Image Picker for Magic Import */}
+                    <AnimatePresence>
+                      {importedImages.length > 0 && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="space-y-2"
+                        >
+                          <label className="text-[10px] font-black uppercase text-gray-400 px-1">Picker Cover from Scraped Images</label>
+                          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar snap-x">
+                            {importedImages.map((img, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setFormData(p => ({ ...p, image_url: img }))}
+                                className={`flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden border-2 transition-all snap-start ${formData.image_url === img ? 'border-primary-500 scale-95' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                              >
+                                <img src={img} className="w-full h-full object-cover" alt="" />
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                     {/* Image URL Input */}
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 px-1">Or Paste Image URL</label>
@@ -847,7 +954,14 @@ export default function CreateRecipe() {
                     const showHeader = !prevIng || prevIng.group_name !== ing.group_name;
 
                     return (
-                      <Reorder.Item key={ing.id} value={ing} className="space-y-4">
+                      <Reorder.Item 
+                        key={ing.id} 
+                        value={ing} 
+                        className="space-y-4"
+                        initial={isMagicFilling ? { opacity: 0, x: -20 } : false}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: isMagicFilling ? i * 0.1 : 0 }}
+                      >
                         {showHeader && (
                           <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
                             <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
@@ -899,7 +1013,7 @@ export default function CreateRecipe() {
                     <button type="button" onClick={() => {
                       setFormData(prev => ({
                         ...prev,
-                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section' }]
+                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section', linked_recipe_id: null, linked_recipe: undefined }]
                       }));
                     }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
@@ -961,10 +1075,33 @@ export default function CreateRecipe() {
                               )}
                               <input type="text" placeholder="Image URL..." className="flex-1 px-2 py-1.5 rounded-lg bg-white focus:bg-gray-50 text-[10px] border border-gray-100 focus:border-primary-500 transition-colors" value={s.image_url} onChange={e => updateStep(i, { image_url: fixImageUrl(e.target.value) || '' })} />
                               <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                <button type="button" onClick={() => setActiveRecipeLinkIndex(i)} className="p-1 text-gray-400 hover:text-indigo-500 transition-all" title="Link a Recipe"><LinkIcon size={14} /></button>
                                 <button type="button" onClick={() => addStep(i)} className="p-1 text-gray-400 hover:text-primary-500 transition-all" title="Add after this"><Plus size={14} /></button>
                                 <button type="button" onClick={() => removeStep(i)} className="p-1 text-gray-300 hover:text-red-500 transition-all" title="Remove"><X size={14} /></button>
                               </div>
                             </div>
+                            
+                            {/* Linked Recipe Display */}
+                            {s.linked_recipe && (
+                              <div className="flex items-center justify-between gap-3 p-2 bg-indigo-50 border border-indigo-100/50 rounded-xl max-w-sm ml-auto mr-10 relative group/link transition-all hover:border-indigo-200">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-indigo-100 flex-shrink-0 flex items-center justify-center">
+                                    {s.linked_recipe.image_url ? (
+                                      <img src={getOptimizedImageUrl(s.linked_recipe.image_url)} alt="Linked" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <LinkIcon size={12} className="text-indigo-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[9px] font-black uppercase text-indigo-500 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Linked Recipe</span>
+                                    <span className="text-xs font-bold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{s.linked_recipe.title}</span>
+                                  </div>
+                                </div>
+                                <button type="button" onClick={() => updateStep(i, { linked_recipe_id: null, linked_recipe: undefined })} className="opacity-0 group-hover/link:opacity-100 p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all border border-transparent hover:border-red-100">
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Reorder.Item>
@@ -984,21 +1121,42 @@ export default function CreateRecipe() {
               <section id="nutrition" className="section-card space-y-4">
                 <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-lg shadow-inner">📊</div><h2 className="text-xl font-black tracking-tighter">Nutrition Facts</h2></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Calories (kcal)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.calories} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, calories: e.target.value } })} />
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('nutrition') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.nutrition.calories} 
+                      onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, calories: e.target.value } })} 
+                    />
+                    {aiEstimatedFields.includes('nutrition') && <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated Nutrition" />}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Protein (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.protein} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, protein: e.target.value } })} />
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('nutrition') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.nutrition.protein} 
+                      onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, protein: e.target.value } })} 
+                    />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Fat (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.fat} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, fat: e.target.value } })} />
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('nutrition') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.nutrition.fat} 
+                      onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, fat: e.target.value } })} 
+                    />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Carbs (g)</label>
-                    <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.nutrition.carbs} onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, carbs: e.target.value } })} />
+                    <input 
+                      type="number" 
+                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('nutrition') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`} 
+                      value={formData.nutrition.carbs} 
+                      onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, carbs: e.target.value } })} 
+                    />
                   </div>
                 </div>
               </section>
@@ -1009,6 +1167,16 @@ export default function CreateRecipe() {
 
       <AnimatePresence>
         {cropModalOpen && imageToCrop && <ImageCropper imageSrc={imageToCrop} onCropComplete={handleCropComplete} onCancel={() => setCropModalOpen(false)} aspectRatio={cropTarget?.type === 'main' ? 4 / 3 : 1} />}
+        {activeRecipeLinkIndex !== null && (
+          <RecipeSelectorModal 
+            isOpen={true} 
+            onClose={() => setActiveRecipeLinkIndex(null)}
+            onSelect={(recipe) => {
+              updateStep(activeRecipeLinkIndex, { linked_recipe_id: recipe.id, linked_recipe: recipe });
+              setActiveRecipeLinkIndex(null);
+            }}
+          />
+        )}
       </AnimatePresence>
 
       <datalist id="unit-options">
@@ -1019,7 +1187,15 @@ export default function CreateRecipe() {
       <LinkImporterModal
         isOpen={showImporter}
         onClose={() => setShowImporter(false)}
-        onImportSuccess={(data) => {
+        onImportSuccess={async (data) => {
+          setIsMagicFilling(true);
+          setImportedImages(data.all_images || []);
+          
+          const estimated = [];
+          if (!data.raw_time) estimated.push('prep_time', 'cook_time');
+          if (!data.raw_nutrition) estimated.push('nutrition');
+          setAiEstimatedFields(estimated);
+
           setFormData(prev => ({
             ...prev,
             title: data.title || prev.title,
@@ -1037,38 +1213,26 @@ export default function CreateRecipe() {
               carbs: String(data.nutrition.carbs || 0),
             } : prev.nutrition,
             steps: data.steps ? data.steps.map((s: any) => {
-              if (typeof s === 'string') return {
-                id: Math.random().toString(),
-                text: s,
-                image_url: '',
-                alignment: 'full',
-                group_name: 'Main Steps'
-              };
+              const base = typeof s === 'string' ? { text: s, image_url: '', group_name: 'Main Steps' } : s;
               return {
                 id: Math.random().toString(),
-                text: s.text || '',
-                image_url: s.image_url || '',
+                text: base.text || '',
+                image_url: base.image_url || '',
                 alignment: 'full',
-                group_name: 'Main Steps'
+                group_name: base.group_name || 'Main Steps',
+                linked_recipe_id: null,
+                linked_recipe: undefined
               };
             }) : prev.steps
           }));
 
           if (data.ingredients) {
-            setIngredients(data.ingredients.map((ing: any) => {
-              const cleaned = cleanIngData(ing);
-              return {
-                id: Math.random().toString(),
-                name: cleaned.name || '',
-                amount: String(cleaned.amount || ''),
-                unit: cleaned.unit || '',
-                note: cleaned.note || '',
-                group_name: cleaned.group_name || 'Main'
-              };
-            }));
+            const normalized = await normalizeIngredients(data.ingredients);
+            setIngredients(normalized);
           }
 
-          toast.success('Fields populated! Preview and save.');
+          setTimeout(() => setIsMagicFilling(false), 2000);
+          toast.success('Magic Filling Complete!');
         }}
       />
     </div>

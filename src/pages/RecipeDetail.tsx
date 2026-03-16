@@ -366,10 +366,11 @@ export default function RecipeDetail() {
                     <div className="absolute top-6 right-6 flex flex-col items-end gap-3 z-30">
                         <div className="flex items-center gap-2">
                             <div className="hidden sm:flex items-center gap-2">
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 relative z-50 pointer-events-auto">
                                     <Link
                                         to={`/category/${recipe.category?.slug || 'uncategorized'}`}
                                         className="px-4 py-1.5 bg-primary-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-primary-600 transition-colors shadow-lg shadow-black/20"
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         {recipe.category?.name || 'Uncategorized'}
                                     </Link>
@@ -379,6 +380,7 @@ export default function RecipeDetail() {
                                             <Link
                                                 to={`/category/${cat.slug}`}
                                                 className="px-4 py-1.5 bg-white/10 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-white/20 transition-colors border border-white/10"
+                                                onClick={(e) => e.stopPropagation()}
                                             >
                                                 {cat.name}
                                             </Link>
@@ -436,7 +438,8 @@ export default function RecipeDetail() {
                             <div className="flex flex-wrap items-center gap-2">
                                 <Link
                                     to={`/category/${recipe.category?.slug || 'uncategorized'}`}
-                                    className="px-3 py-1 bg-primary-500 text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full shadow-lg"
+                                    className="px-3 py-1 bg-primary-500 text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full shadow-lg cursor-pointer relative z-50 pointer-events-auto"
+                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     {recipe.category?.name || 'Uncategorized'}
                                 </Link>
@@ -445,7 +448,8 @@ export default function RecipeDetail() {
                                         <span className="text-white/40 font-black text-[10px]">+</span>
                                         <Link
                                             to={`/category/${cat.slug}`}
-                                            className="px-3 py-1 bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full border border-white/10"
+                                            className="px-3 py-1 bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full border border-white/10 cursor-pointer relative z-50 pointer-events-auto"
+                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             {cat.name}
                                         </Link>
@@ -841,6 +845,28 @@ export default function RecipeDetail() {
                                                         }`}>
                                                         {stepData.text}
                                                     </p>
+
+                                                    {stepData.linked_recipe && (
+                                                        <Link 
+                                                            to={`/recipe/${stepData.linked_recipe.slug || stepData.linked_recipe.id}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="mt-6 flex flex-row items-stretch gap-4 p-3 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 rounded-[2rem] transition-all group/link w-full max-w-sm shadow-sm hover:shadow-md"
+                                                        >
+                                                            <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                                                {stepData.linked_recipe.image_url ? (
+                                                                    <img src={getOptimizedImageUrl(stepData.linked_recipe.image_url)} alt="Linked recipe" className="w-full h-full object-cover group-hover/link:scale-105 transition-transform duration-500" />
+                                                                ) : (
+                                                                    <span className="text-xl">🍽️</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col justify-center min-w-0 pr-2">
+                                                                <span className="text-[9px] font-black uppercase text-indigo-500 tracking-[0.2em] flex items-center gap-1.5 mb-1 transition-colors group-hover/link:text-indigo-600">
+                                                                    <ExternalLink size={10} /> RECIPE LINK
+                                                                </span>
+                                                                <h4 className="font-bold text-gray-900 group-hover/link:text-primary-600 transition-colors line-clamp-2 text-sm leading-tight">{stepData.linked_recipe.title}</h4>
+                                                            </div>
+                                                        </Link>
+                                                    )}
                                                 </div>
                                             </div>
 

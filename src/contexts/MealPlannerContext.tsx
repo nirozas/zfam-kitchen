@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Recipe, PlannerMeal } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 interface MealPlannerContextType {
     plannedMeals: Record<string, PlannerMeal[]>;
     dailyNotes: Record<string, string>;
-    addRecipeToDate: (recipe: Recipe, dateStr: string) => void;
-    addCustomMealToDate: (title: string, dateStr: string) => void;
+    addRecipeToDate: (recipe: Recipe, dateStr: string) => Promise<boolean>;
+    addCustomMealToDate: (title: string, dateStr: string) => Promise<boolean>;
     removeRecipeFromDate: (dateStr: string, index: number) => void;
     assignRecipeToMeal: (mealId: number | string, recipe: Recipe) => Promise<void>;
     updateMealNote: (dateStr: string, mealIndex: number, note: string) => Promise<void>;
@@ -110,9 +111,27 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const addRecipeToDate = async (recipe: Recipe, dateStr: string) => {
+    const addRecipeToDate = async (recipe: Recipe, dateStr: string): Promise<boolean> => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            toast.error("You must be signed in to add to your meal planner.");
+            return false;
+        }
+
+        const tempId = `temp-${Date.now()}-${Math.random()}`;
+
+        // Optimistic update
+        setPlannedMeals(prev => ({
+            ...prev,
+            [dateStr]: [...(prev[dateStr] || []), {
+                id: tempId,
+                title: recipe.title,
+                image_url: recipe.image_url || undefined,
+                recipe: recipe,
+                note: '',
+                completed: false
+            }]
+        }));
 
         const { data, error } = await supabase
             .from('meal_planner')
@@ -126,27 +145,59 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
 
         if (error) {
             console.error('Error saving meal to planner:', error);
-            return;
+            toast.error(`Could not add to planner: ${error.message}`);
+            // Revert optimistic update
+            setPlannedMeals(prev => ({
+                ...prev,
+                [dateStr]: (prev[dateStr] || []).filter(m => m.id !== tempId)
+            }));
+            return false;
         }
 
         if (data) {
-            setPlannedMeals(prev => ({
-                ...prev,
-                [dateStr]: [...(prev[dateStr] || []), {
-                    id: data.id,
-                    title: recipe.title,
-                    image_url: recipe.image_url || undefined,
-                    recipe: recipe,
-                    note: '',
-                    completed: false
-                }]
-            }));
+            // Replace temporary ID
+            setPlannedMeals(prev => {
+                const meals = [...(prev[dateStr] || [])];
+                const tmpIdx = meals.findIndex(m => m.id === tempId);
+                if (tmpIdx !== -1) {
+                    meals[tmpIdx] = { ...meals[tmpIdx], id: data.id };
+                } else {
+                    meals.push({
+                        id: data.id,
+                        title: recipe.title,
+                        image_url: recipe.image_url || undefined,
+                        recipe: recipe,
+                        note: '',
+                        completed: false
+                    });
+                }
+                return { ...prev, [dateStr]: meals };
+            });
+            return true;
         }
+        return false;
     };
 
-    const addCustomMealToDate = async (title: string, dateStr: string) => {
+    const addCustomMealToDate = async (title: string, dateStr: string): Promise<boolean> => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            toast.error("You must be signed in to add to your meal planner.");
+            return false;
+        }
+
+        const tempId = `temp-${Date.now()}-${Math.random()}`;
+
+        // Optimistic update
+        setPlannedMeals(prev => ({
+            ...prev,
+            [dateStr]: [...(prev[dateStr] || []), {
+                id: tempId,
+                title: title,
+                isCustom: true,
+                note: '',
+                completed: false
+            }]
+        }));
 
         const { data, error } = await supabase
             .from('meal_planner')
@@ -160,21 +211,36 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
 
         if (error) {
             console.error('Error saving custom meal to planner:', error);
-            return;
+            toast.error(`Could not add to planner: ${error.message}`);
+            // Revert optimistic update
+            setPlannedMeals(prev => ({
+                ...prev,
+                [dateStr]: (prev[dateStr] || []).filter(m => m.id !== tempId)
+            }));
+            return false;
         }
 
         if (data) {
-            setPlannedMeals(prev => ({
-                ...prev,
-                [dateStr]: [...(prev[dateStr] || []), {
-                    id: data.id,
-                    title: title,
-                    isCustom: true,
-                    note: '',
-                    completed: false
-                }]
-            }));
+            // Replace temporary ID
+            setPlannedMeals(prev => {
+                const meals = [...(prev[dateStr] || [])];
+                const tmpIdx = meals.findIndex(m => m.id === tempId);
+                if (tmpIdx !== -1) {
+                    meals[tmpIdx] = { ...meals[tmpIdx], id: data.id };
+                } else {
+                    meals.push({
+                        id: data.id,
+                        title: title,
+                        isCustom: true,
+                        note: '',
+                        completed: false
+                    });
+                }
+                return { ...prev, [dateStr]: meals };
+            });
+            return true;
         }
+        return false;
     };
 
     const removeRecipeFromDate = async (dateStr: string, index: number) => {

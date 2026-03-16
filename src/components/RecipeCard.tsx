@@ -1,5 +1,5 @@
 import { Recipe } from '@/lib/types';
-import { Clock, Flame, Star, ShoppingCart, Heart } from 'lucide-react';
+import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
@@ -7,6 +7,7 @@ import { useFavorites, useLikes } from '@/lib/hooks';
 import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { getOptimizedImageUrl } from '@/lib/utils';
+import AddToPlannerModal from './AddToPlannerModal';
 
 interface RecipeCardProps {
     recipe: Recipe;
@@ -17,6 +18,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
     const { favorites, toggleFavorite } = useFavorites();
     const { likes, toggleLike } = useLikes();
     const [localLikesCount, setLocalLikesCount] = useState(recipe.likesCount || 0);
+    const [isPlannerOpen, setIsPlannerOpen] = useState(false);
 
     // Sync if parent updates the pre-fetched likesCount
     useEffect(() => {
@@ -107,6 +109,17 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                     {/* Action Buttons - Always visible on mobile, hover on desktop */}
                     <div className="absolute top-3 right-3 flex flex-col gap-2 z-10 lg:translate-x-4 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-500">
                         <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsPlannerOpen(true);
+                            }}
+                            className="p-2 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border bg-white/90 text-gray-600 border-white hover:bg-white hover:text-primary-600"
+                            title="Add to Meal Planner"
+                        >
+                            <CalendarPlus size={16} />
+                        </button>
+                        <button
                             onClick={handleToggleLike}
                             className={`p-2 rounded-full backdrop-blur-xl transition-all duration-300 shadow-xl border ${isLiked
                                 ? 'bg-rose-500 text-white border-rose-400'
@@ -177,6 +190,12 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                     </div>
                 </div>
             </Link>
+            
+            <AddToPlannerModal 
+                isOpen={isPlannerOpen} 
+                onClose={() => setIsPlannerOpen(false)} 
+                recipe={recipe} 
+            />
         </motion.div>
     );
 }

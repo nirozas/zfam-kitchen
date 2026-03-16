@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRecipes, useTopTags, useRecipeStats, useCategories } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
@@ -13,6 +13,8 @@ export default function Search() {
 
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
+    const [localQuery, setLocalQuery] = useState(query);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used' | 'category'>('created_at');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
@@ -52,8 +54,40 @@ export default function Search() {
     }, [recipes, query, selectedCategories, sortBy, sortOrder, recipeStats]);
 
     const handleTagClick = (tagName: string) => {
+        setLocalQuery(tagName);
         setSearchParams({ q: tagName });
+        setIsSearchFocused(false);
     };
+
+    // Keep localQuery synced with URL params if they change externally
+    useEffect(() => {
+        setLocalQuery(query);
+    }, [query]);
+
+    type Suggestion = 
+        | { type: 'tag'; title: string }
+        | { type: 'recipe'; id: string | number; title: string; slug: string | null | undefined; image_url: string | null | undefined; category: string | undefined };
+
+    // Live search suggestions
+    const searchSuggestions = useMemo<Suggestion[]>(() => {
+        if (!localQuery.trim()) return [];
+        const terms = localQuery.toLowerCase();
+        
+        // Find matching recipes (limit to 5)
+        const matchedRecipes: Suggestion[] = recipes
+            .filter(r => r.title.toLowerCase().includes(terms))
+            .slice(0, 5)
+            .map(r => ({ type: 'recipe' as const, id: r.id, title: r.title, slug: r.slug, image_url: r.image_url, category: r.category?.name }));
+
+        // Find matching tags (limit to 3)
+        const allTags = Array.from(new Set(recipes.flatMap(r => r.tags?.map(t => t.name) || [])));
+        const matchedTags: Suggestion[] = allTags
+            .filter(t => t.toLowerCase().includes(terms))
+            .slice(0, 3)
+            .map(t => ({ type: 'tag' as const, title: t }));
+
+        return [...matchedTags, ...matchedRecipes];
+    }, [localQuery, recipes]);
 
     if (loading) {
         return (
@@ -116,16 +150,16 @@ export default function Search() {
                         </div>
 
                         {/* Search and Sort Row */}
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-50">
                             {/* Smaller Search Bar on the Left */}
-                            <div className="w-full max-w-xl group">
+                            <div className="w-full max-w-xl group relative">
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
-                                        const formData = new FormData(e.currentTarget);
-                                        setSearchParams({ q: formData.get('search') as string });
+                                        setSearchParams({ q: localQuery });
+                                        setIsSearchFocused(false);
                                     }}
-                                    className="relative w-full"
+                                    className="relative w-full z-20"
                                 >
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <SearchIcon className="h-5 w-5 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
@@ -133,21 +167,79 @@ export default function Search() {
                                     <input
                                         type="text"
                                         name="search"
-                                        defaultValue={query}
+                                        value={localQuery}
+                                        onChange={(e) => setLocalQuery(e.target.value)}
+                                        onFocus={() => setIsSearchFocused(true)}
+                                        onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                                         placeholder="Search by name, ingredient, or tag..."
                                         className="block w-full pl-14 pr-28 py-4 border-2 border-gray-100 rounded-2xl bg-white ring-offset-background placeholder:text-gray-400 focus:outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-50/30 transition-all font-bold text-lg shadow-sm"
+                                        autoComplete="off"
                                     />
                                     <button
                                         type="submit"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all active:scale-95"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all active:scale-95 z-10"
                                     >
                                         Search
                                     </button>
                                 </form>
 
+                                {/* Autocomplete Dropdown */}
+                                <AnimatePresence>
+                                    {isSearchFocused && localQuery.trim().length > 0 && searchSuggestions.length > 0 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-20 flex flex-col"
+                                        >
+                                            {searchSuggestions.map((suggestion, idx) => (
+                                                <button
+                                                    key={`${suggestion.type}-${idx}`}
+                                                    onClick={() => {
+                                                        if (suggestion.type === 'tag') {
+                                                            handleTagClick(suggestion.title);
+                                                        } else {
+                                                            setLocalQuery(suggestion.title);
+                                                            setSearchParams({ q: suggestion.title });
+                                                            setIsSearchFocused(false);
+                                                            // Alternatively, navigate to the recipe directly? No, search results are good.
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-b-0 group"
+                                                >
+                                                    {suggestion.type === 'recipe' ? (
+                                                        <>
+                                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                                                {suggestion.image_url ? (
+                                                                    <img src={suggestion.image_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xs">{suggestion.title.substring(0,2)}</div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-bold text-sm text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">{suggestion.title}</h4>
+                                                                {suggestion.category && <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">{suggestion.category}</p>}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-500 flex-shrink-0">
+                                                                <Hash size={16} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-bold text-sm text-gray-900 group-hover:text-primary-600 transition-colors">Search for #{suggestion.title}</h4>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
                                 {/* Top Hashtags - Directly below search bar */}
                                 {topTags.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-4">
+                                    <div className="flex flex-wrap gap-2 mt-4 relative z-0">
                                         {topTags.map((tag) => (
                                             <button
                                                 key={tag.name}

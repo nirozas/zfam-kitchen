@@ -19,7 +19,14 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
         carbs: number;
     };
     ingredients: RecipeIngredient[];
-    steps: Array<{ text: string; image_url?: string; alignment?: 'left' | 'center' | 'right' | 'full'; group_name?: string }>;
+    steps: Array<{ 
+        text: string; 
+        image_url?: string; 
+        alignment?: 'left' | 'center' | 'right' | 'full'; 
+        group_name?: string;
+        linked_recipe_id?: string | null;
+        linked_recipe?: { id: string; title: string; image_url: string | null; slug: string | null };
+    }>;
     gallery_urls?: Array<{ url: string; caption?: string; alignment?: string }>;
     tags: Tag[]; // Joined tags
     category: Category; // Main Joined category
