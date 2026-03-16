@@ -16,8 +16,7 @@ interface RecipeStep {
   image_url?: string;
   alignment: 'left' | 'center' | 'right' | 'full';
   group_name?: string;
-  linked_recipe_id?: string | null;
-  linked_recipe?: { id: string; title: string; image_url: string | null; slug: string | null };
+  linked_recipes?: Array<{ id: string; title: string; image_url: string | null; slug: string | null }>;
 }
 
 interface GalleryItem {
@@ -141,7 +140,7 @@ export default function CreateRecipe() {
     category_id: 0,
     secondary_category_ids: [] as number[],
     country_origin: '',
-    steps: [{ id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipe_id: null, linked_recipe: undefined }] as any[],
+    steps: [{ id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipes: [] }] as any[],
     gallery_urls: [] as GalleryItem[],
     rating: 3,
     tags: '',
@@ -290,8 +289,8 @@ export default function CreateRecipe() {
               secondary_category_ids: recipe.recipe_categories?.map((rc: any) => rc.category_id).filter(Boolean) || [],
               country_origin: recipe.country_origin || '',
               steps: (recipe.steps || []).map((s: any) => typeof s === 'string' ?
-                { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipe_id: null, linked_recipe: undefined } :
-                { ...s, id: s.id || Math.random().toString(), text: s.text || '', group_name: s.group_name || s.section || 'Main Steps' }),
+                { id: Math.random().toString(), text: s, image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipes: [] } :
+                { ...s, id: s.id || Math.random().toString(), text: s.text || '', group_name: s.group_name || s.section || 'Main Steps', linked_recipes: s.linked_recipes || [] }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
               tags: recipe.recipe_tags?.map((rt: any) => rt.tags?.name ? `#${rt.tags.name}` : '').filter(Boolean).join(' ') || '',
@@ -470,7 +469,7 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : (lastFocusedStepIndex !== null ? lastFocusedStepIndex : formData.steps.length - 1);
     const lastSection = formData.steps.length > 0 ? (formData.steps[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Main Steps') : 'Main Steps';
     const newSteps = [...formData.steps];
-    newSteps.splice(targetIdx + 1, 0, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: lastSection, linked_recipe_id: null, linked_recipe: undefined });
+    newSteps.splice(targetIdx + 1, 0, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: lastSection, linked_recipes: [] });
     setFormData(prev => ({ ...prev, steps: newSteps }));
     setLastFocusedStepIndex(targetIdx + 1);
   };
@@ -593,8 +592,7 @@ export default function CreateRecipe() {
           image_url: '',
           alignment: 'full' as const,
           group_name: currentGroup,
-          linked_recipe_id: null,
-          linked_recipe: undefined
+          linked_recipes: []
         });
       }
     });
@@ -1013,7 +1011,7 @@ export default function CreateRecipe() {
                     <button type="button" onClick={() => {
                       setFormData(prev => ({
                         ...prev,
-                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section', linked_recipe_id: null, linked_recipe: undefined }]
+                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section', linked_recipes: [] }]
                       }));
                     }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
@@ -1082,24 +1080,31 @@ export default function CreateRecipe() {
                             </div>
                             
                             {/* Linked Recipe Display */}
-                            {s.linked_recipe && (
-                              <div className="flex items-center justify-between gap-3 p-2 bg-indigo-50 border border-indigo-100/50 rounded-xl max-w-sm ml-auto mr-10 relative group/link transition-all hover:border-indigo-200">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-indigo-100 flex-shrink-0 flex items-center justify-center">
-                                    {s.linked_recipe.image_url ? (
-                                      <img src={getOptimizedImageUrl(s.linked_recipe.image_url)} alt="Linked" className="w-full h-full object-cover" />
-                                    ) : (
-                                      <LinkIcon size={12} className="text-indigo-400" />
-                                    )}
+                            {s.linked_recipes && s.linked_recipes.length > 0 && (
+                              <div className="flex flex-col gap-2 ml-auto mr-10">
+                                {s.linked_recipes.map((lr: any, lrIndex: number) => (
+                                  <div key={lr.id || lrIndex} className="flex items-center justify-between gap-3 p-2 bg-indigo-50 border border-indigo-100/50 rounded-xl max-w-sm relative group/link transition-all hover:border-indigo-200">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-indigo-100 flex-shrink-0 flex items-center justify-center">
+                                        {lr.image_url ? (
+                                          <img src={getOptimizedImageUrl(lr.image_url)} alt="Linked" className="w-full h-full object-cover" />
+                                        ) : (
+                                          <LinkIcon size={12} className="text-indigo-400" />
+                                        )}
+                                      </div>
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="text-[9px] font-black uppercase text-indigo-500 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Linked Recipe</span>
+                                        <span className="text-xs font-bold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{lr.title}</span>
+                                      </div>
+                                    </div>
+                                    <button type="button" onClick={() => {
+                                      const updatedLinks = s.linked_recipes.filter((_: any, i: number) => i !== lrIndex);
+                                      updateStep(i, { linked_recipes: updatedLinks });
+                                    }} className="opacity-0 group-hover/link:opacity-100 p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all border border-transparent hover:border-red-100">
+                                      <X size={14} />
+                                    </button>
                                   </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-[9px] font-black uppercase text-indigo-500 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Linked Recipe</span>
-                                    <span className="text-xs font-bold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{s.linked_recipe.title}</span>
-                                  </div>
-                                </div>
-                                <button type="button" onClick={() => updateStep(i, { linked_recipe_id: null, linked_recipe: undefined })} className="opacity-0 group-hover/link:opacity-100 p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all border border-transparent hover:border-red-100">
-                                  <X size={14} />
-                                </button>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -1172,7 +1177,10 @@ export default function CreateRecipe() {
             isOpen={true} 
             onClose={() => setActiveRecipeLinkIndex(null)}
             onSelect={(recipe) => {
-              updateStep(activeRecipeLinkIndex, { linked_recipe_id: recipe.id, linked_recipe: recipe });
+              const currentLinks = formData.steps[activeRecipeLinkIndex].linked_recipes || [];
+              if (!currentLinks.find((r: any) => r.id === recipe.id)) {
+                updateStep(activeRecipeLinkIndex, { linked_recipes: [...currentLinks, recipe] });
+              }
               setActiveRecipeLinkIndex(null);
             }}
           />

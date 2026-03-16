@@ -209,8 +209,8 @@ export default function Navbar() {
                             )}
                         </Link>
 
-                        <Link to="/planner" className="hidden sm:flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors px-2 py-2 rounded-lg hover:bg-gray-100">
-                            <Calendar size={20} />
+                        <Link to="/planner" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors px-2 py-2 rounded-lg hover:bg-gray-100" title="Meal Planner">
+                            <Calendar size={22} />
                             <span className="font-medium text-xs hidden lg:inline">Planner</span>
                         </Link>
 
