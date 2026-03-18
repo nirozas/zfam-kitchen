@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { useCategories, useRecipes } from '@/lib/hooks';
+import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
 import RecipeSelectorModal from '@/components/RecipeSelectorModal';
@@ -295,7 +295,6 @@ export default function CreateRecipe() {
   const location = useLocation();
   const isEditing = !!id;
   const { categories } = useCategories();
-  const { recipes } = useRecipes({ minimal: true });
 
   const [formData, setFormData] = useState({
     title: '',
