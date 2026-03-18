@@ -118,54 +118,67 @@ export function useRecipe(id: string | undefined) {
                 setLoading(true);
                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-                let query = supabase
+                // Phase 1: Fetch core recipe data (fast — no heavy ingredient joins)
+                let coreQuery = supabase
                     .from('recipes')
                     .select(`
                         *,
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
-                        recipe_tags(tags(id, name)),
-                        recipe_ingredients!recipe_id(amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url))
+                        recipe_tags(tags(id, name))
                     `);
 
                 if (isUuid) {
-                    query = query.eq('id', id);
+                    coreQuery = coreQuery.eq('id', id);
                 } else {
-                    query = query.eq('slug', id);
+                    coreQuery = coreQuery.eq('slug', id);
                 }
 
-                const { data, error } = await query.single();
+                const { data, error } = await coreQuery.single();
 
                 if (error) throw error;
 
                 if (data) {
-                    const transformedRecipe: Recipe = {
+                    const coreRecipe: Recipe = {
                         ...data,
                         rating: data.rating || 3,
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
                         all_categories: data.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                         tags: data.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
-                        ingredients: data.recipe_ingredients
-                            ?.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                            .map((ri: any) => ({
-                                amount_in_grams: ri.amount_in_grams,
-                                unit: ri.unit || 'g',
-                                group_name: ri.group_name || 'Main',
-                                note: ri.note,
-                                ingredient: ri.ingredients,
-                                linked_recipe: ri.linked_recipe
-                            })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
+                        ingredients: [], // filled in phase 2
                     };
 
-                    // Show the recipe immediately — don't wait for likes count
-                    setRecipe(transformedRecipe);
+                    // Show recipe immediately with core data
+                    setRecipe(coreRecipe);
                     setLoading(false);
 
-                    // Fetch likes count in the background (non-blocking)
+                    // Phase 2: Fetch heavy ingredient data in background
+                    supabase
+                        .from('recipe_ingredients')
+                        .select('amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)')
+                        .eq('recipe_id', coreRecipe.id)
+                        .order('order_index')
+                        .then(({ data: ingData }) => {
+                            if (ingData) {
+                                const ingredients = ingData
+                                    .map((ri: any) => ({
+                                        amount_in_grams: ri.amount_in_grams,
+                                        unit: ri.unit || 'g',
+                                        group_name: ri.group_name || 'Main',
+                                        note: ri.note,
+                                        ingredient: ri.ingredients,
+                                        linked_recipe: ri.linked_recipe
+                                    }))
+                                    .filter((ing: any) => ing.ingredient || ing.linked_recipe);
+                                setRecipe(prev => prev ? { ...prev, ingredients } : prev);
+                            }
+                        });
+
+                    // Phase 2b: Fetch likes count in background too
                     supabase
                         .from('likes')
                         .select('*', { count: 'exact', head: true })
-                        .eq('recipe_id', transformedRecipe.id)
+                        .eq('recipe_id', coreRecipe.id)
                         .then(({ count: likesCount }) => {
                             setRecipe(prev => prev ? { ...prev, likesCount: likesCount || 0 } : prev);
                         });
