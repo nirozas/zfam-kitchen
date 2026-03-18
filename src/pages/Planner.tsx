@@ -1,12 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipe, PlannerMeal } from '@/lib/types';
-import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart, History, ExternalLink, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart, History, ExternalLink, CheckCircle2, Circle, StickyNote } from 'lucide-react';
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { useRecipes } from '@/lib/hooks';
 import { Link } from 'react-router-dom';
+
+const DebouncedInput = ({ value, onChange, placeholder, className, delay = 500 }: any) => {
+    const [localValue, setLocalValue] = useState(value);
+    const timerRef = useRef<any>(null);
+
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
+
+    const handleChange = (e: any) => {
+        const newVal = e.target.value;
+        setLocalValue(newVal);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            onChange(newVal);
+        }, delay);
+    };
+
+    return (
+        <input
+            type="text"
+            placeholder={placeholder}
+            className={className}
+            value={localValue}
+            onChange={handleChange}
+        />
+    );
+};
+
+const DebouncedTextArea = ({ value, onChange, placeholder, className, delay = 500, onTouchStart }: any) => {
+    const [localValue, setLocalValue] = useState(value);
+    const timerRef = useRef<any>(null);
+
+    useEffect(() => {
+        setLocalValue(value || '');
+    }, [value]);
+
+    const handleChange = (e: any) => {
+        const newVal = e.target.value;
+        setLocalValue(newVal);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            onChange(newVal);
+        }, delay);
+    };
+
+    return (
+        <textarea
+            placeholder={placeholder}
+            className={className}
+            value={localValue}
+            onChange={handleChange}
+            onTouchStart={onTouchStart}
+        />
+    );
+};
 
 export default function Planner() {
     const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, +1 = next week
@@ -70,11 +126,19 @@ export default function Planner() {
         setIsSearchOpen(true);
     };
 
-    const filteredRecipes = recipes.filter(r =>
-        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.alternative_titles || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.tags.some(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredRecipes = recipes.filter(r => {
+        const q = searchQuery.toLowerCase();
+        return (
+            r.title.toLowerCase().includes(q) ||
+            (r.alternative_titles || '').toLowerCase().includes(q) ||
+            (r.notes || '').toLowerCase().includes(q) ||
+            r.tags.some(t => t.name.toLowerCase().includes(q)) ||
+            r.ingredients.some(i => 
+                (i.ingredient?.name || '').toLowerCase().includes(q) || 
+                (i.note || '').toLowerCase().includes(q)
+            )
+        );
+    });
 
     const addWeekToCart = () => {
         const weekId = getWeekId(currentWeekStart);
@@ -118,18 +182,38 @@ export default function Planner() {
     };
 
     // Global Planner Search Results
-    const globalSearchResults = Object.entries(plannedMeals).flatMap(([date, meals]) =>
-        meals
-            .filter(m =>
-                plannerSearchQuery && (
-                    m.title.toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
-                    (m.recipe?.alternative_titles || '').toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
-                    (m.recipe?.category?.name || '').toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
-                    (m.recipe?.tags || []).some(t => t.name.toLowerCase().includes(plannerSearchQuery.toLowerCase()))
+    const globalSearchResults = Array.from(new Set([...Object.keys(plannedMeals), ...Object.keys(dailyNotes)]))
+        .flatMap(date => {
+            const q = plannerSearchQuery.toLowerCase();
+            if (!plannerSearchQuery) return [];
+
+            const mealsMatching = (plannedMeals[date] || []).filter(m =>
+                m.title.toLowerCase().includes(q) ||
+                (m.note || '').toLowerCase().includes(q) ||
+                (m.recipe?.alternative_titles || '').toLowerCase().includes(q) ||
+                (m.recipe?.notes || '').toLowerCase().includes(q) ||
+                (m.recipe?.category?.name || '').toLowerCase().includes(q) ||
+                (m.recipe?.tags || []).some(t => t.name.toLowerCase().includes(q)) ||
+                (m.recipe?.ingredients || []).some(i => 
+                    (i.ingredient?.name || '').toLowerCase().includes(q) || 
+                    (i.note || '').toLowerCase().includes(q)
                 )
-            )
-            .map(m => ({ ...m, date }))
-    ).sort((a, b) => b.date.localeCompare(a.date));
+            ).map(m => ({ ...m, date }));
+
+            const dayNoteMatch = (dailyNotes[date] || '').toLowerCase().includes(q);
+            if (dayNoteMatch) {
+                const noteResult = {
+                    id: `note-${date}`,
+                    title: `Plan Note: ${dailyNotes[date]}`,
+                    date,
+                    isNote: true,
+                    image_url: undefined
+                };
+                // Prepend the note result
+                return [noteResult, ...mealsMatching];
+            }
+            return mealsMatching;
+        }).sort((a, b) => b.date.localeCompare(a.date));
 
     const weekEndDate = addDays(currentWeekStart, 6);
     const isCurrentWeek = weekOffset === 0;
@@ -196,11 +280,15 @@ export default function Planner() {
                                                 onClick={() => navigateToDate(result.date)}
                                                 className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
                                             >
-                                                <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                                                    {result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">{result.title.substring(0, 2)}</div>}
+                                                <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                    {(result as any).isNote ? (
+                                                       <StickyNote size={18} className="text-yellow-500 fill-yellow-50" />
+                                                    ) : (
+                                                       result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">{result.title.substring(0, 2)}</div>
+                                                    )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-xs text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">{result.title}</p>
+                                                    <p className={`font-bold text-xs text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors ${(result as any).isNote ? 'italic' : ''}`}>{result.title}</p>
                                                     <p className="text-[10px] text-gray-400 font-medium">{format(new Date(result.date), 'MMM d, yyyy')}</p>
                                                 </div>
                                                 <ExternalLink size={12} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-all" />
@@ -417,12 +505,11 @@ export default function Planner() {
 
                                                     {/* Individual Meal Note */}
                                                     <div className="px-2 mt-2">
-                                                        <input
-                                                            type="text"
+                                                        <DebouncedInput
                                                             placeholder="Personal note..."
                                                             className="w-full text-[10px] bg-transparent border-none p-0 focus:ring-0 text-gray-400 font-medium placeholder:text-gray-200 hover:text-gray-600 transition-colors"
                                                             value={meal.note || ''}
-                                                            onChange={(e) => updateMealNote(dateStr, idx, e.target.value)}
+                                                            onChange={(newVal: string) => updateMealNote(dateStr, idx, newVal)}
                                                         />
                                                     </div>
 
@@ -448,15 +535,13 @@ export default function Planner() {
                                             </div>
                                         )}
                                     </div>
-
-
                                     <div className="mt-4 pt-4 border-t border-gray-100">
-                                        <textarea
+                                        <DebouncedTextArea
                                             placeholder="Notes..."
                                             className="w-full text-xs bg-gray-50 border-none rounded-xl p-3 min-h-[60px] resize-none focus:ring-1 focus:ring-primary-500 transition-all font-medium text-gray-600 placeholder:text-gray-300 relative z-10 touch-auto"
                                             value={dailyNotes[dateStr] || ''}
-                                            onChange={(e) => saveDailyNote(dateStr, e.target.value)}
-                                            onTouchStart={(e) => e.stopPropagation()} // Fix for mobile scroll/touch conflict
+                                            onChange={(newVal: string) => saveDailyNote(dateStr, newVal)}
+                                            onTouchStart={(e: any) => e.stopPropagation()} // Fix for mobile scroll/touch conflict
                                         />
                                     </div>
 
@@ -604,11 +689,15 @@ export default function Planner() {
                                             onClick={() => { navigateToDate(result.date); setShowAllOccurrences(false); }}
                                             className="group flex items-center gap-5 p-4 bg-gray-50/50 hover:bg-primary-50 border border-gray-100 hover:border-primary-100 rounded-3xl transition-all text-left"
                                         >
-                                            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-white flex-shrink-0">
-                                                {result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-200">{result.title.substring(0, 2)}</div>}
+                                            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-white flex-shrink-0 flex items-center justify-center">
+                                                {(result as any).isNote ? (
+                                                   <StickyNote size={24} className="text-yellow-500 fill-yellow-50" />
+                                                ) : (
+                                                   result.image_url ? <img src={result.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-200">{result.title.substring(0, 2)}</div>
+                                                )}
                                             </div>
                                             <div className="flex-1">
-                                                <h4 className="font-black text-gray-900 group-hover:text-primary-700 transition-colors">{result.title}</h4>
+                                                <h4 className={`font-black text-gray-900 group-hover:text-primary-700 transition-colors ${(result as any).isNote ? 'italic' : ''}`}>{result.title}</h4>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <CalendarIcon size={12} className="text-primary-500" />
                                                     <p className="text-xs font-bold text-gray-500">{format(new Date(result.date), 'EEEE, MMMM d, yyyy')}</p>
