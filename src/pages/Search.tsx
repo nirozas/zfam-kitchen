@@ -60,58 +60,18 @@ export default function Search() {
         return translations.length > 0 ? `${name} (${translations.join(' / ')})` : name;
     };
 
-    // Build a global map of synonyms (bridging translations across all records)
-    const globalSynonyms = useMemo(() => {
-        const map = new Map<string, Set<string>>();
-        let groups: Set<string>[] = [];
-
-        ingredientsData.forEach(ing => {
-            const names = [
-                ing.name.toLowerCase(),
-                ing.name_ar?.toLowerCase(),
-                ing.name_he?.toLowerCase(),
-                ing.name_es?.toLowerCase()
-            ].filter(Boolean) as string[];
-
-            // Find ALL groups that overlap with these names
-            const matchingGroups = groups.filter(g => names.some(n => g.has(n)));
-            
-            let targetGroup: Set<string>;
-            if (matchingGroups.length === 0) {
-                targetGroup = new Set<string>();
-                groups.push(targetGroup);
-            } else {
-                targetGroup = matchingGroups[0];
-                // If there are multiple matching groups, merge them all into the first one
-                if (matchingGroups.length > 1) {
-                    matchingGroups.slice(1).forEach(g => {
-                        g.forEach(name => targetGroup.add(name));
-                        groups = groups.filter(gr => gr !== g);
-                    });
-                }
-            }
-            names.forEach(n => targetGroup.add(n));
-        });
-
-        groups.forEach(group => {
-            group.forEach(name => map.set(name, group));
-        });
-
-        return map;
-    }, [ingredientsData]);
-
-    const getSynonyms = (term: string) => globalSynonyms.get(term.toLowerCase()) || new Set([term.toLowerCase()]);
-
     const ingredientSuggestions = useMemo(() => {
         if (!ingredientSearch.trim()) return [];
         const terms = ingredientSearch.toLowerCase();
         return ingredientsData
-            .filter(ing => {
-                const synonyms = getSynonyms(ing.name);
-                return Array.from(synonyms).some(syn => syn.includes(terms));
-            })
+            .filter(ing =>
+                ing.name.toLowerCase().includes(terms) ||
+                (ing.name_ar || '').toLowerCase().includes(terms) ||
+                (ing.name_he || '').toLowerCase().includes(terms) ||
+                (ing.name_es || '').toLowerCase().includes(terms)
+            )
             .slice(0, 5);
-    }, [ingredientSearch, ingredientsData, globalSynonyms]);
+    }, [ingredientSearch, ingredientsData]);
 
     const filteredRecipes = useMemo(() => {
         return recipes.filter(recipe => {
@@ -128,14 +88,15 @@ export default function Search() {
 
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
-                    const synonyms = Array.from(getSynonyms(si));
-
+                    const term = si.toLowerCase();
                     return recipe.ingredients?.some(ri => {
-                        return synonyms.some(syn => {
-                            const searchLower = syn.toLowerCase();
-                            const riSynonyms = Array.from(getSynonyms(ri.ingredient.name));
-                            return riSynonyms.some(rs => rs.toLowerCase().includes(searchLower));
-                        });
+                        const ing = ri.ingredient as any;
+                        return (
+                            ing.name?.toLowerCase().includes(term) ||
+                            (ing.name_ar || '').toLowerCase().includes(term) ||
+                            (ing.name_he || '').toLowerCase().includes(term) ||
+                            (ing.name_es || '').toLowerCase().includes(term)
+                        );
                     });
                 });
 
