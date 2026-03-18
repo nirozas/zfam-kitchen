@@ -185,7 +185,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                         </div>
                         <div className="flex items-center gap-1">
                             <Flame size={12} className="text-orange-500" />
-                            <span>{Math.round(recipe.ingredients.reduce((acc, curr) => acc + (curr.amount_in_grams * (curr.ingredient.calories_per_100g || 0) / 100), 0))} kcal</span>
+                            <span>{Math.round(recipe.ingredients.reduce((acc, curr) => acc + (curr.amount_in_grams * (curr.ingredient?.calories_per_100g || 0) / 100), 0))} kcal</span>
                         </div>
                     </div>
                 </div>

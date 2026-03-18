@@ -128,7 +128,7 @@ export default function RecipeDetail() {
             for (const index of selectedForCart) {
                 const item = recipe.ingredients[index];
                 await addToCart({
-                    name: item.ingredient.name,
+                    name: item.ingredient?.name || 'Unknown Ingredient',
                     amount: Math.round(item.amount_in_grams * multiplier),
                     unit: item.unit || 'g',
                     recipeId: recipe.id,
@@ -231,7 +231,7 @@ export default function RecipeDetail() {
     const videoData = recipe?.video_url ? getVideoData(recipe.video_url) : null;
 
     const baseCalories = recipe?.ingredients?.reduce((acc, curr) => {
-        return acc + (curr.amount_in_grams * (curr.ingredient.calories_per_100g || 0) / 100);
+        return acc + (curr.amount_in_grams * (curr.ingredient?.calories_per_100g || 0) / 100);
     }, 0) || 0;
 
     const isOwner = currentUserId && recipe?.author_id === currentUserId;
@@ -706,7 +706,7 @@ export default function RecipeDetail() {
                                                     >
                                                         <div className="flex flex-col">
                                                             <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
-                                                                {ing.ingredient.name}
+                                                                {ing.ingredient?.name || 'Unknown'}
                                                             </span>
                                                             {ing.note && (
                                                                 <span className="text-[10px] font-bold text-gray-400 mt-0.5 leading-tight">

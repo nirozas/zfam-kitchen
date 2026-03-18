@@ -81,17 +81,28 @@ export default function Search() {
                 (recipe.category && selectedCategories.includes(recipe.category.id));
 
             const matchesIngredients = selectedIngredients.length === 0 ||
-                selectedIngredients.every(si => 
-                    recipe.ingredients?.some(ri => {
-                        const searchLower = si.toLowerCase();
-                        return (
-                            ri.ingredient.name.toLowerCase().includes(searchLower) ||
-                            (ri.ingredient as any).name_ar?.includes(si) ||
-                            (ri.ingredient as any).name_he?.includes(si) ||
-                            (ri.ingredient as any).name_es?.toLowerCase().includes(searchLower)
-                        );
-                    })
-                );
+                selectedIngredients.every(si => {
+                    // Find all known names for the selected chip (English, Arabic, Hebrew, Spanish)
+                    const chipData = ingredientsData.find(ing => ing.name.toLowerCase() === si.toLowerCase());
+                    const synonyms = chipData ? [
+                        chipData.name.toLowerCase(),
+                        chipData.name_ar,
+                        chipData.name_he,
+                        chipData.name_es?.toLowerCase()
+                    ].filter(Boolean) as string[] : [si.toLowerCase()];
+
+                    return recipe.ingredients?.some(ri => {
+                        return synonyms.some(syn => {
+                            const searchLower = syn.toLowerCase();
+                            return (
+                                ri.ingredient.name.toLowerCase().includes(searchLower) ||
+                                (ri.ingredient as any).name_ar?.includes(syn) ||
+                                (ri.ingredient as any).name_he?.includes(syn) ||
+                                (ri.ingredient as any).name_es?.toLowerCase().includes(searchLower)
+                            );
+                        });
+                    });
+                });
 
             return matchesSearch && matchesCategory && matchesIngredients;
         }).sort((a, b) => {
@@ -276,7 +287,17 @@ export default function Search() {
                                 onBlur={() => setTimeout(() => setIsIngredientFocused(false), 200)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && ingredientSearch.trim()) {
-                                        setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
+                                        // If there's a suggestion that exactly matches (or is the first suggestion), use its canonical name
+                                        const bestMatch = ingredientSuggestions.find(
+                                            s => s.name.toLowerCase() === ingredientSearch.toLowerCase() || 
+                                            s.name_ar === ingredientSearch || 
+                                            s.name_he === ingredientSearch || 
+                                            s.name_es?.toLowerCase() === ingredientSearch.toLowerCase()
+                                        ) || (ingredientSuggestions.length > 0 ? ingredientSuggestions[0] : null);
+
+                                        const nameToAdd = bestMatch ? bestMatch.name : ingredientSearch.trim();
+                                        
+                                        setSelectedIngredients(prev => [...prev, nameToAdd]);
                                         setIngredientSearch('');
                                         setIsIngredientFocused(false);
                                     }
