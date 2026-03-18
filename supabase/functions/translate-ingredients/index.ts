@@ -12,13 +12,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  // These are auto-injected by Supabase into every edge function
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+
+  console.log('Keys available:', { gemini: !!GEMINI_API_KEY, groq: !!GROQ_API_KEY, supabase: !!serviceRoleKey });
 
   try {
     // Fetch all ingredients that are missing at least one translation
@@ -37,10 +40,11 @@ serve(async (req) => {
 
     console.log(`Translating ${ingredients.length} ingredients...`);
 
-    // Process in batches of 30
-    const BATCH_SIZE = 30;
+    // Process in batches of 10
+    const BATCH_SIZE = 10;
     let updated = 0;
     let failed = 0;
+    let lastError = '';
 
     for (let i = 0; i < ingredients.length; i += BATCH_SIZE) {
       const batch = ingredients.slice(i, i + BATCH_SIZE);
@@ -55,6 +59,8 @@ Ingredients to translate:
 ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
 
       let responseText = '';
+      let geminiErr = '';
+      let groqErr = '';
 
       // Try Gemini first
       if (GEMINI_API_KEY) {
@@ -70,10 +76,15 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
               })
             }
           );
+          if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Gemini Error (${res.status}): ${err}`);
+          }
           const data = await res.json();
-          responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          responseText = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
         } catch (e) {
           console.error('Gemini failed:', e);
+          geminiErr = (e as any).message;
         }
       }
 
@@ -84,32 +95,45 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
             method: 'POST',
             headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'llama3-70b-8192',
+              model: 'llama-3.3-70b-versatile',
               messages: [{ role: 'user', content: prompt }],
               temperature: 0.1,
               max_tokens: 4096,
             })
           });
+          if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Groq Error (${res.status}): ${err}`);
+          }
           const data = await res.json();
-          responseText = data.choices?.[0]?.message?.content || '';
+          responseText = (data.choices?.[0]?.message?.content || '').trim();
         } catch (e) {
           console.error('Groq failed:', e);
+          groqErr = (e as any).message;
         }
+      }
+
+      if (!responseText) {
+        failed += batch.length;
+        lastError = `Gemini: ${geminiErr} | Groq: ${groqErr}`;
+        continue;
       }
 
       // Parse JSON from response
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('No JSON found in response for batch', i);
+        lastError = `No JSON array found in AI response. Raw start: ${responseText.substring(0, 50)}`;
         failed += batch.length;
         continue;
       }
 
       let translations: any[];
       try {
-        translations = JSON.parse(jsonMatch[0]);
+        translations = JSON.parse(jsonMatch[0].replace(/\n/g, ' '));
       } catch (e) {
         console.error('Failed to parse JSON for batch', i);
+        lastError = `JSON parse error: ${(e as any).message}. Raw match: ${jsonMatch[0].substring(0, 100)}`;
         failed += batch.length;
         continue;
       }
@@ -131,6 +155,7 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
 
         if (updateError) {
           console.error(`Failed to update ${ing.name}:`, updateError);
+          lastError = `DB update error: ${updateError.message}`;
           failed++;
         } else {
           updated++;
@@ -139,7 +164,7 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
 
       // Small delay between batches
       if (i + BATCH_SIZE < ingredients.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 500));
       }
     }
 
@@ -148,7 +173,8 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
         message: 'Translation complete!',
         total: ingredients.length,
         updated,
-        failed 
+        failed,
+        lastError
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -33,7 +33,7 @@ export default function Search() {
                     const name = i.ingredient.name;
                     const key = name.toLowerCase();
                     const existing = ingsMap.get(key);
-                    
+
                     const name_ar = (i.ingredient as any).name_ar;
                     const name_he = (i.ingredient as any).name_he;
                     const name_es = (i.ingredient as any).name_es;
@@ -129,7 +129,7 @@ export default function Search() {
         setLocalQuery(query);
     }, [query]);
 
-    type Suggestion = 
+    type Suggestion =
         | { type: 'tag'; title: string }
         | { type: 'recipe'; id: string | number; title: string; slug: string | null | undefined; image_url: string | null | undefined; category: string | undefined };
 
@@ -137,7 +137,7 @@ export default function Search() {
     const searchSuggestions = useMemo<Suggestion[]>(() => {
         if (!localQuery.trim()) return [];
         const terms = localQuery.toLowerCase();
-        
+
         // Find matching recipes (limit to 5)
         const matchedRecipes: Suggestion[] = recipes
             .filter(r => r.title.toLowerCase().includes(terms))
@@ -474,10 +474,13 @@ export default function Search() {
 
                 {/* Results Grid */}
                 {filteredRecipes.length > 0 ? (
-                    <div className={`grid ${gridDensity === 1 ? 'grid-cols-1' :
-                        gridDensity === 2 ? 'grid-cols-2' :
-                            'grid-cols-3'
-                        } md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4 lg:gap-8 min-h-[400px]`}>
+                    <div className={`grid gap-2 sm:gap-4 lg:gap-8 min-h-[400px] ${
+                        gridDensity === 1 
+                            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
+                            : gridDensity === 2 
+                                ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' 
+                                : 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
+                    }`}>
                         {filteredRecipes.map((recipe) => (
                             <RecipeCard key={recipe.id} recipe={recipe} />
                         ))}
