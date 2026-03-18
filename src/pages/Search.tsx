@@ -310,17 +310,7 @@ export default function Search() {
                                 onBlur={() => setTimeout(() => setIsIngredientFocused(false), 200)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && ingredientSearch.trim()) {
-                                        // If there's a suggestion that exactly matches (or is the first suggestion), use its canonical name
-                                        const bestMatch = ingredientSuggestions.find(
-                                            s => s.name.toLowerCase() === ingredientSearch.toLowerCase() || 
-                                            s.name_ar === ingredientSearch || 
-                                            s.name_he === ingredientSearch || 
-                                            s.name_es?.toLowerCase() === ingredientSearch.toLowerCase()
-                                        ) || (ingredientSuggestions.length > 0 ? ingredientSuggestions[0] : null);
-
-                                        const nameToAdd = bestMatch ? bestMatch.name : ingredientSearch.trim();
-                                        
-                                        setSelectedIngredients(prev => [...prev, nameToAdd]);
+                                        setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
                                         setIngredientSearch('');
                                         setIsIngredientFocused(false);
                                     }
