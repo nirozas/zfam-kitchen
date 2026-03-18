@@ -63,22 +63,34 @@ export default function Search() {
     // Build a global map of synonyms (bridging translations across all records)
     const globalSynonyms = useMemo(() => {
         const map = new Map<string, Set<string>>();
-        const groups: Set<string>[] = [];
+        let groups: Set<string>[] = [];
 
         ingredientsData.forEach(ing => {
             const names = [
                 ing.name.toLowerCase(),
-                ing.name_ar,
-                ing.name_he,
+                ing.name_ar?.toLowerCase(),
+                ing.name_he?.toLowerCase(),
                 ing.name_es?.toLowerCase()
             ].filter(Boolean) as string[];
 
-            let targetGroup = groups.find(g => names.some(n => g.has(n)));
-            if (!targetGroup) {
+            // Find ALL groups that overlap with these names
+            const matchingGroups = groups.filter(g => names.some(n => g.has(n)));
+            
+            let targetGroup: Set<string>;
+            if (matchingGroups.length === 0) {
                 targetGroup = new Set<string>();
                 groups.push(targetGroup);
+            } else {
+                targetGroup = matchingGroups[0];
+                // If there are multiple matching groups, merge them all into the first one
+                if (matchingGroups.length > 1) {
+                    matchingGroups.slice(1).forEach(g => {
+                        g.forEach(name => targetGroup.add(name));
+                        groups = groups.filter(gr => gr !== g);
+                    });
+                }
             }
-            names.forEach(n => targetGroup!.add(n));
+            names.forEach(n => targetGroup.add(n));
         });
 
         groups.forEach(group => {
