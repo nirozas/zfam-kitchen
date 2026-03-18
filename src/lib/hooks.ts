@@ -31,7 +31,7 @@ export function useRecipes(options?: UseRecipesOptions) {
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, note, ingredients(*))
+                        recipe_ingredients!recipe_id(amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url))
                     `);
                 }
 
@@ -59,10 +59,11 @@ export function useRecipes(options?: UseRecipesOptions) {
                         .map((ri: any) => ({
                             amount_in_grams: ri.amount_in_grams,
                             unit: ri.unit || 'g',
-                            group_name: ri.group_name || 'Main',
+                            group_name: ri.group_name || 'Ingredients',
                             note: ri.note,
-                            ingredient: ri.ingredients
-                        })).filter((ing: any) => ing.ingredient) || [],
+                            ingredient: ri.ingredients,
+                            linked_recipe: ri.linked_recipe
+                        })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
                     steps: recipe.steps || [],
                 }));
 
@@ -85,9 +86,10 @@ export function useRecipes(options?: UseRecipesOptions) {
                 }
 
                 setRecipes(transformedRecipes);
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Full error:', err);
-                setError(err instanceof Error ? err.message : 'Failed to fetch recipes');
+                const message = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+                setError(`Fetch Error: ${message}`);
             } finally {
                 setLoading(false);
             }
@@ -123,7 +125,7 @@ export function useRecipe(id: string | undefined) {
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
-                        recipe_ingredients(amount_in_grams, unit, group_name, order_index, note, ingredients(*))
+                        recipe_ingredients!recipe_id(amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url))
                     `);
 
                 if (isUuid) {
@@ -150,8 +152,9 @@ export function useRecipe(id: string | undefined) {
                                 unit: ri.unit || 'g',
                                 group_name: ri.group_name || 'Main',
                                 note: ri.note,
-                                ingredient: ri.ingredients
-                            })).filter((ing: any) => ing.ingredient) || [],
+                                ingredient: ri.ingredients,
+                                linked_recipe: ri.linked_recipe
+                            })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
                     };
 
                     const { count: likesCount } = await supabase
@@ -163,8 +166,10 @@ export function useRecipe(id: string | undefined) {
 
                     setRecipe(transformedRecipe);
                 }
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to fetch recipe');
+            } catch (err: any) {
+                console.error('Full Recipe Fetch Error:', err);
+                const message = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+                setError(`Fetch Error: ${message}`);
             } finally {
                 setLoading(false);
             }

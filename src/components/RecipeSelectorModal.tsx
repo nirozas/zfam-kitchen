@@ -12,7 +12,7 @@ interface RecipeSelectorModalProps {
 }
 
 export default function RecipeSelectorModal({ isOpen, onClose, onSelect }: RecipeSelectorModalProps) {
-    const { recipes, loading } = useRecipes();
+    const { recipes, loading, error } = useRecipes({ minimal: true });
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredRecipes = useMemo(() => {
@@ -65,7 +65,16 @@ export default function RecipeSelectorModal({ isOpen, onClose, onSelect }: Recip
 
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                     {loading ? (
-                        <div className="text-center py-10 text-gray-400 font-bold text-sm">Loading...</div>
+                        <div className="text-center py-10 text-gray-400 font-bold text-sm flex flex-col items-center gap-2">
+                           <div className="w-8 h-8 border-4 border-gray-100 border-t-indigo-500 rounded-full animate-spin"></div>
+                           <span>Loading recipes...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="text-center py-10 px-6">
+                            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-500 font-bold">⚠️</div>
+                            <p className="text-sm font-bold text-gray-800 mb-1">Could not fetch recipes</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase leading-relaxed">{error}</p>
+                        </div>
                     ) : filteredRecipes.length === 0 ? (
                         <div className="text-center py-10 text-gray-400 font-bold text-sm">No recipes found.</div>
                     ) : (

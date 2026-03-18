@@ -154,6 +154,7 @@ export interface Database {
                     ingredient_id: number
                     amount_in_grams: number
                     group_name: string | null
+                    linked_recipe_id: string | null
                 }
                 Insert: {
                     id?: number
@@ -161,6 +162,7 @@ export interface Database {
                     ingredient_id: number
                     amount_in_grams?: number
                     group_name?: string | null
+                    linked_recipe_id?: string | null
                 }
                 Update: {
                     id?: number
@@ -168,6 +170,7 @@ export interface Database {
                     ingredient_id?: number
                     amount_in_grams?: number
                     group_name?: string | null
+                    linked_recipe_id?: string | null
                 }
             }
             tags: {

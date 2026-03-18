@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart } from 'lucide-react';
+import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
@@ -11,7 +11,7 @@ export default function RecipeDetail() {
     const { id } = useParams();
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
     const navigate = useNavigate();
-    const { recipe, loading } = useRecipe(id);
+    const { recipe, loading, error } = useRecipe(id);
     const { reviews, fetchReviews } = useReviews(isUuid ? id : recipe?.id);
     const { likes, toggleLike } = useLikes();
     const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(recipe?.id);
@@ -265,8 +265,36 @@ export default function RecipeDetail() {
         );
     }
 
+    if (error) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-red-50/20">
+                <div className="text-center bg-white p-12 rounded-[2.5rem] shadow-2xl border border-red-50 max-w-md mx-4">
+                    <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
+                        <AlertTriangle className="w-10 h-10 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 mb-2">Recipe Load Failed</h2>
+                    <p className="text-gray-500 mb-8 font-medium">{error}</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="px-8 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg"
+                    >
+                        Try Again
+                    </button>
+                    <p className="mt-6 text-[10px] font-black text-red-300 uppercase tracking-widest">Zoabi Family Kitchen | Security & Data Error</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!recipe) {
-        return <div className="py-20 text-center text-xl font-bold text-gray-500">Recipe not found</div>;
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                   <h2 className="text-2xl font-black text-gray-400 mb-4 uppercase tracking-widest">Recipe not found</h2>
+                   <Link to="/" className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg">Browse Recipes</Link>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -704,19 +732,34 @@ export default function RecipeDetail() {
                                                         onClick={() => toggleCrossed(ing.originalIndex)}
                                                         className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors"
                                                     >
-                                                        <div className="flex flex-col">
-                                                            <span className={`font-bold transition-all text-sm ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
-                                                                {ing.ingredient?.name || 'Unknown'}
-                                                            </span>
+                                                        <div className="flex flex-col flex-1">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className={`font-bold transition-all text-sm truncate ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
+                                                                    {ing.ingredient?.name || 'Unknown'}
+                                                                </span>
+                                                                {ing.linked_recipe && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            navigate(`/recipe/${ing.linked_recipe.slug}`);
+                                                                        }}
+                                                                        className="p-1 px-1.5 bg-indigo-50 text-indigo-600 rounded-md text-[8px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
+                                                                    >
+                                                                        Recipe <LinkIcon size={8} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                             {ing.note && (
                                                                 <span className="text-[10px] font-bold text-gray-400 mt-0.5 leading-tight">
                                                                     {ing.note}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
-                                                            {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
-                                                        </span>
+                                                        {ing.amount_in_grams > 0 && (
+                                                            <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
+                                                                {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -856,6 +899,9 @@ export default function RecipeDetail() {
                                                         }`}>
                                                         {stepData.text}
                                                     </p>
+                                                    {stepData.note && (
+                                                       <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Chef's Tip: {stepData.note}</p>
+                                                    )}
 
                                                     {stepData.linked_recipes && stepData.linked_recipes.length > 0 && (
                                                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">

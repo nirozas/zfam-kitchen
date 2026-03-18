@@ -50,10 +50,11 @@ serve(async (req) => {
       const batch = ingredients.slice(i, i + BATCH_SIZE);
       const names = batch.map(ing => ing.name);
 
-      const prompt = `You are a culinary dictionary. Translate each of the following English ingredient names into Arabic, Hebrew, and Spanish.
+      const prompt = `You are a culinary dictionary. These ingredient names could be in English, Arabic, Hebrew, or Spanish. 
+For each one, provide the translation in ALL four languages: English, Arabic, Hebrew, and Spanish.
 
 Return ONLY a JSON array, no markdown, no explanations. The array must have exactly ${names.length} objects in the same order as the input, each with this structure:
-{ "name": "original english name", "name_ar": "arabic translation", "name_he": "hebrew translation", "name_es": "spanish translation" }
+{ "name_en": "english", "name_ar": "arabic", "name_he": "hebrew", "name_es": "spanish" }
 
 Ingredients to translate:
 ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
@@ -72,7 +73,11 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+                generationConfig: { 
+                  temperature: 0.1, 
+                  maxOutputTokens: 4096,
+                  response_mime_type: "application/json"
+                }
               })
             }
           );
@@ -99,6 +104,7 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
               messages: [{ role: 'user', content: prompt }],
               temperature: 0.1,
               max_tokens: 4096,
+              response_format: { type: "json_object" }
             })
           });
           if (!res.ok) {
@@ -120,20 +126,14 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
       }
 
       // Parse JSON from response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.error('No JSON found in response for batch', i);
-        lastError = `No JSON array found in AI response. Raw start: ${responseText.substring(0, 50)}`;
-        failed += batch.length;
-        continue;
-      }
-
       let translations: any[];
       try {
-        translations = JSON.parse(jsonMatch[0].replace(/\n/g, ' '));
+        // Handle potential wrapper object from some AI responses
+        const parsed = JSON.parse(responseText.replace(/```json|```/g, '').trim());
+        translations = Array.isArray(parsed) ? parsed : (parsed.translations || parsed.ingredients || Object.values(parsed)[0] as any[]);
       } catch (e) {
-        console.error('Failed to parse JSON for batch', i);
-        lastError = `JSON parse error: ${(e as any).message}. Raw match: ${jsonMatch[0].substring(0, 100)}`;
+        console.error('Failed to parse JSON for batch', i, responseText);
+        lastError = `JSON parse error: ${(e as any).message}`;
         failed += batch.length;
         continue;
       }
@@ -144,11 +144,19 @@ ${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
         const trans = translations[j];
         if (!trans) continue;
 
+        // Determination of English name: use translated name if original name seems non-English
+        // We'll keep the original 'name' if it's already English, otherwise we might want to store the English translation
+        // Since we don't have name_en, we'll assume 'name' should be English but for now we'll just update translations.
+        
+        const isNonLatin = /[\u0600-\u06FF\u0590-\u05FF]/.test(ing.name);
+        const englishName = trans.name_en || trans.name;
+
         const { error: updateError } = await supabase
           .from('ingredients')
           .update({
-            name_ar: ing.name_ar || trans.name_ar || null,
-            name_he: ing.name_he || trans.name_he || null,
+            name: isNonLatin && englishName ? englishName : ing.name,
+            name_ar: ing.name_ar || trans.name_ar || (isNonLatin && /[\u0600-\u06FF]/.test(ing.name) ? ing.name : null),
+            name_he: ing.name_he || trans.name_he || (isNonLatin && /[\u0590-\u05FF]/.test(ing.name) ? ing.name : null),
             name_es: ing.name_es || trans.name_es || null,
           })
           .eq('id', ing.id);

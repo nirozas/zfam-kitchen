@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRecipes, useTopTags, useRecipeStats, useCategories } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
-import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus } from 'lucide-react';
+import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Search() {
@@ -80,7 +80,16 @@ export default function Search() {
                 recipe.title.toLowerCase().includes(searchTerms) ||
                 recipe.description?.toLowerCase().includes(searchTerms) ||
                 recipe.category?.name.toLowerCase().includes(searchTerms) ||
-                recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms))
+                recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms)) ||
+                recipe.ingredients?.some(ri => {
+                    const ing = ri.ingredient as any;
+                    return ing && (
+                        ing.name?.toLowerCase().includes(searchTerms) ||
+                        (ing.name_ar || '').toLowerCase().includes(searchTerms) ||
+                        (ing.name_he || '').toLowerCase().includes(searchTerms) ||
+                        (ing.name_es || '').toLowerCase().includes(searchTerms)
+                    );
+                })
             );
 
             const matchesCategory = selectedCategories.length === 0 ||
@@ -167,10 +176,31 @@ export default function Search() {
 
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center max-w-md p-6 bg-red-50 rounded-2xl border border-red-100">
-                    <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
-                    <p className="text-red-500">{error}</p>
+            <div className="min-h-screen flex items-center justify-center bg-red-50/10">
+                <div className="text-center max-w-xl p-10 bg-white rounded-3xl border border-red-50 shadow-2xl">
+                    <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
+                        <AlertTriangle className="w-10 h-10 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Search Unavailable</h2>
+                    <p className="text-gray-500 font-medium mb-8 leading-relaxed">
+                        {error.includes('PGRST201') || error.includes('relationship') 
+                          ? "We've detected a database link ambiguity. This usually happens when we add new connection features."
+                          : error}
+                    </p>
+                    {error.includes('relationship') && (
+                        <div className="bg-gray-50 p-6 rounded-2xl text-left mb-8 border border-gray-100">
+                             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Diagnostic Information</p>
+                             <code className="text-[11px] text-red-600 font-bold block bg-white p-4 rounded-xl border border-red-50 leading-relaxed break-all">
+                                {error}
+                             </code>
+                        </div>
+                    )}
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-primary-600 transition-all shadow-xl"
+                    >
+                        Retry Connection
+                    </button>
                 </div>
             </div>
         );

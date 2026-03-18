@@ -33,7 +33,7 @@ export default function Activity() {
                     category:categories(*),
                     author:profiles(*),
                     tags:tags(*),
-                    ingredients:recipe_ingredients(
+                    ingredients:recipe_ingredients!recipe_id(
                         amount_in_grams,
                         unit,
                         ingredient:ingredients(*)

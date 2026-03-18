@@ -36,7 +36,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         const [mealsResult, notesResult] = await Promise.all([
             supabase
                 .from('meal_planner')
-                .select('*, recipes(*, category:category_id(*), recipe_ingredients(*, ingredients(*)), recipe_tags(*, tags(*)))')
+                .select('*, recipes(*, category:category_id(*), recipe_ingredients!recipe_id(*, ingredients(*)), recipe_tags(*, tags(*)))')
                 .eq('user_id', user.id)
                 .order('id', { ascending: true }),
             supabase
@@ -46,7 +46,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         ]);
 
         if (mealsResult.error) {
-            console.error('Error fetching meal plan:', mealsResult.error);
+            console.error('Error fetching meal plan:', mealsResult.error, 'Details:', (mealsResult.error as any)?.details);
         } else if (mealsResult.data) {
             const grouped: Record<string, PlannerMeal[]> = {};
             mealsResult.data.forEach((item: any) => {
