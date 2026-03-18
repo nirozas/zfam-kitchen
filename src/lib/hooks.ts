@@ -139,7 +139,7 @@ export function useRecipe(id: string | undefined) {
                 if (error) throw error;
 
                 if (data) {
-                    let transformedRecipe: Recipe = {
+                    const transformedRecipe: Recipe = {
                         ...data,
                         rating: data.rating || 3,
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
@@ -157,14 +157,18 @@ export function useRecipe(id: string | undefined) {
                             })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
                     };
 
-                    const { count: likesCount } = await supabase
+                    // Show the recipe immediately — don't wait for likes count
+                    setRecipe(transformedRecipe);
+                    setLoading(false);
+
+                    // Fetch likes count in the background (non-blocking)
+                    supabase
                         .from('likes')
                         .select('*', { count: 'exact', head: true })
-                        .eq('recipe_id', transformedRecipe.id);
-
-                    transformedRecipe.likesCount = likesCount || 0;
-
-                    setRecipe(transformedRecipe);
+                        .eq('recipe_id', transformedRecipe.id)
+                        .then(({ count: likesCount }) => {
+                            setRecipe(prev => prev ? { ...prev, likesCount: likesCount || 0 } : prev);
+                        });
                 }
             } catch (err: any) {
                 console.error('Full Recipe Fetch Error:', err);
@@ -254,7 +258,7 @@ export function useRecipeStats() {
 
 export function useDetailedRecipeStats(recipeId: string | undefined) {
     const [stats, setStats] = useState({ month: 0, year: 0, allTime: 0 });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Start non-blocking
 
     useEffect(() => {
         if (!recipeId) return;
