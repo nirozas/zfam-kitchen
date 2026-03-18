@@ -98,8 +98,29 @@ export default function Search() {
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
                     const term = si.toLowerCase();
+                    // Find canonical translations for this term to ensure cross-language matching
+                    const canonical = ingredientsData.find(d => 
+                        d.name.toLowerCase() === term ||
+                        (d.name_ar || '').toLowerCase() === term ||
+                        (d.name_he || '').toLowerCase() === term ||
+                        (d.name_es || '').toLowerCase() === term
+                    );
+
                     return recipe.ingredients?.some(ri => {
                         const ing = ri.ingredient as any;
+                        if (!ing) return false;
+
+                        if (canonical) {
+                            // Match against any of the canonical translations
+                            return (
+                                (ing.name || '').toLowerCase().includes(canonical.name.toLowerCase()) ||
+                                (canonical.name_ar && (ing.name_ar || '').toLowerCase().includes(canonical.name_ar.toLowerCase())) ||
+                                (canonical.name_he && (ing.name_he || '').toLowerCase().includes(canonical.name_he.toLowerCase())) ||
+                                (canonical.name_es && (ing.name_es || '').toLowerCase().includes(canonical.name_es.toLowerCase()))
+                            );
+                        }
+
+                        // Fallback to literal match
                         return (
                             ing.name?.toLowerCase().includes(term) ||
                             (ing.name_ar || '').toLowerCase().includes(term) ||
