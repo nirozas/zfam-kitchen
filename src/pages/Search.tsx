@@ -113,18 +113,19 @@ export default function Search() {
                         const ing = ri.ingredient as any;
                         if (!ing) return false;
 
-                        // Check if this recipe ingredient matches any canonical English name
-                        // This ensures cross-language consistency: searching "breast" or "صدر" yields identical results
+                        const ingName = (ing.name || '').toLowerCase();
+
+                        // Strategy 1: match via canonical English names resolved from any language
+                        // e.g. "breast" → ["chicken breast"] AND "صدر" → ["chicken breast"] → same result
                         if (canonicalEnglishNames.length > 0) {
                             return canonicalEnglishNames.some(en =>
-                                (ing.name || '').toLowerCase().includes(en) ||
-                                en.includes((ing.name || '').toLowerCase())
+                                en.length > 1 && ingName.includes(en)
                             );
                         }
 
-                        // Fallback: direct literal match across all language fields
+                        // Strategy 2 (fallback): literal match across all language fields
                         return (
-                            (ing.name || '').toLowerCase().includes(term) ||
+                            ingName.includes(term) ||
                             (ing.name_ar || '').toLowerCase().includes(term) ||
                             (ing.name_he || '').toLowerCase().includes(term) ||
                             (ing.name_es || '').toLowerCase().includes(term)
