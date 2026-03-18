@@ -107,25 +107,40 @@ export default function Search() {
                         (d.name_es || '').toLowerCase().includes(term)
                     );
 
-                    const canonicalEnglishNames = matchingCanonicals.map(d => d.name.toLowerCase());
+                    // Collect ALL known name variants (all languages) for every matching canonical ingredient
+                    const allVariants = new Set<string>();
+                    matchingCanonicals.forEach(d => {
+                        if (d.name) allVariants.add(d.name.toLowerCase());
+                        if (d.name_ar) allVariants.add(d.name_ar.toLowerCase());
+                        if (d.name_he) allVariants.add(d.name_he.toLowerCase());
+                        if (d.name_es) allVariants.add(d.name_es.toLowerCase());
+                    });
 
                     return recipe.ingredients?.some(ri => {
                         const ing = ri.ingredient as any;
                         if (!ing) return false;
 
-                        const ingName = (ing.name || '').toLowerCase();
-
-                        // Strategy 1: match via canonical English names resolved from any language
-                        // e.g. "breast" → ["chicken breast"] AND "صدر" → ["chicken breast"] → same result
-                        if (canonicalEnglishNames.length > 0) {
-                            return canonicalEnglishNames.some(en =>
-                                en.length > 1 && ingName.includes(en)
+                        // If we found canonical matches, check the recipe ingredient against ALL language variants.
+                        // This bridges English↔Arabic: "breast" resolves to variants including "صدر دجاج",
+                        // which then matches recipes whose ingredient name is stored in Arabic.
+                        if (allVariants.size > 0) {
+                            const ingName = (ing.name || '').toLowerCase();
+                            const ingAr = (ing.name_ar || '').toLowerCase();
+                            const ingHe = (ing.name_he || '').toLowerCase();
+                            const ingEs = (ing.name_es || '').toLowerCase();
+                            return Array.from(allVariants).some(variant =>
+                                variant.length > 1 && (
+                                    ingName.includes(variant) ||
+                                    ingAr.includes(variant) ||
+                                    ingHe.includes(variant) ||
+                                    ingEs.includes(variant)
+                                )
                             );
                         }
 
-                        // Strategy 2 (fallback): literal match across all language fields
+                        // Fallback: literal match across all language fields
                         return (
-                            ingName.includes(term) ||
+                            (ing.name || '').toLowerCase().includes(term) ||
                             (ing.name_ar || '').toLowerCase().includes(term) ||
                             (ing.name_he || '').toLowerCase().includes(term) ||
                             (ing.name_es || '').toLowerCase().includes(term)
