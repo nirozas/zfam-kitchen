@@ -24,23 +24,48 @@ export default function Search() {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [gridDensity, setGridDensity] = useState(2); // 1 = large, 2 = normal, 3 = compact
 
-    const allIngredients = useMemo(() => {
-        const ings = new Set<string>();
+    // Collect unique ingredients and their translations from all fetched recipes
+    const ingredientsData = useMemo(() => {
+        const ingsMap = new Map<string, { name: string, name_ar?: string, name_he?: string, name_es?: string }>();
         recipes.forEach(r => {
             r.ingredients?.forEach(i => {
-                if (i.ingredient?.name) ings.add(i.ingredient.name);
+                if (i.ingredient?.name) {
+                    const name = i.ingredient.name;
+                    if (!ingsMap.has(name.toLowerCase())) {
+                        ingsMap.set(name.toLowerCase(), {
+                            name,
+                            name_ar: (i.ingredient as any).name_ar,
+                            name_he: (i.ingredient as any).name_he,
+                            name_es: (i.ingredient as any).name_es,
+                        });
+                    }
+                }
             });
         });
-        return Array.from(ings).sort();
+        return Array.from(ingsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [recipes]);
+
+    // Helper to get formatted translation label
+    const getIngredientLabel = (name: string) => {
+        const data = ingredientsData.find(ing => ing.name.toLowerCase() === name.toLowerCase());
+        if (!data) return name;
+        const translations = [data.name_ar, data.name_he, data.name_es].filter(Boolean);
+        return translations.length > 0 ? `${name} (${translations.join(' / ')})` : name;
+    };
 
     const ingredientSuggestions = useMemo(() => {
         if (!ingredientSearch.trim()) return [];
         const terms = ingredientSearch.toLowerCase();
-        return allIngredients
-            .filter(ing => ing.toLowerCase().includes(terms) && !selectedIngredients.includes(ing))
+        return ingredientsData
+            .filter(ing => 
+                (ing.name.toLowerCase().includes(terms) || 
+                 ing.name_ar?.includes(terms) || 
+                 ing.name_he?.includes(terms) || 
+                 ing.name_es?.toLowerCase().includes(terms)) && 
+                !selectedIngredients.some(si => si.toLowerCase() === ing.name.toLowerCase())
+            )
             .slice(0, 5);
-    }, [ingredientSearch, allIngredients, selectedIngredients]);
+    }, [ingredientSearch, ingredientsData, selectedIngredients]);
 
     const filteredRecipes = useMemo(() => {
         return recipes.filter(recipe => {
@@ -256,9 +281,9 @@ export default function Search() {
                                     >
                                         {ingredientSuggestions.map((ing) => (
                                             <button
-                                                key={ing}
+                                                key={ing.name}
                                                 onClick={() => {
-                                                    setSelectedIngredients(prev => [...prev, ing]);
+                                                    setSelectedIngredients(prev => [...prev, ing.name]);
                                                     setIngredientSearch('');
                                                     setIsIngredientFocused(false);
                                                 }}
@@ -268,7 +293,14 @@ export default function Search() {
                                                     <Plus size={16} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-sm text-gray-900 group-hover:text-indigo-600 transition-colors">{ing}</h4>
+                                                    <h4 className="font-bold text-sm text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                                        {ing.name}
+                                                    </h4>
+                                                    {(ing.name_ar || ing.name_he || ing.name_es) && (
+                                                        <p className="text-[10px] text-gray-400 font-medium truncate">
+                                                            {[ing.name_ar, ing.name_he, ing.name_es].filter(Boolean).join(' • ')}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </button>
                                         ))}
@@ -286,9 +318,10 @@ export default function Search() {
                                     key={ing}
                                     onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-red-500 transition-all shadow-md group"
+                                    title={getIngredientLabel(ing)}
                                 >
-                                    {ing}
-                                    <X size={12} className="group-hover:rotate-90 transition-transform" />
+                                    <span className="max-w-[150px] truncate">{ing}</span>
+                                    <X size={12} className="group-hover:rotate-90 transition-transform flex-shrink-0" />
                                 </motion.button>
                             ))}
                             {selectedIngredients.length > 0 && (

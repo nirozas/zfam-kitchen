@@ -151,7 +151,7 @@ serve(async (req) => {
             "servings": number,
             "raw_time": boolean,
             "raw_nutrition": boolean,
-            "ingredients": [{"name": "string", "amount": "string", "unit": "string", "note": "string", "group_name": "string"}],
+            "ingredients": [{"name": "string", "name_ar": "Arabic", "name_he": "Hebrew", "name_es": "Spanish", "amount": "string", "unit": "string", "note": "string", "group_name": "string"}],
             "steps": [{"text": "string", "image_url": "string", "group_name": "string"}],
             "nutrition": {"calories": number, "protein": number, "fat": number, "carbs": number},
             "image_url": "string"
@@ -293,6 +293,9 @@ serve(async (req) => {
             })),
             ingredients: (result.ingredients || []).map((i: any) => ({
                 name: i.name || '',
+                name_ar: i.name_ar || '',
+                name_he: i.name_he || '',
+                name_es: i.name_es || '',
                 amount: String(i.amount || ''),
                 unit: i.unit || '',
                 note: i.note || '',

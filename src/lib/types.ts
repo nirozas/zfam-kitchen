@@ -1,7 +1,11 @@
 import { Database } from './database.types';
 
 export type Category = Database['public']['Tables']['categories']['Row'];
-export type Ingredient = Database['public']['Tables']['ingredients']['Row'];
+export type Ingredient = Database['public']['Tables']['ingredients']['Row'] & {
+    name_ar?: string;
+    name_he?: string;
+    name_es?: string;
+};
 export type Tag = Database['public']['Tables']['tags']['Row'];
 
 // Recipe with joined data (as used in the UI)
