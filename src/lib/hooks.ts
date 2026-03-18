@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { Recipe } from './types';
 
+// Simple module-level cache so re-mounting components (like modals) don't re-fetch
+const recipesCache: Record<string, { recipes: Recipe[], ts: number }> = {};
+const CACHE_TTL_MS = 60_000; // 1 minute
+
 export interface UseRecipesOptions {
     limit?: number;
     minimal?: boolean;
@@ -13,6 +17,9 @@ export function useRecipes(options?: UseRecipesOptions) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        const cacheKey = `${options?.limit ?? 'all'}-${options?.minimal ?? false}`;
+        const cached = recipesCache[cacheKey];
+
         async function fetchRecipes() {
             try {
                 setLoading(true);
@@ -67,6 +74,9 @@ export function useRecipes(options?: UseRecipesOptions) {
                     steps: recipe.steps || [],
                 }));
 
+                // Cache result
+                recipesCache[cacheKey] = { recipes: transformedRecipes, ts: Date.now() };
+
                 // Show recipes immediately — don't block on likes count
                 setRecipes(transformedRecipes);
                 setLoading(false);
@@ -95,8 +105,14 @@ export function useRecipes(options?: UseRecipesOptions) {
             }
         }
 
-        fetchRecipes();
-    }, [options?.limit]);
+        // Serve from cache if fresh
+        if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+            setRecipes(cached.recipes);
+            setLoading(false);
+        } else {
+            fetchRecipes();
+        }
+    }, [options?.limit, options?.minimal]);
 
     return { recipes, loading, error };
 }
