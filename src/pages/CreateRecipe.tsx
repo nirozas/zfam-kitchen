@@ -738,6 +738,15 @@ export default function CreateRecipe() {
           .replace(/\s+(of|and)\s+/i, ' ');
         
         let note = '';
+
+        // Handle parentheses extraction
+        const parenthesisMatch = finalName.match(/\(([^)]+)\)/);
+        if (parenthesisMatch) {
+          const inside = parenthesisMatch[1].trim();
+          note = note ? `${note}, ${inside}` : inside;
+          finalName = finalName.replace(/\([^)]+\)/g, '').trim();
+        }
+        
         const EXTRA_INFO = ['chopped', 'cubed', 'minced', 'peeled', 'sliced', 'diced', 'toasted', 'crushed', 'melted', 'softened', 'grated', 'shredded', 'beaten', 'whisked', 'halved', 'quartered', 'warm', 'cold', 'room temperature', 'optional'];
         
         EXTRA_INFO.forEach(word => {
