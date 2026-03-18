@@ -98,31 +98,33 @@ export default function Search() {
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
                     const term = si.toLowerCase();
-                    // Find canonical translations for this term to ensure cross-language matching
-                    const canonical = ingredientsData.find(d => 
-                        d.name.toLowerCase() === term ||
-                        (d.name_ar || '').toLowerCase() === term ||
-                        (d.name_he || '').toLowerCase() === term ||
-                        (d.name_es || '').toLowerCase() === term
+
+                    // Find all canonical ingredients that match the term in ANY language (partial match)
+                    const matchingCanonicals = ingredientsData.filter(d =>
+                        d.name.toLowerCase().includes(term) ||
+                        (d.name_ar || '').toLowerCase().includes(term) ||
+                        (d.name_he || '').toLowerCase().includes(term) ||
+                        (d.name_es || '').toLowerCase().includes(term)
                     );
+
+                    const canonicalEnglishNames = matchingCanonicals.map(d => d.name.toLowerCase());
 
                     return recipe.ingredients?.some(ri => {
                         const ing = ri.ingredient as any;
                         if (!ing) return false;
 
-                        if (canonical) {
-                            // Match against any of the canonical translations
-                            return (
-                                (ing.name || '').toLowerCase().includes(canonical.name.toLowerCase()) ||
-                                (canonical.name_ar && (ing.name_ar || '').toLowerCase().includes(canonical.name_ar.toLowerCase())) ||
-                                (canonical.name_he && (ing.name_he || '').toLowerCase().includes(canonical.name_he.toLowerCase())) ||
-                                (canonical.name_es && (ing.name_es || '').toLowerCase().includes(canonical.name_es.toLowerCase()))
+                        // Check if this recipe ingredient matches any canonical English name
+                        // This ensures cross-language consistency: searching "breast" or "صدر" yields identical results
+                        if (canonicalEnglishNames.length > 0) {
+                            return canonicalEnglishNames.some(en =>
+                                (ing.name || '').toLowerCase().includes(en) ||
+                                en.includes((ing.name || '').toLowerCase())
                             );
                         }
 
-                        // Fallback to literal match
+                        // Fallback: direct literal match across all language fields
                         return (
-                            ing.name?.toLowerCase().includes(term) ||
+                            (ing.name || '').toLowerCase().includes(term) ||
                             (ing.name_ar || '').toLowerCase().includes(term) ||
                             (ing.name_he || '').toLowerCase().includes(term) ||
                             (ing.name_es || '').toLowerCase().includes(term)
