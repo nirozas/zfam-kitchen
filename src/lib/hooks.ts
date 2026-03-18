@@ -48,7 +48,7 @@ export function useRecipes(options?: UseRecipesOptions) {
                     throw error;
                 }
 
-                let transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
+                const transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
                     ...recipe,
                     rating: recipe.rating || 3,
                     category: recipe.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
@@ -67,25 +67,25 @@ export function useRecipes(options?: UseRecipesOptions) {
                     steps: recipe.steps || [],
                 }));
 
+                // Show recipes immediately — don't block on likes count
+                setRecipes(transformedRecipes);
+                setLoading(false);
+
+                // Fetch likes in the background (non-blocking)
                 if (transformedRecipes.length > 0) {
                     const recipeIds = transformedRecipes.map(r => r.id);
-                    const { data: likesData } = await supabase
+                    supabase
                         .from('likes')
                         .select('recipe_id')
-                        .in('recipe_id', recipeIds);
-
-                    const likesCounts: Record<string, number> = {};
-                    likesData?.forEach(like => {
-                        likesCounts[like.recipe_id] = (likesCounts[like.recipe_id] || 0) + 1;
-                    });
-
-                    transformedRecipes = transformedRecipes.map(r => ({
-                        ...r,
-                        likesCount: likesCounts[r.id] || 0
-                    }));
+                        .in('recipe_id', recipeIds)
+                        .then(({ data: likesData }) => {
+                            const likesCounts: Record<string, number> = {};
+                            likesData?.forEach(like => {
+                                likesCounts[like.recipe_id] = (likesCounts[like.recipe_id] || 0) + 1;
+                            });
+                            setRecipes(prev => prev.map(r => ({ ...r, likesCount: likesCounts[r.id] || 0 })));
+                        });
                 }
-
-                setRecipes(transformedRecipes);
             } catch (err: any) {
                 console.error('Full error:', err);
                 const message = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
