@@ -8,6 +8,7 @@ import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
 import RecipeSelectorModal from '@/components/RecipeSelectorModal';
 import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
+import { uploadToB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 
 interface RecipeStep {
@@ -231,11 +232,7 @@ export default function CreateRecipe() {
   const handleCropComplete = async (croppedBlob: Blob) => {
     try {
       setUploading(true);
-      const fileName = `${Math.random()}.jpeg`;
-      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
-      await supabase.storage.from('recipes').upload(fileName, file);
-      const { data } = supabase.storage.from('recipes').getPublicUrl(fileName);
-      const url = data.publicUrl;
+      const url = await uploadToB2(croppedBlob, 'recipes');
       if (cropTarget?.type === 'main') setFormData(prev => ({ ...prev, image_url: url }));
       else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') updateStep(cropTarget.index, { image_url: url });
       setCropModalOpen(false);
@@ -332,11 +329,8 @@ export default function CreateRecipe() {
     }
   }, [id, isEditing, location.search]);
 
-  const handleFileUpload = async (file: File) => {
-    const fileName = `${Math.random()}.${file.name.split('.').pop()}`;
-    await supabase.storage.from('recipes').upload(fileName, file);
-    const { data } = supabase.storage.from('recipes').getPublicUrl(fileName);
-    return data.publicUrl;
+  const handleFileUpload = async (file: File): Promise<string> => {
+    return await uploadToB2(file, 'recipes');
   };
 
   const handleGalleryAdd = async (event: React.ChangeEvent<HTMLInputElement>) => {

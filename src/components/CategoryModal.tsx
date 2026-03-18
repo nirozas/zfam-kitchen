@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ImageIcon, X, Loader2, Upload, ExternalLink, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Category } from '@/lib/types';
+import { uploadToB2 } from '@/lib/b2';
 
 interface CategoryModalProps {
     isOpen: boolean;
@@ -30,21 +31,13 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
     }, [category, isOpen]);
 
     const processImageUrl = async (url: string): Promise<string> => {
-        if (!url || url.includes('.supabase.co/storage')) return url;
+        if (!url || url.includes('backblazeb2.com') || url.includes('.supabase.co/storage')) return url;
 
         try {
             setUploading(true);
             const response = await fetch(url);
             const blob = await response.blob();
-            const fileExt = blob.type.split('/')[1] || 'jpg';
-            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `categories/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage.from('recipes').upload(filePath, blob);
-            if (uploadError) throw uploadError;
-
-            const { data } = supabase.storage.from('recipes').getPublicUrl(filePath);
-            return data.publicUrl;
+            return await uploadToB2(blob, 'categories');
         } catch (err) {
             console.error('Failed to ingest image URL:', err);
             return url;
@@ -203,13 +196,8 @@ export default function CategoryModal({ isOpen, onClose, onSave, category, allCa
                                                     setUploading(true);
                                                     const file = e.target.files?.[0];
                                                     if (!file) return;
-                                                    const fileExt = file.name.split('.').pop();
-                                                    const fileName = `${Math.random()}.${fileExt}`;
-                                                    const filePath = `categories/${fileName}`;
-                                                    const { error: uploadError } = await supabase.storage.from('recipes').upload(filePath, file);
-                                                    if (uploadError) throw uploadError;
-                                                    const { data } = supabase.storage.from('recipes').getPublicUrl(filePath);
-                                                    setFormData({ ...formData, image_url: data.publicUrl });
+                                                    const url = await uploadToB2(file, 'categories');
+                                                    setFormData({ ...formData, image_url: url });
                                                 } catch (err) {
                                                     alert('Upload failed: ' + (err as Error).message);
                                                 } finally {
