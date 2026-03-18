@@ -82,7 +82,15 @@ export default function Search() {
 
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => 
-                    recipe.ingredients?.some(ri => ri.ingredient.name.toLowerCase() === si.toLowerCase())
+                    recipe.ingredients?.some(ri => {
+                        const searchLower = si.toLowerCase();
+                        return (
+                            ri.ingredient.name.toLowerCase().includes(searchLower) ||
+                            (ri.ingredient as any).name_ar?.includes(si) ||
+                            (ri.ingredient as any).name_he?.includes(si) ||
+                            (ri.ingredient as any).name_es?.toLowerCase().includes(searchLower)
+                        );
+                    })
                 );
 
             return matchesSearch && matchesCategory && matchesIngredients;
