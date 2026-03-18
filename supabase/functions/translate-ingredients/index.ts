@@ -50,6 +50,7 @@ serve(async (req) => {
       const batch = ingredients.slice(i, i + BATCH_SIZE);
       const names = batch.map(ing => ing.name);
 
+      
       const prompt = `You are a culinary dictionary. These ingredient names could be in English, Arabic, Hebrew, or Spanish. 
 For each one, provide the translation in ALL four languages: English, Arabic, Hebrew, and Spanish.
 
