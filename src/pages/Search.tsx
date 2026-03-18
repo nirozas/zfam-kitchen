@@ -274,6 +274,13 @@ export default function Search() {
                                 onChange={(e) => setIngredientSearch(e.target.value)}
                                 onFocus={() => setIsIngredientFocused(true)}
                                 onBlur={() => setTimeout(() => setIsIngredientFocused(false), 200)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && ingredientSearch.trim()) {
+                                        setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
+                                        setIngredientSearch('');
+                                        setIsIngredientFocused(false);
+                                    }
+                                }}
                                 placeholder="Search recipes by ingredients..."
                                 className="block w-full pl-14 pr-6 py-4 border-2 border-gray-100 rounded-2xl bg-white ring-offset-background placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/30 transition-all font-bold text-base shadow-sm"
                             />
