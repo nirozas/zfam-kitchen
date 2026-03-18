@@ -460,7 +460,7 @@ export default function RecipeDetail() {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="max-w-4xl relative z-10 pt-52 sm:pt-56 md:pt-64 lg:pt-40"
+                        className="max-w-4xl relative z-10 pt-24 sm:pt-40 md:pt-64 lg:pt-40"
                     >
                         <div className="flex flex-wrap items-center gap-4 mb-4 sm:hidden">
                             <div className="flex flex-wrap items-center gap-2">
@@ -499,7 +499,7 @@ export default function RecipeDetail() {
                         {recipe.alternative_titles && (
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {recipe.alternative_titles.split(',').map((alt, i) => (
-                                    <span key={i} className="px-6 py-3 bg-white/10 backdrop-blur-md rounded-2xl text-white/60 text-[20px] font-black uppercase tracking-widest border border-white/5">
+                                    <span key={i} className="px-3 py-1.5 sm:px-6 sm:py-3 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl text-white/60 text-xs sm:text-xl font-black uppercase tracking-widest border border-white/5">
                                         {alt.trim()}
                                     </span>
                                 ))}
@@ -551,7 +551,7 @@ export default function RecipeDetail() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 sm:gap-8 text-white font-black uppercase tracking-widest text-[10px] w-full relative z-10 mt-6 sm:mt-10"
+                        className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 sm:gap-8 text-white font-black uppercase tracking-widest text-[9px] sm:text-[10px] w-full relative z-10 mt-6 sm:mt-12"
                     >
                         <div className="flex items-center gap-6 sm:gap-8 flex-wrap">
                             <div className="flex items-center gap-3">
@@ -569,18 +569,18 @@ export default function RecipeDetail() {
                         </div>
 
                         {/* Usage Stats - Centered & Large */}
-                        <div className="flex items-center gap-12 sm:gap-16 py-2">
+                        <div className="flex items-center gap-6 sm:gap-16 py-2 overflow-x-auto no-scrollbar">
                             <div className="flex flex-col items-center">
-                                <span className="text-[10px] text-white/50 mb-1 font-black">THIS MONTH</span>
-                                <span className="text-5xl font-black text-white leading-none">{usageStats.month}</span>
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">THIS MONTH</span>
+                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.month}</span>
                             </div>
-                            <div className="flex flex-col items-center">
-                                <span className="text-[10px] text-white/50 mb-1 font-black">THIS YEAR</span>
-                                <span className="text-5xl font-black text-white leading-none">{usageStats.year}</span>
+                            <div className="flex flex-col items-center border-l border-white/10 pl-6 sm:pl-16">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">THIS YEAR</span>
+                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.year}</span>
                             </div>
-                            <div className="flex flex-col items-center">
-                                <span className="text-[10px] text-white/50 mb-1 font-black">ALL TIME</span>
-                                <span className="text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
+                            <div className="flex flex-col items-center border-l border-white/10 pl-6 sm:pl-16">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">ALL TIME</span>
+                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
                             </div>
                         </div>
 
