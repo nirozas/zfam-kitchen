@@ -699,34 +699,47 @@ export default function CreateRecipe() {
       let unit = '';
       let name = '';
 
-      // Safer extraction: [Amount] [Unit] [Name]
+      // Safer extraction: Supports both [Amount] [Unit] [Name] and [Name] [Amount] [Unit]
       const amountMatch = trimmed.match(/^([\d\/\.\s-]+)/);
-      if (amountMatch) {
-        const rawAmount = amountMatch[1].trim();
-        if (rawAmount.match(/[\d]/)) {
-          amount = rawAmount;
-          let remainder = trimmed.substring(amountMatch[0].length).trim();
+      if (amountMatch && amountMatch[1].trim().match(/[\d]/)) {
+        amount = amountMatch[1].trim();
+        let remainder = trimmed.substring(amountMatch[0].length).trim();
 
-          let unitFound = false;
-          for (const key of unitKeys) {
-            // Search for unit as a FULL WORD boundary-safe
-            const unitRegex = new RegExp('^' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|$|(?=\\d))', 'i');
-            if (unitRegex.test(remainder)) {
-              unit = UNIT_MAPPING[key];
-              name = remainder.replace(unitRegex, '').trim();
-              unitFound = true;
-              break;
-            }
+        let unitFound = false;
+        for (const key of unitKeys) {
+          const unitRegex = new RegExp('^' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|$|(?=\\d))', 'i');
+          if (unitRegex.test(remainder)) {
+            unit = UNIT_MAPPING[key];
+            name = remainder.replace(unitRegex, '').trim();
+            unitFound = true;
+            break;
           }
-
-          if (!unitFound) {
-            name = remainder;
-          }
-        } else {
-          name = trimmed;
         }
+        if (!unitFound) name = remainder;
       } else {
-        name = trimmed;
+        // Try trailing amount: [Name] [Amount] [Unit]
+        let foundTrailing = false;
+        for (const key of unitKeys) {
+          const unitRegex = new RegExp(`[\\s,]+([\\d\\/\\.\\s-]+)\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$|(?=\\d))`, 'i');
+          const unitMatch = trimmed.match(unitRegex);
+          if (unitMatch) {
+            amount = unitMatch[1].trim();
+            unit = UNIT_MAPPING[key];
+            name = trimmed.substring(0, unitMatch.index).trim().replace(/,$/, '');
+            foundTrailing = true;
+            break;
+          }
+        }
+
+        if (!foundTrailing) {
+          const trailingAmountMatch = trimmed.match(/[\s,]+([\d\/\.\s-]+)$/);
+          if (trailingAmountMatch && trailingAmountMatch[1].trim().match(/\d/)) {
+            amount = trailingAmountMatch[1].trim();
+            name = trimmed.substring(0, trailingAmountMatch.index).trim().replace(/,$/, '');
+          } else {
+            name = trimmed;
+          }
+        }
       }
 
       if (name) {
@@ -1154,7 +1167,7 @@ export default function CreateRecipe() {
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'New Section', linked_recipe: null }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'New Section', linked_recipe: null, is_alternative: false }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addIngredient()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
                   </div>
                 </div>
