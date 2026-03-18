@@ -31,13 +31,20 @@ export default function Search() {
             r.ingredients?.forEach(i => {
                 if (i.ingredient?.name) {
                     const name = i.ingredient.name;
-                    if (!ingsMap.has(name.toLowerCase())) {
-                        ingsMap.set(name.toLowerCase(), {
-                            name,
-                            name_ar: (i.ingredient as any).name_ar,
-                            name_he: (i.ingredient as any).name_he,
-                            name_es: (i.ingredient as any).name_es,
-                        });
+                    const key = name.toLowerCase();
+                    const existing = ingsMap.get(key);
+                    
+                    const name_ar = (i.ingredient as any).name_ar;
+                    const name_he = (i.ingredient as any).name_he;
+                    const name_es = (i.ingredient as any).name_es;
+
+                    if (!existing) {
+                        ingsMap.set(key, { name, name_ar, name_he, name_es });
+                    } else {
+                        // Merge translations if they exist in this instance but not in the map
+                        if (!existing.name_ar && name_ar) existing.name_ar = name_ar;
+                        if (!existing.name_he && name_he) existing.name_he = name_he;
+                        if (!existing.name_es && name_es) existing.name_es = name_es;
                     }
                 }
             });
@@ -53,19 +60,46 @@ export default function Search() {
         return translations.length > 0 ? `${name} (${translations.join(' / ')})` : name;
     };
 
+    // Build a global map of synonyms (bridging translations across all records)
+    const globalSynonyms = useMemo(() => {
+        const map = new Map<string, Set<string>>();
+        const groups: Set<string>[] = [];
+
+        ingredientsData.forEach(ing => {
+            const names = [
+                ing.name.toLowerCase(),
+                ing.name_ar,
+                ing.name_he,
+                ing.name_es?.toLowerCase()
+            ].filter(Boolean) as string[];
+
+            let targetGroup = groups.find(g => names.some(n => g.has(n)));
+            if (!targetGroup) {
+                targetGroup = new Set<string>();
+                groups.push(targetGroup);
+            }
+            names.forEach(n => targetGroup!.add(n));
+        });
+
+        groups.forEach(group => {
+            group.forEach(name => map.set(name, group));
+        });
+
+        return map;
+    }, [ingredientsData]);
+
+    const getSynonyms = (term: string) => globalSynonyms.get(term.toLowerCase()) || new Set([term.toLowerCase()]);
+
     const ingredientSuggestions = useMemo(() => {
         if (!ingredientSearch.trim()) return [];
         const terms = ingredientSearch.toLowerCase();
         return ingredientsData
-            .filter(ing => 
-                (ing.name.toLowerCase().includes(terms) || 
-                 ing.name_ar?.includes(terms) || 
-                 ing.name_he?.includes(terms) || 
-                 ing.name_es?.toLowerCase().includes(terms)) && 
-                !selectedIngredients.some(si => si.toLowerCase() === ing.name.toLowerCase())
-            )
+            .filter(ing => {
+                const synonyms = getSynonyms(ing.name);
+                return Array.from(synonyms).some(syn => syn.includes(terms));
+            })
             .slice(0, 5);
-    }, [ingredientSearch, ingredientsData, selectedIngredients]);
+    }, [ingredientSearch, ingredientsData, globalSynonyms]);
 
     const filteredRecipes = useMemo(() => {
         return recipes.filter(recipe => {
@@ -82,24 +116,13 @@ export default function Search() {
 
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
-                    // Find all known names for the selected chip (English, Arabic, Hebrew, Spanish)
-                    const chipData = ingredientsData.find(ing => ing.name.toLowerCase() === si.toLowerCase());
-                    const synonyms = chipData ? [
-                        chipData.name.toLowerCase(),
-                        chipData.name_ar,
-                        chipData.name_he,
-                        chipData.name_es?.toLowerCase()
-                    ].filter(Boolean) as string[] : [si.toLowerCase()];
+                    const synonyms = Array.from(getSynonyms(si));
 
                     return recipe.ingredients?.some(ri => {
                         return synonyms.some(syn => {
                             const searchLower = syn.toLowerCase();
-                            return (
-                                ri.ingredient.name.toLowerCase().includes(searchLower) ||
-                                (ri.ingredient as any).name_ar?.includes(syn) ||
-                                (ri.ingredient as any).name_he?.includes(syn) ||
-                                (ri.ingredient as any).name_es?.toLowerCase().includes(searchLower)
-                            );
+                            const riSynonyms = Array.from(getSynonyms(ri.ingredient.name));
+                            return riSynonyms.some(rs => rs.toLowerCase().includes(searchLower));
                         });
                     });
                 });
