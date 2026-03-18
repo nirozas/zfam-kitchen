@@ -373,7 +373,7 @@ export default function RecipeDetail() {
             </AnimatePresence>
 
             {/* Hero Section */}
-            <div className="relative h-[50vh] md:h-[65vh] w-full overflow-hidden">
+            <div className="relative min-h-[75vh] h-auto md:h-[75vh] w-full overflow-hidden flex flex-col">
                 {recipe.image_url ? (
                     <img
                         src={getOptimizedImageUrl(recipe.image_url)}
@@ -386,7 +386,7 @@ export default function RecipeDetail() {
                         <span className="text-6xl">🍽️</span>
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/20 flex flex-col justify-end p-6 sm:p-10">
                     <Link to="/" className="absolute top-6 left-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 transition-colors z-30">
                         <ArrowLeft size={24} />
                     </Link>
@@ -460,7 +460,7 @@ export default function RecipeDetail() {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="max-w-4xl relative z-10 pt-24 sm:pt-40 md:pt-64 lg:pt-40"
+                        className="max-w-4xl relative z-10 pt-48 sm:pt-40 md:pt-64 lg:pt-40"
                     >
                         <div className="flex flex-wrap items-center gap-4 mb-4 sm:hidden">
                             <div className="flex flex-wrap items-center gap-2">
@@ -491,7 +491,7 @@ export default function RecipeDetail() {
                             </div>
                         </div>
 
-                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9]">
+                        <h1 className="text-2xl sm:text-5xl md:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9]">
                             {recipe.title}
                         </h1>
 
@@ -499,7 +499,7 @@ export default function RecipeDetail() {
                         {recipe.alternative_titles && (
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {recipe.alternative_titles.split(',').map((alt, i) => (
-                                    <span key={i} className="px-3 py-1.5 sm:px-6 sm:py-3 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl text-white/60 text-xs sm:text-xl font-black uppercase tracking-widest border border-white/5">
+                                    <span key={i} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-lg sm:rounded-2xl text-white/50 text-[10px] sm:text-xl font-black uppercase tracking-widest border border-white/5">
                                         {alt.trim()}
                                     </span>
                                 ))}
@@ -568,19 +568,19 @@ export default function RecipeDetail() {
                             </div>
                         </div>
 
-                        {/* Usage Stats - Centered & Large */}
-                        <div className="flex items-center gap-6 sm:gap-16 py-2 overflow-x-auto no-scrollbar">
-                            <div className="flex flex-col items-center">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">THIS MONTH</span>
-                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.month}</span>
+                        {/* Usage Stats - Optimized for Mobile Grid */}
+                        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-16 py-4 sm:py-2 border-t sm:border-none border-white/5">
+                            <div className="flex flex-col items-center sm:items-start">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">MONTH</span>
+                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.month}</span>
                             </div>
-                            <div className="flex flex-col items-center border-l border-white/10 pl-6 sm:pl-16">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">THIS YEAR</span>
-                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.year}</span>
+                            <div className="flex flex-col items-center sm:items-start border-l border-white/10 sm:border-none">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">YEAR</span>
+                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.year}</span>
                             </div>
-                            <div className="flex flex-col items-center border-l border-white/10 pl-6 sm:pl-16">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">ALL TIME</span>
-                                <span className="text-3xl sm:text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
+                            <div className="flex flex-col items-center sm:items-start border-l border-white/10 sm:border-none">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">ALL</span>
+                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
                             </div>
                         </div>
 
