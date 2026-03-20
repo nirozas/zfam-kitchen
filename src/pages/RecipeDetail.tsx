@@ -6,6 +6,7 @@ import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContex
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 import { getOptimizedImageUrl } from '@/lib/utils';
+import { deleteFromB2 } from '@/lib/b2';
 
 export default function RecipeDetail() {
     const { id } = useParams();
@@ -39,7 +40,10 @@ export default function RecipeDetail() {
         // User requested that ingredients start UNCHECKED and multiplier defaults to 1
         setSelectedForCart([]);
         setMultiplier(1);
-    }, [recipe]);
+        
+        // Scroll to top when recipe changes
+        window.scrollTo(0, 0);
+    }, [id]);
 
     const [isAdmin, setIsAdmin] = useState(false);
 
@@ -105,6 +109,28 @@ export default function RecipeDetail() {
         if (!recipe) return;
         setIsDeleting(true);
         try {
+            // 1. Delete all associated images from B2
+            const imagesToDelete: string[] = [];
+            if (recipe.image_url) imagesToDelete.push(recipe.image_url);
+            
+            if (recipe.gallery_urls && Array.isArray(recipe.gallery_urls)) {
+                recipe.gallery_urls.forEach((item: any) => {
+                    if (item.url) imagesToDelete.push(item.url);
+                });
+            }
+            
+            if (recipe.steps && Array.isArray(recipe.steps)) {
+                recipe.steps.forEach((step: any) => {
+                    if (step.image_url) imagesToDelete.push(step.image_url);
+                });
+            }
+
+            // Fire and forget deletions (don't block recipe deletion if B2 delete fails)
+            Promise.all(imagesToDelete.map(url => deleteFromB2(url))).catch(err => {
+                console.error('Failed to clean up some B2 images:', err);
+            });
+
+            // 2. Delete recipe from DB (cascade should handle tags/ingredients/likes etc)
             const { error } = await supabase
                 .from('recipes')
                 .delete()
@@ -661,7 +687,7 @@ export default function RecipeDetail() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     {/* Sidebar: Ingredients & Nutrition Facts */}
-                    <div className="lg:col-span-1 space-y-8">
+                    <div className="lg:col-span-1 space-y-8 min-w-0">
                         <div className="bg-white p-8 rounded-[3rem] shadow-xl shadow-gray-100/50 border border-gray-100 sticky top-8">
                             <div className="flex flex-col gap-6 mb-10">
                                 <div className="flex items-center justify-between">
@@ -716,42 +742,55 @@ export default function RecipeDetail() {
                                                     key={ing.originalIndex}
                                                     className="flex items-center gap-4 group/item"
                                                 >
-                                                    {/* Checkbox for Cart Selection */}
-                                                    <button
-                                                        onClick={() => toggleSelectedForCart(ing.originalIndex)}
-                                                        className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(ing.originalIndex)
-                                                            ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-100'
-                                                            : 'border-gray-200 hover:border-primary-200'
-                                                            }`}
-                                                    >
-                                                        {selectedForCart.includes(ing.originalIndex) && <Check size={14} strokeWidth={4} />}
-                                                    </button>
+                                                    {/* Checkbox for Cart Selection OR Image for Linked Recipe */}
+                                                    {ing.linked_recipe ? (
+                                                        <div 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigate(`/recipe/${ing.linked_recipe.slug || ing.linked_recipe.id}`);
+                                                            }}
+                                                            className="flex-shrink-0 w-10 h-10 rounded-xl overflow-hidden border-2 border-indigo-100 hover:border-indigo-400 cursor-pointer shadow-sm transition-all hover:scale-105 active:scale-95 group/img"
+                                                            title={`View ${ing.linked_recipe.title}`}
+                                                        >
+                                                            {ing.linked_recipe.image_url ? (
+                                                                <img src={getOptimizedImageUrl(ing.linked_recipe.image_url)} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-400 group-hover/img:bg-indigo-100">
+                                                                    <LinkIcon size={14} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => toggleSelectedForCart(ing.originalIndex)}
+                                                            className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(ing.originalIndex)
+                                                                ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-100'
+                                                                : 'border-gray-200 hover:border-primary-200'
+                                                                }`}
+                                                        >
+                                                            {selectedForCart.includes(ing.originalIndex) && <Check size={14} strokeWidth={4} />}
+                                                        </button>
+                                                    )}
 
                                                     {/* Ingredient Info - Clickable for Crossing Out */}
                                                     <div
                                                         onClick={() => toggleCrossed(ing.originalIndex)}
-                                                        className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors"
+                                                        className="flex-1 flex items-center justify-between cursor-pointer py-2 px-3 hover:bg-gray-50 rounded-2xl transition-colors min-w-0 font-bold"
                                                     >
                                                         <div className="flex flex-col flex-1">
                                                             <div className="flex items-center gap-1.5 min-w-0">
-                                                                <span className={`font-bold transition-all text-sm truncate ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
+                                                                <span className={`font-bold transition-all text-sm break-words whitespace-pre-wrap ${crossedIngredients.includes(ing.originalIndex) ? 'line-through text-gray-300 scale-95 origin-left' : 'text-gray-700'}`}>
                                                                     {ing.ingredient?.name || 'Unknown'}
                                                                 </span>
-                                                                {ing.linked_recipe && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            navigate(`/recipe/${ing.linked_recipe.slug}`);
-                                                                        }}
-                                                                        className="p-1 px-1.5 bg-indigo-50 text-indigo-600 rounded-md text-[8px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
-                                                                    >
-                                                                        Recipe <LinkIcon size={8} />
-                                                                    </button>
-                                                                )}
                                                             </div>
                                                             {ing.note && (
                                                                 <span className="text-[10px] font-bold text-gray-400 mt-0.5 leading-tight">
                                                                     {ing.note}
+                                                                </span>
+                                                            )}
+                                                            {ing.linked_recipe && (
+                                                                <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400 mt-1 flex items-center gap-1">
+                                                                    <LinkIcon size={8} /> Attached Recipe
                                                                 </span>
                                                             )}
                                                         </div>
@@ -808,7 +847,7 @@ export default function RecipeDetail() {
                     </div>
 
                     {/* Main Content Column: Video & Instructions */}
-                    <div className="lg:col-span-2 space-y-12">
+                    <div className="lg:col-span-2 space-y-12 min-w-0">
                         {videoData && (
                             <section className="bg-white p-3 rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden group">
                                 <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden relative">
@@ -895,7 +934,7 @@ export default function RecipeDetail() {
                                                     {index + 1}
                                                 </div>
                                                 <div className="pt-3 flex-1">
-                                                    <p className={`leading-relaxed font-bold text-xl tracking-tight transition-all ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
+                                                    <p className={`leading-relaxed font-bold text-xl tracking-tight transition-all break-words whitespace-pre-wrap ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
                                                         }`}>
                                                         {stepData.text}
                                                     </p>

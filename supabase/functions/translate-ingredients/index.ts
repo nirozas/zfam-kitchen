@@ -7,18 +7,22 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   // These are auto-injected by Supabase into every edge function
+  // @ts-ignore: Deno global is available in edge functions
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  // @ts-ignore: Deno global is available in edge functions
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // @ts-ignore: Deno global is available in edge functions
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+  // @ts-ignore: Deno global is available in edge functions
   const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
 
   console.log('Keys available:', { gemini: !!GEMINI_API_KEY, groq: !!GROQ_API_KEY, supabase: !!serviceRoleKey });
@@ -31,7 +35,7 @@ serve(async (req) => {
       .or('name_ar.is.null,name_he.is.null,name_es.is.null');
 
     if (error) throw error;
-    if (!ingredients || ingredients.length === 0) {
+    if (!ingredients || (ingredients as any[]).length === 0) {
       return new Response(JSON.stringify({ message: 'All ingredients already have translations!', count: 0 }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -48,7 +52,7 @@ serve(async (req) => {
 
     for (let i = 0; i < ingredients.length; i += BATCH_SIZE) {
       const batch = ingredients.slice(i, i + BATCH_SIZE);
-      const names = batch.map(ing => ing.name);
+      const names = batch.map((ing: { name: string }) => ing.name);
 
       
       const prompt = `You are a culinary dictionary. These ingredient names could be in English, Arabic, Hebrew, or Spanish. 
@@ -58,7 +62,7 @@ Return ONLY a JSON array, no markdown, no explanations. The array must have exac
 { "name_en": "english", "name_ar": "arabic", "name_he": "hebrew", "name_es": "spanish" }
 
 Ingredients to translate:
-${names.map((n, idx) => `${idx + 1}. ${n}`).join('\n')}`;
+${names.map((n: string, idx: number) => `${idx + 1}. ${n}`).join('\n')}`;
 
       let responseText = '';
       let geminiErr = '';

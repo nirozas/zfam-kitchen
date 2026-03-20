@@ -1,4 +1,4 @@
-import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid, Home } from 'lucide-react';
+import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid, Home, Bug, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -6,6 +6,7 @@ import { Session } from '@supabase/supabase-js';
 import { useShoppingCart } from '@/contexts/ShoppingCartContext';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import BugReportModal from './BugReportModal';
 
 export default function Navbar() {
     const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function Navbar() {
     const [profileUsername, setProfileUsername] = useState<string | null>(null);
     const { cartCount } = useShoppingCart();
     const [isLogoDropdownOpen, setIsLogoDropdownOpen] = useState(false);
+    const [isBugModalOpen, setIsBugModalOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -71,7 +73,8 @@ export default function Navbar() {
     ];
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/20">
+        <>
+            <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/20">
             <div className="w-full px-2 sm:px-4 lg:px-8">
                 <div className="flex justify-between items-center h-16 gap-2">
                     {/* Logo & Dropdown Trigger */}
@@ -134,12 +137,34 @@ export default function Navbar() {
                                             </Link>
                                         ))}
                                     </div>
-                                    <div className="p-4 bg-gray-50 border-t border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Navigation</p>
-                                        <div className="flex gap-4">
-                                            <Link to="/" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Home</Link>
-                                            <Link to="/search" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Recipes</Link>
-                                            <Link to="/planner" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Planner</Link>
+                                    <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-4">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Navigation</p>
+                                            <div className="flex gap-4">
+                                                <Link to="/" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Home</Link>
+                                                <Link to="/search" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Recipes</Link>
+                                                <Link to="/planner" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Planner</Link>
+                                            </div>
+                                        </div>
+                                        <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    setIsLogoDropdownOpen(false);
+                                                    navigate('/profile');
+                                                }}
+                                                className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-2"
+                                            >
+                                                <Settings size={14} /> Profile Settings
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    setIsLogoDropdownOpen(false);
+                                                    setIsBugModalOpen(true);
+                                                }}
+                                                className="text-xs font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-colors flex items-center gap-2"
+                                            >
+                                                <Bug size={14} /> Report a Bug
+                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -243,5 +268,7 @@ export default function Navbar() {
                 </div>
             </div>
         </nav>
-    );
+        <BugReportModal isOpen={isBugModalOpen} onClose={() => setIsBugModalOpen(false)} />
+    </>
+);
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
@@ -8,7 +8,7 @@ import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
 import RecipeSelectorModal from '@/components/RecipeSelectorModal';
 import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
-import { uploadToB2 } from '@/lib/b2';
+import { uploadToB2, deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 
 interface RecipeStep {
@@ -275,8 +275,57 @@ const StepReorderItem = ({
           )}
 
           <input type="text" placeholder="Add a chef's tip for this step..." className="w-full bg-transparent border-none text-[10px] font-bold text-gray-400 p-0 placeholder:text-gray-200 uppercase tracking-widest italic" value={s.note || ''} onChange={e => updateStep(i, { note: e.target.value })} />
+
+          {s.image_url && (
+            <div className="mt-3 relative group/step-img">
+              <div className={`flex ${s.alignment === 'center' ? 'justify-center' : s.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`relative rounded-xl overflow-hidden border border-gray-100 shadow-sm ${s.alignment === 'full' ? 'w-full' : 'max-w-[200px]'}`}>
+                  <img src={getOptimizedImageUrl(s.image_url)} className="w-full h-auto object-cover max-h-[200px]" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/step-img:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button type="button" onClick={() => updateStep(i, { alignment: 'left' })} className={`p-1.5 rounded-lg transition-all ${s.alignment === 'left' ? 'bg-primary-500 text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}><AlignLeft size={14} /></button>
+                    <button type="button" onClick={() => updateStep(i, { alignment: 'center' })} className={`p-1.5 rounded-lg transition-all ${s.alignment === 'center' ? 'bg-primary-500 text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}><AlignCenter size={14} /></button>
+                    <button type="button" onClick={() => updateStep(i, { alignment: 'right' })} className={`p-1.5 rounded-lg transition-all ${s.alignment === 'right' ? 'bg-primary-500 text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}><AlignRight size={14} /></button>
+                    <button type="button" onClick={() => updateStep(i, { alignment: 'full' })} className={`p-1.5 rounded-lg transition-all ${s.alignment === 'full' ? 'bg-primary-500 text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}><Maximize size={14} /></button>
+                    <button type="button" onClick={() => updateStep(i, { image_url: '' })} className="p-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all ml-2"><X size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1 items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="relative group/upload">
+            <button type="button" className="text-gray-300 hover:text-primary-600 transition-colors p-1.5">
+              <ImageIcon size={16} />
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="absolute inset-0 opacity-0 cursor-pointer" 
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const url = await uploadToB2(file, 'steps');
+                    updateStep(i, { image_url: url });
+                  } catch (err) {
+                    toast.error('Failed to upload step image');
+                  }
+                }}
+              />
+            </button>
+            <div className="absolute right-full top-0 mr-2 hidden group-hover/upload:flex flex-col bg-white shadow-xl border border-gray-100 rounded-xl p-2 z-50 min-w-[150px]">
+              <button 
+                type="button" 
+                onClick={() => {
+                  const url = prompt('Enter image URL:');
+                  if (url) updateStep(i, { image_url: fixImageUrl(url) || '' });
+                }}
+                className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-primary-600 p-2 text-left whitespace-nowrap"
+              >
+                + Paste URL
+              </button>
+            </div>
+          </div>
           <button type="button" onClick={() => {
             setActiveRecipeLinkType('step');
             setActiveRecipeLinkIndex(i);
@@ -398,8 +447,21 @@ export default function CreateRecipe() {
     try {
       setUploading(true);
       const url = await uploadToB2(croppedBlob, 'recipes');
-      if (cropTarget?.type === 'main') setFormData(prev => ({ ...prev, image_url: url }));
-      else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') updateStep(cropTarget.index, { image_url: url });
+      
+      if (cropTarget?.type === 'main') {
+        // If replacing an existing B2 image, delete the old version
+        if (formData.image_url) {
+          deleteFromB2(formData.image_url);
+        }
+        setFormData(prev => ({ ...prev, image_url: url }));
+      }
+      else if (cropTarget?.type === 'step' && typeof cropTarget.index === 'number') {
+        const oldStepUrl = formData.steps[cropTarget.index]?.image_url;
+        if (oldStepUrl) {
+          deleteFromB2(oldStepUrl);
+        }
+        updateStep(cropTarget.index, { image_url: url });
+      }
       setCropModalOpen(false);
     } catch (error) { alert('Upload failed: ' + (error as Error).message); }
     finally { setUploading(false); }
@@ -578,13 +640,15 @@ export default function CreateRecipe() {
         await supabase.from('recipe_categories').upsert(categoryLinks);
       }
 
-      const currentIngredients = ingredients.filter(ing => ing.name.trim() !== '');
+      // Filter only truly empty ingredients (no name AND no linked recipe)
+      const currentIngredients = ingredients.filter(ing => ing.name.trim() !== '' || ing.linked_recipe);
       if (isEditing) await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeIdForIngredients);
       for (const ing of currentIngredients) {
-        let { data: existingIng } = await supabase.from('ingredients').select('id').eq('name', ing.name).single();
+        const finalIngName = (ing.name || '').trim() || ing.linked_recipe?.title || 'Unknown Ingredient';
+        let { data: existingIng } = await supabase.from('ingredients').select('id').eq('name', finalIngName).single();
         let ingredientId: number;
         if (!existingIng) {
-          const { data: newIng } = await supabase.from('ingredients').insert([{ name: ing.name }]).select().single();
+          const { data: newIng } = await supabase.from('ingredients').insert([{ name: finalIngName }]).select().single();
           ingredientId = newIng.id;
         } else ingredientId = existingIng.id;
 
@@ -639,10 +703,22 @@ export default function CreateRecipe() {
   };
   const updateStep = (idx: number, updates: Partial<RecipeStep>) => {
     const newSteps = [...formData.steps];
+    
+    // If we're removing or replacing an image, delete the old one from B2
+    const oldUrl = newSteps[idx].image_url;
+    if (updates.image_url !== undefined && updates.image_url !== oldUrl && oldUrl) {
+      deleteFromB2(oldUrl);
+    }
+    
     newSteps[idx] = { ...newSteps[idx], ...updates };
     setFormData(prev => ({ ...prev, steps: newSteps }));
   };
-  const removeStep = (idx: number) => setFormData(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
+  const removeStep = (idx: number) => {
+    if (formData.steps[idx].image_url) {
+      deleteFromB2(formData.steps[idx].image_url);
+    }
+    setFormData(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
+  };
 
   const addIngredient = (index?: number) => {
     const targetIdx = index !== undefined ? index : ingredients.length - 1;
@@ -1088,7 +1164,10 @@ export default function CreateRecipe() {
                           <img src={getOptimizedImageUrl(formData.image_url)} className="w-full h-full object-cover" />
                           <div className="absolute top-4 right-4 flex gap-2">
                             <button type="button" onClick={() => onEditImage(formData.image_url, 'main')} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-primary-500 transition-all"><Maximize2 size={20} /></button>
-                            <button type="button" onClick={() => setFormData({ ...formData, image_url: '' })} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
+                            <button type="button" onClick={() => {
+                              deleteFromB2(formData.image_url);
+                              setFormData({ ...formData, image_url: '' });
+                            }} className="p-3 bg-black/50 text-white rounded-2xl hover:bg-red-500 transition-all"><X size={20} /></button>
                           </div>
                         </>
                       ) : (
@@ -1148,7 +1227,10 @@ export default function CreateRecipe() {
                       {formData.gallery_urls.map((g, i) => (
                         <div key={i} className="aspect-square rounded-xl overflow-hidden relative group border border-gray-100">
                           <img src={getOptimizedImageUrl(g.url)} className="w-full h-full object-cover" />
-                          <button type="button" onClick={() => setFormData(p => ({ ...p, gallery_urls: p.gallery_urls.filter((_, idx) => idx !== i) }))} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
+                          <button type="button" onClick={() => {
+                            deleteFromB2(g.url);
+                            setFormData(p => ({ ...p, gallery_urls: p.gallery_urls.filter((_, idx) => idx !== i) }));
+                          }} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
                         </div>
                       ))}
                       <div className="aspect-square rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 relative hover:bg-gray-100 cursor-pointer overflow-hidden"><Plus size={16} /><input type="file" multiple accept="image/*" onChange={handleGalleryAdd} className="absolute inset-0 opacity-0 cursor-pointer" /></div>
@@ -1324,7 +1406,8 @@ export default function CreateRecipe() {
                 const next = [...ingredients];
                 next[activeRecipeLinkIndex] = {
                   ...next[activeRecipeLinkIndex],
-                  linked_recipe: recipe
+                  linked_recipe: recipe,
+                  name: next[activeRecipeLinkIndex].name.trim() === '' ? recipe.title : next[activeRecipeLinkIndex].name
                 };
                 setIngredients(next);
               } else {

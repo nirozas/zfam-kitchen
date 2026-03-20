@@ -11,7 +11,7 @@ const APP_KEY = Deno.env.get('B2_APP_KEY')!;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-file-name, x-file-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, DELETE',
 };
 
 // AWS SigV4 signing for B2 S3-compatible API
@@ -73,9 +73,40 @@ async function signRequest(
   };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const fileName = req.headers.get('x-file-name');
+      if (!fileName) throw new Error('File name is required');
+
+      const deleteUrl = `${ENDPOINT}/${BUCKET_NAME}/${fileName}`;
+      const headers = await signRequest('DELETE', deleteUrl, new ArrayBuffer(0), 'application/octet-stream');
+      
+      const deleteRes = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: { ...headers },
+      });
+
+      if (!deleteRes.ok && deleteRes.status !== 404) {
+        const errText = await deleteRes.text();
+        throw new Error(`B2 delete failed: ${deleteRes.status} ${errText}`);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      console.error('Delete error:', err);
+      return new Response(JSON.stringify({ error: (err as Error).message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   if (req.method !== 'POST') {

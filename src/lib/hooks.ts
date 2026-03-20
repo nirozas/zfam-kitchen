@@ -11,13 +11,21 @@ export interface UseRecipesOptions {
     minimal?: boolean;
 }
 
+
+export interface UseRecipesOptions {
+    limit?: number;
+    offset?: number;
+    minimal?: boolean;
+}
+
 export function useRecipes(options?: UseRecipesOptions) {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [totalCount, setTotalCount] = useState<number | null>(null);
 
     useEffect(() => {
-        const cacheKey = `${options?.limit ?? 'all'}-${options?.minimal ?? false}`;
+        const cacheKey = `${options?.limit ?? 'all'}-${options?.offset ?? 0}-${options?.minimal ?? false}`;
         const cached = recipesCache[cacheKey];
 
         async function fetchRecipes() {
@@ -25,35 +33,44 @@ export function useRecipes(options?: UseRecipesOptions) {
                 setLoading(true);
 
                 let query;
+                const LIST_FIELDS = `
+                    id, slug, title, image_url, created_at, rating, category_id, 
+                    time_minutes, description, servings, alternative_titles,
+                    author:author_id(username),
+                    category:category_id(id, name, slug),
+                    recipe_tags(tags(id, name))
+                `;
 
                 if (options?.minimal) {
-                    query = supabase.from('recipes').select(`
-                        id, slug, title, image_url, created_at, rating, category_id,
-                        category:category_id(id, name, slug),
-                        recipe_tags(tags(id, name))
-                    `);
+                    query = supabase.from('recipes').select(LIST_FIELDS, { count: 'exact' });
                 } else {
                     query = supabase.from('recipes').select(`
-                        *,
-                        category:category_id(id, name, slug),
+                        ${LIST_FIELDS},
                         recipe_categories(categories(id, name, slug)),
-                        recipe_tags(tags(id, name)),
-                        recipe_ingredients!recipe_id(amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url))
-                    `);
+                        recipe_ingredients!recipe_id(
+                          amount_in_grams, unit, group_name, order_index, note, 
+                          ingredients(*), 
+                          linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
+                        )
+                    `, { count: 'exact' });
                 }
 
                 query = query.order('created_at', { ascending: false });
 
                 if (options?.limit) {
-                    query = query.limit(options.limit);
+                    const from = options.offset ?? 0;
+                    const to = from + options.limit - 1;
+                    query = query.range(from, to);
                 }
 
-                const { data, error } = await query;
+                const { data, error, count } = await query;
 
                 if (error) {
                     console.error('Supabase error:', error);
                     throw error;
                 }
+
+                setTotalCount(count);
 
                 const transformedRecipes: Recipe[] = (data || []).map((recipe: any) => ({
                     ...recipe,
@@ -77,7 +94,7 @@ export function useRecipes(options?: UseRecipesOptions) {
                 // Cache result
                 recipesCache[cacheKey] = { recipes: transformedRecipes, ts: Date.now() };
 
-                // Show recipes immediately — don't block on likes count
+                // Show recipes immediately
                 setRecipes(transformedRecipes);
                 setLoading(false);
 
@@ -112,9 +129,9 @@ export function useRecipes(options?: UseRecipesOptions) {
         } else {
             fetchRecipes();
         }
-    }, [options?.limit, options?.minimal]);
+    }, [options?.limit, options?.offset, options?.minimal]);
 
-    return { recipes, loading, error };
+    return { recipes, loading, error, totalCount };
 }
 
 export function useRecipe(id: string | undefined) {
@@ -134,67 +151,60 @@ export function useRecipe(id: string | undefined) {
                 setLoading(true);
                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-                // Phase 1: Fetch core recipe data (fast — no heavy ingredient joins)
-                let coreQuery = supabase
+                // One efficient query to get EVERYTHING
+                let query = supabase
                     .from('recipes')
                     .select(`
                         *,
+                        author:author_id(username),
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
-                        recipe_tags(tags(id, name))
+                        recipe_tags(tags(id, name)),
+                        recipe_ingredients!recipe_id(
+                            amount_in_grams, unit, group_name, order_index, note, 
+                            ingredients(*), 
+                            linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
+                        )
                     `);
 
                 if (isUuid) {
-                    coreQuery = coreQuery.eq('id', id);
+                    query = query.eq('id', id);
                 } else {
-                    coreQuery = coreQuery.eq('slug', id);
+                    query = query.eq('slug', id);
                 }
 
-                const { data, error } = await coreQuery.single();
+                const { data, error } = await query.single();
 
                 if (error) throw error;
 
                 if (data) {
-                    const coreRecipe: Recipe = {
+                    const fullRecipe: Recipe = {
                         ...data,
                         rating: data.rating || 3,
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
                         all_categories: data.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                         tags: data.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
-                        ingredients: [], // filled in phase 2
+                        ingredients: (data.recipe_ingredients || [])
+                            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                            .map((ri: any) => ({
+                                amount_in_grams: ri.amount_in_grams,
+                                unit: ri.unit || 'g',
+                                group_name: ri.group_name || 'Main',
+                                note: ri.note,
+                                ingredient: ri.ingredients,
+                                linked_recipe: ri.linked_recipe
+                            }))
+                            .filter((ing: any) => ing.ingredient || ing.linked_recipe),
                     };
 
-                    // Show recipe immediately with core data
-                    setRecipe(coreRecipe);
+                    setRecipe(fullRecipe);
                     setLoading(false);
 
-                    // Phase 2: Fetch heavy ingredient data in background
-                    supabase
-                        .from('recipe_ingredients')
-                        .select('amount_in_grams, unit, group_name, order_index, note, ingredients(*), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)')
-                        .eq('recipe_id', coreRecipe.id)
-                        .order('order_index')
-                        .then(({ data: ingData }) => {
-                            if (ingData) {
-                                const ingredients = ingData
-                                    .map((ri: any) => ({
-                                        amount_in_grams: ri.amount_in_grams,
-                                        unit: ri.unit || 'g',
-                                        group_name: ri.group_name || 'Main',
-                                        note: ri.note,
-                                        ingredient: ri.ingredients,
-                                        linked_recipe: ri.linked_recipe
-                                    }))
-                                    .filter((ing: any) => ing.ingredient || ing.linked_recipe);
-                                setRecipe(prev => prev ? { ...prev, ingredients } : prev);
-                            }
-                        });
-
-                    // Phase 2b: Fetch likes count in background too
+                    // Fetch likes count in background
                     supabase
                         .from('likes')
                         .select('*', { count: 'exact', head: true })
-                        .eq('recipe_id', coreRecipe.id)
+                        .eq('recipe_id', fullRecipe.id)
                         .then(({ count: likesCount }) => {
                             setRecipe(prev => prev ? { ...prev, likesCount: likesCount || 0 } : prev);
                         });
@@ -299,9 +309,9 @@ export function useDetailedRecipeStats(recipeId: string | undefined) {
                 const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
 
                 const [allTimeRes, monthRes, yearRes] = await Promise.all([
-                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId),
-                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', monthStart),
-                    supabase.from('meal_planner').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', yearStart)
+                    supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId),
+                    supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', monthStart),
+                    supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', yearStart)
                 ]);
 
                 setStats({
@@ -330,7 +340,7 @@ export function useTopTags(limit: number = 12) {
             try {
                 const { data, error } = await supabase
                     .from('recipe_tags')
-                    .select('tags(name)');
+                    .select('tags:tag_id(name)');
 
                 if (error) throw error;
 
@@ -499,42 +509,26 @@ export function useUserStats(userId: string | undefined) {
         if (!userId) return;
         async function fetchUserStats() {
             try {
-                // 1. Recipes Count
-                const { count: recipesCount } = await supabase
-                    .from('recipes')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('author_id', userId);
-
-                // 2. Favorites Given (Bookmarks)
-                const { count: favoritesGiven } = await supabase
-                    .from('favorites')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', userId);
-
-                // 2b. Likes Given (Social)
-                const { count: likesGiven } = await supabase
-                    .from('likes')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', userId);
-
-                // 3. Reviews Given
-                const { count: reviewsGiven } = await supabase
-                    .from('reviews')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', userId);
-
-                // 4. Likes Received (Total favorites on user's recipes)
-                const { data: userRecipes } = await supabase
-                    .from('recipes')
-                    .select('id')
-                    .eq('author_id', userId);
+                const [
+                    { count: recipesCount },
+                    { count: favoritesGiven },
+                    { count: likesGiven },
+                    { count: reviewsGiven },
+                    { data: userRecipes }
+                ] = await Promise.all([
+                    supabase.from('recipes').select('id', { count: 'exact', head: true }).eq('author_id', userId),
+                    supabase.from('favorites').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+                    supabase.from('likes').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+                    supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+                    supabase.from('recipes').select('id').eq('author_id', userId)
+                ]);
 
                 const recipeIds = userRecipes?.map(r => r.id) || [];
                 let likesReceived = 0;
                 if (recipeIds.length > 0) {
                     const { count: receivedCount } = await supabase
                         .from('favorites')
-                        .select('*', { count: 'exact', head: true })
+                        .select('id', { count: 'exact', head: true })
                         .in('recipe_id', recipeIds);
                     likesReceived = receivedCount || 0;
                 }

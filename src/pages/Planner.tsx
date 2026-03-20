@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipe, PlannerMeal } from '@/lib/types';
@@ -6,7 +6,7 @@ import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, S
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { useRecipes } from '@/lib/hooks';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const DebouncedInput = ({ value, onChange, placeholder, className, delay = 500 }: any) => {
     const [localValue, setLocalValue] = useState(value);
@@ -65,7 +65,32 @@ const DebouncedTextArea = ({ value, onChange, placeholder, className, delay = 50
 };
 
 export default function Planner() {
-    const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, +1 = next week
+    const [searchParams, setSearchParams] = useSearchParams();
+    const weekParam = searchParams.get('week');
+    const today = new Date();
+
+    const weekOffset = useMemo(() => {
+        if (!weekParam) return 0;
+        try {
+            // Append T12:00:00 to avoid UTC parsing issues (which could shift the date to the previous day in some timezones)
+            const target = startOfWeek(new Date(`${weekParam}T12:00:00`), { weekStartsOn: 1 });
+            const current = startOfWeek(today, { weekStartsOn: 1 });
+            return Math.round((target.getTime() - current.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        } catch (e) {
+            return 0;
+        }
+    }, [weekParam, today]);
+
+    const setWeekOffset = (newOffset: number | ((prev: number) => number)) => {
+        const calculatedOffset = typeof newOffset === 'function' ? newOffset(weekOffset) : newOffset;
+        const target = startOfWeek(addWeeks(today, calculatedOffset), { weekStartsOn: 1 });
+        const dateStr = format(target, 'yyyy-MM-dd');
+        setSearchParams(prev => {
+            prev.set('week', dateStr);
+            return prev;
+        }, { replace: true });
+    };
+
     const { addMultipleToCart } = useShoppingCart();
     const { plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, updateMealNote, toggleMealCompleted } = useMealPlanner();
     const { recipes, loading, error } = useRecipes();
@@ -75,7 +100,6 @@ export default function Planner() {
     const [showAllOccurrences, setShowAllOccurrences] = useState(false);
     const [gridDensity, setGridDensity] = useState(1); // 1 = normal, 2 = compact
 
-    const today = new Date();
     const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
@@ -174,7 +198,7 @@ export default function Planner() {
     };
 
     const navigateToDate = (dateStr: string) => {
-        const targetDate = new Date(dateStr);
+        const targetDate = new Date(`${dateStr}T12:00:00`);
         const diffInDays = Math.floor((targetDate.getTime() - startOfWeek(today, { weekStartsOn: 1 }).getTime()) / (1000 * 60 * 60 * 24));
         const offset = Math.floor(diffInDays / 7);
         setWeekOffset(offset);
@@ -667,21 +691,65 @@ export default function Planner() {
                             onClick={(e) => e.stopPropagation()}
                             className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]"
                         >
-                            <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-primary-50/30">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600">
-                                        <History size={24} />
+                            <div className="p-8 border-b border-gray-50 bg-primary-50/30 flex flex-col gap-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600">
+                                            <History size={24} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">All Occurrences</h2>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary-500">History Search for "{plannerSearchQuery}"</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">All Occurrences</h2>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary-500">History Search for "{plannerSearchQuery}"</p>
+                                    <button onClick={() => setShowAllOccurrences(false)} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-white shadow-sm">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
+                                        <p className="text-2xl font-black text-primary-600 leading-none">{globalSearchResults.length}</p>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-white shadow-sm flex flex-col justify-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Per Year</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {Object.entries(
+                                                globalSearchResults.reduce((acc, r) => {
+                                                    const year = r.date.split('-')[0];
+                                                    acc[year] = (acc[year] || 0) + 1;
+                                                    return acc;
+                                                }, {} as Record<string, number>)
+                                            ).map(([year, count]) => (
+                                                <span key={year} className="text-[11px] font-bold text-gray-700">
+                                                    {year}: <span className="text-primary-600">{count}</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-white shadow-sm flex flex-col justify-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Top Months</p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                            {Object.entries(
+                                                globalSearchResults.reduce((acc, r) => {
+                                                    const month = format(new Date(r.date), 'MMM yy');
+                                                    acc[month] = (acc[month] || 0) + 1;
+                                                    return acc;
+                                                }, {} as Record<string, number>)
+                                            )
+                                            .sort((a, b) => b[1] - a[1])
+                                            .slice(0, 3)
+                                            .map(([month, count]) => (
+                                                <span key={month} className="text-[11px] font-bold text-gray-700">
+                                                    {month}: <span className="text-primary-600">{count}</span>
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowAllOccurrences(false)} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
-                                    <X size={24} />
-                                </button>
                             </div>
-                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/20">
                                 <div className="grid grid-cols-1 gap-3">
                                     {globalSearchResults.map((result, i) => (
                                         <button

@@ -65,10 +65,24 @@ export default async function getCroppedImg(
     // draw image
     ctx.drawImage(image, 0, 0)
 
-    // Set canvas size to match the cropping area
+    // Set canvas size to match the cropping area, but cap at 1200px for performance
+    const MAX_DIMENSION = 1200
+    let targetWidth = pixelCrop.width
+    let targetHeight = pixelCrop.height
+
+    if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+        if (targetWidth > targetHeight) {
+            targetHeight = (MAX_DIMENSION / targetWidth) * targetHeight
+            targetWidth = MAX_DIMENSION
+        } else {
+            targetWidth = (MAX_DIMENSION / targetHeight) * targetWidth
+            targetHeight = MAX_DIMENSION
+        }
+    }
+
     const finalCanvas = document.createElement('canvas')
-    finalCanvas.width = pixelCrop.width
-    finalCanvas.height = pixelCrop.height
+    finalCanvas.width = targetWidth
+    finalCanvas.height = targetHeight
     const finalCtx = finalCanvas.getContext('2d')
     if (!finalCtx) return null
 
@@ -85,14 +99,14 @@ export default async function getCroppedImg(
         pixelCrop.height,
         0,
         0,
-        pixelCrop.width,
-        pixelCrop.height
+        targetWidth,
+        targetHeight
     )
 
-    // As a blob
+    // As a compressed blob
     return new Promise((resolve) => {
         finalCanvas.toBlob((file) => {
             resolve(file)
-        }, 'image/jpeg')
+        }, 'image/jpeg', 0.82)
     })
 }

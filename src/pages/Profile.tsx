@@ -2,12 +2,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ChefHat, Settings, Award, TrendingUp, DollarSign, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare } from 'lucide-react';
+import { Heart, ChefHat, Settings, Award, TrendingUp, DollarSign, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare, Bug } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import RecipeCard from '@/components/RecipeCard';
 import { useRecipes, useFavorites, useCategories, useUserStats } from '@/lib/hooks';
 import { useShoppingCart } from '@/contexts/ShoppingCartContext';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
+import AdminBugReports from '@/components/AdminBugReports';
+import { deleteFromB2 } from '@/lib/b2';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -22,7 +24,7 @@ export default function ProfilePage() {
     const [profile, setProfile] = useState<Profile | null>(null);
     const { stats: myStats } = useUserStats(profile?.id);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'favorites' | 'my-recipes' | 'stats' | 'settings' | 'users'>('stats');
+    const [activeTab, setActiveTab] = useState<'favorites' | 'my-recipes' | 'stats' | 'settings' | 'users' | 'bugs'>('stats');
     const [allUsers, setAllUsers] = useState<(Profile & { recipe_count: number; review_count: number; likes_given: number; favorites_given: number })[]>([]);
     const [usersLoading, setUsersLoading] = useState(false);
 
@@ -91,13 +93,55 @@ export default function ProfilePage() {
 
     const deleteUser = async (userId: string) => {
         if (!confirm('Are you sure you want to remove this user? This cannot be undone.')) return;
-        const { error } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', userId);
 
-        if (error) alert('Error deleting user');
-        else fetchUsers();
+        try {
+            // 1. Fetch all recipes authored by this user
+            const { data: userRecipes } = await supabase
+                .from('recipes')
+                .select('image_url, gallery_urls, steps')
+                .eq('author_id', userId);
+
+            if (userRecipes && userRecipes.length > 0) {
+                const imagesToDelete: string[] = [];
+                userRecipes.forEach(recipe => {
+                    if (recipe.image_url) imagesToDelete.push(recipe.image_url);
+                    
+                    if (recipe.gallery_urls && Array.isArray(recipe.gallery_urls)) {
+                        recipe.gallery_urls.forEach((item: any) => {
+                            if (item.url) imagesToDelete.push(item.url);
+                        });
+                    }
+                    
+                    if (recipe.steps && Array.isArray(recipe.steps)) {
+                        recipe.steps.forEach((step: any) => {
+                            if (step.image_url) imagesToDelete.push(step.image_url);
+                        });
+                    }
+                });
+
+                // Fire and forget deletions
+                if (imagesToDelete.length > 0) {
+                    Promise.all(imagesToDelete.map(url => deleteFromB2(url))).catch(err => {
+                        console.error('Failed to clean up user B2 images:', err);
+                    });
+                }
+            }
+
+            // 2. Delete the user (this will cascade delete recipes in DB)
+            const { error } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', userId);
+
+            if (error) {
+                alert('Error deleting user');
+            } else {
+                fetchUsers();
+            }
+        } catch (err) {
+            console.error('Error in user deletion flow:', err);
+            alert('An error occurred while deleting the user.');
+        }
     };
 
     const fetchProfile = async () => {
@@ -363,7 +407,10 @@ export default function ProfilePage() {
                             { id: 'my-recipes', label: 'My Recipes', icon: ChefHat },
                             { id: 'stats', label: 'Performance', icon: TrendingUp },
                             { id: 'settings', label: 'Settings', icon: Settings },
-                            ...(profile?.role === 'admin' ? [{ id: 'users' as const, label: 'Manage Users', icon: Users }] : [])
+                            ...(profile?.role === 'admin' ? [
+                                { id: 'users' as const, label: 'Manage Users', icon: Users },
+                                { id: 'bugs' as const, label: 'Bug Reports', icon: Bug }
+                            ] : [])
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -737,6 +784,12 @@ export default function ProfilePage() {
                                             </tbody>
                                         </table>
                                     </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'bugs' && profile.role === 'admin' && (
+                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
+                                    <AdminBugReports />
                                 </div>
                             )}
                         </motion.div>

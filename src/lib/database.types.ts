@@ -247,6 +247,35 @@ export interface Database {
                     created_at?: string | null
                 }
             }
+            bug_reports: {
+                Row: {
+                    id: string
+                    user_id: string
+                    description: string
+                    status: 'pending' | 'in_progress' | 'fixed'
+                    admin_notes: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    description: string
+                    status?: 'pending' | 'in_progress' | 'fixed'
+                    admin_notes?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    description?: string
+                    status?: 'pending' | 'in_progress' | 'fixed'
+                    admin_notes?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
         }
     }
 }
