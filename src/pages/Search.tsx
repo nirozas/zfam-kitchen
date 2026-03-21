@@ -63,7 +63,7 @@ export default function Search() {
     const ingredientSuggestions = useMemo(() => {
         if (!ingredientSearch.trim()) return [];
         const terms = ingredientSearch.toLowerCase();
-        return ingredientsData
+        const filtered = ingredientsData
             .filter(ing =>
                 ing.name.toLowerCase().includes(terms) ||
                 (ing.name_ar || '').toLowerCase().includes(terms) ||
@@ -71,6 +71,15 @@ export default function Search() {
                 (ing.name_es || '').toLowerCase().includes(terms)
             )
             .slice(0, 5);
+
+        // Prepend the typed term as the first option
+        const suggestions = [
+            { name: ingredientSearch.trim(), isTyped: true, name_ar: '', name_he: '', name_es: '' },
+            ...filtered
+                .filter(ing => ing.name.toLowerCase() !== terms)
+                .map(ing => ({ ...ing, isTyped: false }))
+        ];
+        return suggestions;
     }, [ingredientSearch, ingredientsData]);
 
     const filteredRecipes = useMemo(() => {
@@ -79,6 +88,7 @@ export default function Search() {
             const matchesSearch = !localQuery || (
                 recipe.title.toLowerCase().includes(searchTerms) ||
                 recipe.description?.toLowerCase().includes(searchTerms) ||
+                (recipe as any).alternative_titles?.toLowerCase().includes(searchTerms) ||
                 recipe.category?.name.toLowerCase().includes(searchTerms) ||
                 recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms)) ||
                 recipe.ingredients?.some(ri => {
@@ -188,7 +198,7 @@ export default function Search() {
 
         // Find matching recipes (limit to 5)
         const matchedRecipes: Suggestion[] = recipes
-            .filter(r => r.title.toLowerCase().includes(terms))
+            .filter(r => r.title.toLowerCase().includes(terms) || (r as any).alternative_titles?.toLowerCase().includes(terms))
             .slice(0, 5)
             .map(r => ({ type: 'recipe' as const, id: r.id, title: r.title, slug: r.slug, image_url: r.image_url, category: r.category?.name }));
 
@@ -261,12 +271,19 @@ export default function Search() {
                             </p>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 lg:max-w-xl w-full">
+                        <form 
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                (e.target as any).querySelector('input')?.blur();
+                            }}
+                            className="flex flex-col sm:flex-row items-center gap-4 flex-1 lg:max-w-xl w-full"
+                        >
                             <div className="relative group flex-1 w-full">
                                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input
                                     type="text"
                                     placeholder="Search by name, tag, or category..."
+                                    enterKeyHint="search"
                                     value={localQuery}
                                     onChange={(e) => {
                                         setLocalQuery(e.target.value);
@@ -293,6 +310,7 @@ export default function Search() {
                                             {searchSuggestions.map((suggestion, idx) => (
                                                 <button
                                                     key={`${suggestion.type}-${idx}`}
+                                                    type="button"
                                                     onClick={() => {
                                                         if (suggestion.type === 'tag') {
                                                             handleTagClick(suggestion.title);
@@ -334,19 +352,31 @@ export default function Search() {
                                     )}
                                 </AnimatePresence>
                             </div>
-                        </div>
+                        </form>
                     </div>
 
                     {/* Row 2: Ingredients Search and Sort */}
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-4 z-40 relative">
                         {/* Ingredients Multi-select input */}
-                        <div className="flex-1 max-w-xl group relative">
+                        <form 
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (ingredientSearch.trim()) {
+                                    setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
+                                    setIngredientSearch('');
+                                    setIsIngredientFocused(false);
+                                    (e.target as any).querySelector('input')?.blur();
+                                }
+                            }}
+                            className="flex-1 max-w-xl group relative"
+                        >
                             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                 <Filter className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                             </div>
                             <input
                                 type="text"
                                 value={ingredientSearch}
+                                enterKeyHint="done"
                                 onChange={(e) => setIngredientSearch(e.target.value)}
                                 onFocus={() => setIsIngredientFocused(true)}
                                 onBlur={() => setTimeout(() => setIsIngredientFocused(false), 200)}
@@ -355,6 +385,7 @@ export default function Search() {
                                         setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
                                         setIngredientSearch('');
                                         setIsIngredientFocused(false);
+                                        (e.currentTarget as HTMLInputElement).blur();
                                     }
                                 }}
                                 placeholder="Search recipes by ingredients..."
@@ -373,6 +404,7 @@ export default function Search() {
                                         {ingredientSuggestions.map((ing) => (
                                             <button
                                                 key={ing.name}
+                                                type="button"
                                                 onClick={() => {
                                                     setSelectedIngredients(prev => [...prev, ing.name]);
                                                     setIngredientSearch('');
@@ -385,12 +417,15 @@ export default function Search() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-bold text-sm text-gray-900 group-hover:text-indigo-600 transition-colors">
-                                                        {ing.name}
+                                                        {(ing as any).isTyped ? `Search for "${ing.name}"` : ing.name}
                                                     </h4>
-                                                    {(ing.name_ar || ing.name_he || ing.name_es) && (
+                                                    {!(ing as any).isTyped && ((ing as any).name_ar || (ing as any).name_he || (ing as any).name_es) && (
                                                         <p className="text-[10px] text-gray-400 font-medium truncate">
-                                                            {[ing.name_ar, ing.name_he, ing.name_es].filter(Boolean).join(' • ')}
+                                                            {[(ing as any).name_ar, (ing as any).name_he, (ing as any).name_es].filter(Boolean).join(' • ')}
                                                         </p>
+                                                    )}
+                                                    {(ing as any).isTyped && (
+                                                        <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest">Custom Search</p>
                                                     )}
                                                 </div>
                                             </button>
@@ -398,7 +433,7 @@ export default function Search() {
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                        </div>
+                        </form>
 
                         {/* Selected Ingredients Chips */}
                         <div className="flex flex-wrap items-center gap-2 flex-1 min-h-[40px]">

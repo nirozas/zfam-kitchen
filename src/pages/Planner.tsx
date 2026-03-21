@@ -277,10 +277,17 @@ export default function Planner() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4 flex-1">
                         <h1 className="text-3xl font-bold text-gray-900">Weekly Meal Planner</h1>
-                        <div className="relative group max-w-sm flex-1 hidden sm:block">
+                        <form 
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                (e.target as any).querySelector('input')?.blur();
+                            }}
+                            className="relative group max-w-sm flex-1 hidden sm:block"
+                        >
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
                             <input
                                 type="text"
+                                enterKeyHint="search"
                                 placeholder="Search in your plan..."
                                 className="w-full pl-11 pr-10 py-2.5 bg-white border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-sm shadow-sm"
                                 value={plannerSearchQuery}
@@ -334,7 +341,7 @@ export default function Planner() {
                                     <X size={16} />
                                 </button>
                             )}
-                        </div>
+                        </form>
                     </div>
                     <button
                         onClick={addWeekToCart}
@@ -346,10 +353,17 @@ export default function Planner() {
                 </div>
 
                 {/* Mobile Search */}
-                <div className="relative group sm:hidden">
+                <form 
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        (e.target as any).querySelector('input')?.blur();
+                    }}
+                    className="relative group sm:hidden"
+                >
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
                     <input
                         type="text"
+                        enterKeyHint="search"
                         placeholder="Search in your plan..."
                         className="w-full pl-11 pr-10 py-3 bg-white border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-sm shadow-sm"
                         value={plannerSearchQuery}
@@ -363,7 +377,7 @@ export default function Planner() {
                             <X size={16} />
                         </button>
                     )}
-                </div>
+                </form>
 
                 <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <button
@@ -600,19 +614,31 @@ export default function Planner() {
                                 <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0">
                                     <Search size={28} />
                                 </div>
-                                <div className="flex-1">
+                                <form 
+                                    className="flex-1"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        if (searchQuery.trim().length > 0 && !assigningMealId && searchDate) {
+                                            addCustomMealToDate(searchQuery, searchDate);
+                                            setIsSearchOpen(false);
+                                        } else {
+                                            (e.target as any).querySelector('input')?.blur();
+                                        }
+                                    }}
+                                >
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 mb-1">
                                         {assigningMealId ? 'Replace Entry' : 'Add to Planner'}
                                     </p>
                                     <input
                                         autoFocus
                                         type="text"
+                                        enterKeyHint="enter"
                                         className="w-full outline-none text-2xl font-bold placeholder-gray-300 bg-transparent"
                                         placeholder={assigningMealId ? "Search for replacement..." : "Search your kitchen..."}
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                     />
-                                </div>
+                                </form>
                                 <button onClick={closeSearch} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
                                     <X size={28} />
                                 </button>

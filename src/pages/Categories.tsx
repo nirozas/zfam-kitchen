@@ -123,16 +123,23 @@ export default function Categories() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 lg:max-w-xl w-full">
-                        <div className="relative group flex-1 w-full">
+                        <form 
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                (e.target as any).querySelector('input')?.blur();
+                            }}
+                            className="relative group flex-1 w-full"
+                        >
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                             <input
                                 type="text"
+                                enterKeyHint="search"
                                 placeholder="Search categories..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-12 pr-6 py-3.5 bg-white rounded-2xl border border-gray-100 shadow-sm focus:outline-none focus:ring-4 focus:ring-primary-100 focus:border-primary-400 transition-all font-medium text-base"
                             />
-                        </div>
+                        </form>
                         {isAdmin && (
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <button
