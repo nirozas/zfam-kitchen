@@ -776,7 +776,7 @@ export default function RecipeDetail() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     {/* Sidebar: Ingredients & Nutrition Facts */}
                     <div className="lg:col-span-1 space-y-8 min-w-0">
-                        <div className="bg-white p-8 rounded-[3rem] shadow-xl shadow-gray-100/50 border border-gray-100 sticky top-8">
+                        <div className="bg-white p-8 rounded-[3rem] shadow-xl shadow-gray-100/50 border border-gray-100 lg:sticky lg:top-8">
                             <div className="flex flex-col gap-6 mb-10">
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Ingredients</h2>
@@ -932,27 +932,6 @@ export default function RecipeDetail() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Linked Recipes */}
-                        {(loadingLinked || linkedRecipes.length > 0) && (
-                            <div className="space-y-6 mt-12">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-xl shadow-inner">🔗</div>
-                                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Linked Recipes</h2>
-                                </div>
-                                {loadingLinked ? (
-                                    <div className="flex justify-center py-8 bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
-                                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-6">
-                                        {linkedRecipes.map(r => (
-                                            <RecipeCard key={r.id} recipe={r} />
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Main Content Column: Video & Instructions */}
@@ -1247,6 +1226,27 @@ export default function RecipeDetail() {
                         </div>
                     </div>
                 </div>
+
+                {/* Linked Recipes */}
+                {(loadingLinked || linkedRecipes.length > 0) && (
+                    <div className="space-y-6 mt-16 pt-12 border-t border-gray-100">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-xl shadow-inner">🔗</div>
+                            <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Linked Recipes</h2>
+                        </div>
+                        {loadingLinked ? (
+                            <div className="flex justify-center py-12 bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
+                                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                                {linkedRecipes.map(r => (
+                                    <RecipeCard key={r.id} recipe={r} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div >
     );
