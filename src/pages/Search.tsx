@@ -103,7 +103,8 @@ export default function Search() {
             );
 
             const matchesCategory = selectedCategories.length === 0 ||
-                (recipe.category && selectedCategories.includes(recipe.category.id));
+                (recipe.category && selectedCategories.includes(recipe.category.id)) ||
+                recipe.all_categories?.some(cat => selectedCategories.includes(cat.id));
 
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {

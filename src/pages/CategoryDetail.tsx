@@ -31,7 +31,8 @@ export default function CategoryDetail() {
         const categoryIdsToMatch = [categoryId, ...subCategories.map(c => c.id)];
 
         return recipes.filter(recipe => {
-            const matchesCategory = recipe.category && categoryIdsToMatch.includes(recipe.category.id);
+            const matchesCategory = (recipe.category && categoryIdsToMatch.includes(recipe.category.id)) ||
+                recipe.all_categories?.some(cat => categoryIdsToMatch.includes(cat.id));
             const matchesTag = !tagQuery || recipe.tags?.some(tag => tag.name.toLowerCase() === tagQuery.toLowerCase());
             const matchesSearch = !localQuery || recipe.title.toLowerCase().includes(localQuery.toLowerCase());
             return matchesCategory && matchesTag && matchesSearch;
@@ -48,13 +49,21 @@ export default function CategoryDetail() {
             }
             return sortOrder === 'asc' ? comparison : -comparison;
         });
-    }, [recipes, categoryId, tagQuery, localQuery, sortBy, sortOrder, recipeStats]);
+    }, [recipes, categoryId, tagQuery, localQuery, sortBy, sortOrder, recipeStats, categories]);
 
     // Use category-specific tags instead of global top tags
     const categoryTags = useMemo(() => {
         const tagMap = new Map<string, number>();
-        // Only look at recipes in this category to find relevant tags
-        recipes.filter(r => r.category?.id === categoryId || categories.filter(c => c.parent_id === categoryId).some(sc => sc.id === r.category?.id)).forEach(recipe => {
+        if (!categoryId) return [];
+
+        const subCategories = categories.filter(c => c.parent_id === categoryId);
+        const categoryIdsToMatch = [categoryId, ...subCategories.map(c => c.id)];
+
+        // Only look at recipes in this category (or its secondary/sub-categories) to find relevant tags
+        recipes.filter(recipe =>
+            (recipe.category && categoryIdsToMatch.includes(recipe.category.id)) ||
+            recipe.all_categories?.some(cat => categoryIdsToMatch.includes(cat.id))
+        ).forEach(recipe => {
             recipe.tags?.forEach(tag => {
                 tagMap.set(tag.name, (tagMap.get(tag.name) || 0) + 1);
             });

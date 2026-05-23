@@ -7,6 +7,8 @@ import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetai
 import { supabase } from '@/lib/supabase';
 import { getOptimizedImageUrl } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
+import RecipeCard from '@/components/RecipeCard';
+import { Recipe } from '@/lib/types';
 
 export default function RecipeDetail() {
     const { id } = useParams();
@@ -36,6 +38,10 @@ export default function RecipeDetail() {
     // Media State
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+    // Linked Recipes State
+    const [linkedRecipes, setLinkedRecipes] = useState<Recipe[]>([]);
+    const [loadingLinked, setLoadingLinked] = useState(false);
+
     useEffect(() => {
         // User requested that ingredients start UNCHECKED and multiplier defaults to 1
         setSelectedForCart([]);
@@ -44,6 +50,88 @@ export default function RecipeDetail() {
         // Scroll to top when recipe changes
         window.scrollTo(0, 0);
     }, [id]);
+
+    useEffect(() => {
+        if (!recipe?.id) return;
+
+        const fetchLinkedRecipes = async () => {
+            try {
+                setLoadingLinked(true);
+                // 1. Fetch recipe_id's from recipe_ingredients where linked_recipe_id matches current recipe's ID
+                const { data: ingLinks, error: ingError } = await supabase
+                    .from('recipe_ingredients')
+                    .select('recipe_id')
+                    .eq('linked_recipe_id', recipe.id);
+
+                if (ingError) throw ingError;
+
+                // 2. Fetch recipe ids from recipes where steps contains the current recipe ID
+                const { data: stepLinks, error: stepError } = await supabase
+                    .from('recipes')
+                    .select('id')
+                    .filter('steps', 'cs', `[{"linked_recipes": [{"id": "${recipe.id}"}]}]`);
+
+                if (stepError) throw stepError;
+
+                const linkedIds = Array.from(new Set([
+                    ...(ingLinks || []).map(r => r.recipe_id),
+                    ...(stepLinks || []).map(r => r.id)
+                ])).filter(id => id !== recipe.id);
+
+                if (linkedIds.length === 0) {
+                    setLinkedRecipes([]);
+                    return;
+                }
+
+                // 3. Fetch full recipe records for these IDs
+                const LIST_FIELDS = `
+                    id, slug, title, image_url, created_at, rating, category_id, 
+                    time_minutes, description, servings, alternative_titles,
+                    author:author_id(username),
+                    category:category_id(id, name, slug),
+                    recipe_tags(tags(id, name)),
+                    recipe_ingredients!recipe_id(
+                      amount_in_grams, unit, group_name, order_index, note, 
+                      ingredients(*), 
+                      linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
+                    )
+                `;
+                const { data: recipesData, error: recipesError } = await supabase
+                    .from('recipes')
+                    .select(LIST_FIELDS)
+                    .in('id', linkedIds);
+
+                if (recipesError) throw recipesError;
+
+                const transformed: Recipe[] = (recipesData || []).map((r: any) => ({
+                    ...r,
+                    rating: r.rating || 3,
+                    category: r.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
+                    all_categories: r.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
+                    tags: r.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
+                    ingredients: (r.recipe_ingredients || [])
+                        .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                        .map((ri: any) => ({
+                            amount_in_grams: ri.amount_in_grams,
+                            unit: ri.unit || 'g',
+                            group_name: ri.group_name || 'Ingredients',
+                            note: ri.note,
+                            ingredient: ri.ingredients,
+                            linked_recipe: ri.linked_recipe
+                        })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
+                    steps: r.steps || [],
+                }));
+
+                setLinkedRecipes(transformed);
+            } catch (err) {
+                console.error('Error fetching linked recipes:', err);
+            } finally {
+                setLoadingLinked(false);
+            }
+        };
+
+        fetchLinkedRecipes();
+    }, [recipe?.id]);
 
     const [isAdmin, setIsAdmin] = useState(false);
 
@@ -844,6 +932,27 @@ export default function RecipeDetail() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Linked Recipes */}
+                        {(loadingLinked || linkedRecipes.length > 0) && (
+                            <div className="space-y-6 mt-12">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-xl shadow-inner">🔗</div>
+                                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Linked Recipes</h2>
+                                </div>
+                                {loadingLinked ? (
+                                    <div className="flex justify-center py-8 bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
+                                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {linkedRecipes.map(r => (
+                                            <RecipeCard key={r.id} recipe={r} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Main Content Column: Video & Instructions */}
