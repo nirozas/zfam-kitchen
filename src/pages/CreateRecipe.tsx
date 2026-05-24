@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize } from 'lucide-react';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
@@ -402,6 +402,8 @@ export default function CreateRecipe() {
   const [keywordInput, setKeywordInput] = useState('');
   const [showKeywordSuggestions, setShowKeywordSuggestions] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -1161,22 +1163,110 @@ export default function CreateRecipe() {
                         );
                       })}
                     </div>
-                    <div className="flex gap-2">
-                      <select
-                        className="flex-1 py-1.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-[10px] font-bold uppercase tracking-widest"
-                        onChange={e => {
-                          const val = parseInt(e.target.value);
-                          if (val > 0 && !formData.secondary_category_ids.includes(val)) {
-                            setFormData(f => ({ ...f, secondary_category_ids: [...f.secondary_category_ids, val] }));
-                          }
-                          e.target.value = "0";
-                        }}
+                    <div className="relative w-full">
+                      <button
+                        type="button"
+                        onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+                        className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-700 transition-all shadow-sm"
                       >
-                        <option value="0">+ Add Category</option>
-                        {categories.map(c => (
-                          <option key={c.id} value={c.id}>{c.parent_id ? `${categories.find(p => p.id === c.parent_id)?.name} > ` : ''}{c.name}</option>
-                        ))}
-                      </select>
+                        <span>+ Select Categories</span>
+                        <ChevronDown size={14} className={`transform transition-transform ${categoryDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {categoryDropdownOpen && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-40" 
+                            onClick={() => setCategoryDropdownOpen(false)} 
+                          />
+                          
+                          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto p-3 flex flex-col gap-1.5 divide-y divide-gray-50">
+                            {categories.filter(c => !c.parent_id).map(parent => {
+                              const subcats = categories.filter(c => c.parent_id === parent.id);
+                              const isExpanded = expandedCategories.includes(parent.id);
+                              const isParentSelected = formData.secondary_category_ids.includes(parent.id);
+
+                              return (
+                                <div key={parent.id} className="pt-2 first:pt-0">
+                                  <div 
+                                    className={`flex items-center justify-between p-2 rounded-xl transition-all ${
+                                      isParentSelected ? 'bg-primary-50/50 text-primary-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                                    }`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const isSelected = formData.secondary_category_ids.includes(parent.id);
+                                        setFormData(f => ({
+                                          ...f,
+                                          secondary_category_ids: isSelected
+                                            ? f.secondary_category_ids.filter(x => x !== parent.id)
+                                            : [...f.secondary_category_ids, parent.id]
+                                        }));
+                                      }}
+                                      className="flex-1 flex items-center gap-2 text-left text-xs font-bold"
+                                    >
+                                      <span className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                                        isParentSelected ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300'
+                                      }`}>
+                                        {isParentSelected && <Check size={10} strokeWidth={4} />}
+                                      </span>
+                                      <span>{parent.name}</span>
+                                    </button>
+
+                                    {subcats.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedCategories(prev =>
+                                            prev.includes(parent.id) ? prev.filter(id => id !== parent.id) : [...prev, parent.id]
+                                          );
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
+                                      >
+                                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {isExpanded && subcats.length > 0 && (
+                                    <div className="pl-6 mt-1 flex flex-col gap-1 border-l-2 border-gray-100 ml-4">
+                                      {subcats.map(sub => {
+                                        const isSubSelected = formData.secondary_category_ids.includes(sub.id);
+                                        return (
+                                          <button
+                                            key={sub.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setFormData(f => ({
+                                                ...f,
+                                                secondary_category_ids: isSubSelected
+                                                  ? f.secondary_category_ids.filter(x => x !== sub.id)
+                                                  : [...f.secondary_category_ids, sub.id]
+                                              }));
+                                            }}
+                                            className={`flex items-center gap-2 w-full p-1.5 rounded-lg text-left text-xs font-semibold transition-all ${
+                                              isSubSelected ? 'bg-primary-50/30 text-primary-900 font-bold' : 'hover:bg-gray-50 text-gray-600'
+                                            }`}
+                                          >
+                                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
+                                              isSubSelected ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300'
+                                            }`}>
+                                              {isSubSelected && <Check size={8} strokeWidth={4} />}
+                                            </span>
+                                            <span>{sub.name}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-1 col-span-2">

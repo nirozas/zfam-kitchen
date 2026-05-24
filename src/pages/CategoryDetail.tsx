@@ -33,7 +33,9 @@ export default function CategoryDetail() {
         return recipes.filter(recipe => {
             const matchesCategory = (recipe.category && categoryIdsToMatch.includes(recipe.category.id)) ||
                 recipe.all_categories?.some(cat => categoryIdsToMatch.includes(cat.id));
-            const matchesTag = !tagQuery || recipe.tags?.some(tag => tag.name.toLowerCase() === tagQuery.toLowerCase());
+            const matchesTag = !tagQuery || 
+                recipe.tags?.some(tag => tag.name.toLowerCase() === tagQuery.toLowerCase()) ||
+                recipe.keywords?.some(kw => kw.name.toLowerCase() === tagQuery.toLowerCase());
             const matchesSearch = !localQuery || recipe.title.toLowerCase().includes(localQuery.toLowerCase());
             return matchesCategory && matchesTag && matchesSearch;
         }).sort((a, b) => {
@@ -69,6 +71,28 @@ export default function CategoryDetail() {
             });
         });
         return Array.from(tagMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([name]) => ({ name }));
+    }, [recipes, categoryId, categories]);
+
+    // Use category-specific keywords
+    const categoryKeywords = useMemo(() => {
+        const kwMap = new Map<string, number>();
+        if (!categoryId) return [];
+
+        const subCategories = categories.filter(c => c.parent_id === categoryId);
+        const categoryIdsToMatch = [categoryId, ...subCategories.map(c => c.id)];
+
+        // Only look at recipes in this category (or its secondary/sub-categories) to find relevant keywords
+        recipes.filter(recipe =>
+            (recipe.category && categoryIdsToMatch.includes(recipe.category.id)) ||
+            recipe.all_categories?.some(cat => categoryIdsToMatch.includes(cat.id))
+        ).forEach(recipe => {
+            recipe.keywords?.forEach(kw => {
+                kwMap.set(kw.name, (kwMap.get(kw.name) || 0) + 1);
+            });
+        });
+        return Array.from(kwMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(([name]) => ({ name }));
     }, [recipes, categoryId, categories]);
@@ -140,34 +164,57 @@ export default function CategoryDetail() {
                             <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-2 font-display tracking-tighter">
                                 {category.name}
                             </h1>
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                                <span className="px-3 py-1 bg-gray-100 rounded-full text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                                    {categoryRecipes.length} recipes
-                                </span>
+                            <div className="flex flex-col gap-2.5 items-center md:items-start mt-3">
+                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                                    <span className="px-3 py-1 bg-gray-100 rounded-full text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                        {categoryRecipes.length} recipes
+                                    </span>
 
-                                {/* Hashtags */}
-                                <div className="flex flex-wrap gap-1.5 ml-2">
-                                    {categoryTags.slice(0, 8).map((tag) => (
+                                    {/* Hashtags */}
+                                    {categoryTags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 ml-2">
+                                            {categoryTags.slice(0, 8).map((tag) => (
+                                                <button
+                                                    key={tag.name}
+                                                    onClick={() => handleTagClick(tag.name)}
+                                                    className={`px-2 py-1 rounded-lg text-[9px] font-black transition-all flex items-center gap-1 uppercase tracking-widest ${tagQuery.toLowerCase() === tag.name.toLowerCase()
+                                                        ? 'bg-primary-600 text-white shadow-md'
+                                                        : 'bg-white text-gray-400 hover:bg-gray-50 border border-gray-100'
+                                                        }`}
+                                                >
+                                                    #{tag.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {tagQuery && (
                                         <button
-                                            key={tag.name}
-                                            onClick={() => handleTagClick(tag.name)}
-                                            className={`px-2 py-1 rounded-lg text-[9px] font-black transition-all flex items-center gap-1 uppercase tracking-widest ${tagQuery.toLowerCase() === tag.name.toLowerCase()
-                                                ? 'bg-primary-600 text-white shadow-md'
-                                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-gray-100'
-                                                }`}
+                                            onClick={() => setSearchParams({})}
+                                            className="text-[9px] font-black text-primary-600 uppercase tracking-widest hover:underline"
                                         >
-                                            #{tag.name}
+                                            Clear
                                         </button>
-                                    ))}
+                                    )}
                                 </div>
 
-                                {tagQuery && (
-                                    <button
-                                        onClick={() => setSearchParams({})}
-                                        className="text-[9px] font-black text-primary-600 uppercase tracking-widest hover:underline"
-                                    >
-                                        Clear
-                                    </button>
+                                {/* Keywords Displayed Under Hashtags */}
+                                {categoryKeywords.length > 0 && (
+                                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1">Keywords:</span>
+                                        {categoryKeywords.slice(0, 10).map((kw) => (
+                                            <button
+                                                key={kw.name}
+                                                onClick={() => handleTagClick(kw.name)}
+                                                className={`px-2 py-1 rounded-lg text-[9px] font-black transition-all flex items-center gap-1 uppercase tracking-widest ${tagQuery.toLowerCase() === kw.name.toLowerCase()
+                                                    ? 'bg-indigo-600 text-white shadow-md'
+                                                    : 'bg-indigo-50/50 text-indigo-500 hover:bg-indigo-50 border border-indigo-100/50'
+                                                    }`}
+                                            >
+                                                {kw.name}
+                                            </button>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
 
