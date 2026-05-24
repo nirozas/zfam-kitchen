@@ -32,6 +32,7 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     }>;
     gallery_urls?: Array<{ url: string; caption?: string; alignment?: string }>;
     tags: Tag[]; // Joined tags
+    keywords: Tag[]; // Joined keywords
     category: Category; // Main Joined category
     all_categories?: Category[]; // All associated categories
     country_origin?: string;

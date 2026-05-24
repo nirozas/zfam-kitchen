@@ -396,6 +396,51 @@ export default function CreateRecipe() {
     }
   }, [location.search, isEditing]);
 
+  const [tagsList, setTagsList] = useState<string[]>([]);
+  const [keywordsList, setKeywordsList] = useState<string[]>([]);
+  const [allKeywords, setAllKeywords] = useState<{ id: number, name: string }[]>([]);
+  const [keywordInput, setKeywordInput] = useState('');
+  const [showKeywordSuggestions, setShowKeywordSuggestions] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = tagInput.trim().replace(/^#/, '');
+      if (val && !tagsList.includes(val)) {
+        setTagsList([...tagsList, val]);
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (indexToRemove: number) => {
+    setTagsList(tagsList.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleAddKeyword = (kwName: string) => {
+    const clean = kwName.trim();
+    if (clean && !keywordsList.includes(clean)) {
+      setKeywordsList([...keywordsList, clean]);
+    }
+    setKeywordInput('');
+    setShowKeywordSuggestions(false);
+  };
+
+  const handleRemoveKeyword = (kwName: string) => {
+    setKeywordsList(keywordsList.filter(k => k !== kwName));
+  };
+
+  useEffect(() => {
+    const fetchAllKeywords = async () => {
+      const { data, error } = await supabase.from('keywords').select('*').order('name');
+      if (!error && data) {
+        setAllKeywords(data);
+      }
+    };
+    fetchAllKeywords();
+  }, []);
+
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<{ type: 'main' | 'step', index?: number } | null>(null);
@@ -463,7 +508,7 @@ export default function CreateRecipe() {
         updateStep(cropTarget.index, { image_url: url });
       }
       setCropModalOpen(false);
-    } catch (error) { alert('Upload failed: ' + (error as Error).message); }
+    } catch (error) { toast.error('Upload failed: ' + (error as Error).message); }
     finally { setUploading(false); }
   };
 
@@ -486,6 +531,7 @@ export default function CreateRecipe() {
                 linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
               ),
               recipe_tags(tags(id, name)),
+              recipe_keywords(keywords(id, name)),
               recipe_categories(category_id)
             `);
 
@@ -531,6 +577,12 @@ export default function CreateRecipe() {
               }
             });
 
+            const loadedTags = recipe.recipe_tags?.map((rt: any) => rt.tags?.name).filter(Boolean) || [];
+            setTagsList(loadedTags);
+
+            const loadedKeywords = recipe.recipe_keywords?.map((rk: any) => rk.keywords?.name).filter(Boolean) || [];
+            setKeywordsList(loadedKeywords);
+
             const loadedIngredients = (recipe.recipe_ingredients || [])
               .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
               .map((i: any) => ({
@@ -548,7 +600,7 @@ export default function CreateRecipe() {
           }
         } catch (error) {
           console.error('Load recipe error:', error);
-          alert('Failed to load recipe. Please check console for details.');
+          toast.error('Failed to load recipe. Please check console for details.');
         }
       }
     }
@@ -574,7 +626,7 @@ export default function CreateRecipe() {
         urls.push({ url });
       }
       setFormData(prev => ({ ...prev, gallery_urls: [...prev.gallery_urls, ...urls] }));
-    } catch (error) { alert((error as Error).message); }
+    } catch (error) { toast.error((error as Error).message); }
     finally { setUploading(false); }
   };
 
@@ -666,14 +718,15 @@ export default function CreateRecipe() {
 
       // Handle tags
       if (isEditing) await supabase.from('recipe_tags').delete().eq('recipe_id', recipeIdForIngredients);
-      const tagList = formData.tags.split(/[ ,#]+/).filter(t => t.trim() !== '');
-      for (const tagName of tagList) {
-        let { data: tag } = await supabase.from('tags').select('id').eq('name', tagName.replace('#', '')).single();
+      for (const tagName of tagsList) {
+        const cleanName = tagName.trim().replace(/^#/, '');
+        if (!cleanName) continue;
+        let { data: tag } = await supabase.from('tags').select('id').eq('name', cleanName).single();
         if (!tag) {
-          const { data: newTag, error: tagError } = await supabase.from('tags').insert({ name: tagName.replace('#', '') }).select().single();
+          const { data: newTag, error: tagError } = await supabase.from('tags').insert({ name: cleanName }).select().single();
           if (tagError) {
             // Tag might have been inserted by someone else just now
-            const { data: retryTag } = await supabase.from('tags').select('id').eq('name', tagName.replace('#', '')).single();
+            const { data: retryTag } = await supabase.from('tags').select('id').eq('name', cleanName).single();
             tag = retryTag;
           } else {
             tag = newTag;
@@ -684,11 +737,32 @@ export default function CreateRecipe() {
         }
       }
 
-      alert(isEditing ? 'Recipe updated!' : 'Recipe published!');
-      navigate(isEditing ? `/recipe/${recipeData.slug}` : `/recipe/${recipeData.slug}`);
+      // Handle keywords
+      if (isEditing) await supabase.from('recipe_keywords').delete().eq('recipe_id', recipeIdForIngredients);
+      for (const kwName of keywordsList) {
+        const cleanName = kwName.trim();
+        if (!cleanName) continue;
+        let { data: kw } = await supabase.from('keywords').select('id').eq('name', cleanName).single();
+        if (!kw) {
+          const { data: newKw, error: kwError } = await supabase.from('keywords').insert({ name: cleanName }).select().single();
+          if (kwError) {
+            // Keyword might have been inserted by someone else just now
+            const { data: retryKw } = await supabase.from('keywords').select('id').eq('name', cleanName).single();
+            kw = retryKw;
+          } else {
+            kw = newKw;
+          }
+        }
+        if (kw) {
+          await supabase.from('recipe_keywords').upsert({ recipe_id: recipeIdForIngredients, keyword_id: kw.id });
+        }
+      }
+
+      toast.success(isEditing ? 'Recipe updated successfully!' : 'Recipe published successfully!');
+      navigate(`/recipe/${recipeData.slug}`);
     } catch (error) {
       console.error('Save error:', error);
-      alert('Failed to save recipe: ' + (error as Error).message);
+      toast.error('Failed to save recipe: ' + (error as Error).message);
     }
     finally { setUploading(false); }
   };
@@ -1147,9 +1221,112 @@ export default function CreateRecipe() {
                       <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated - Please verify" />
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Tags</label>
-                    <input type="text" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" placeholder="#healthy" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} />
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Hashtags (Enter to add)</label>
+                    <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-gray-50 border border-gray-100 min-h-[42px] items-center focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500 transition-all">
+                      {tagsList.map((tag, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-bold rounded-lg border border-primary-100">
+                          #{tag}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(idx)}
+                            className="text-primary-400 hover:text-red-500 transition-colors p-0.5 rounded cursor-pointer"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder={tagsList.length === 0 ? "Press Enter to add tags..." : ""}
+                        value={tagInput}
+                        onChange={e => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        className="flex-1 bg-transparent border-none outline-none text-xs font-semibold py-1 min-w-[80px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1 col-span-2 sm:col-span-1 relative">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Keywords (e.g. Gluten-free, Vegan)</label>
+                    <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-gray-50 border border-gray-100 min-h-[42px] items-center focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500 transition-all">
+                      {keywordsList.map((kw, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg border border-blue-100">
+                          {kw}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveKeyword(kw)}
+                            className="text-blue-400 hover:text-red-500 transition-colors p-0.5 rounded cursor-pointer"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder={keywordsList.length === 0 ? "Search or add keywords..." : ""}
+                        value={keywordInput}
+                        onChange={e => {
+                          setKeywordInput(e.target.value);
+                          setShowKeywordSuggestions(true);
+                        }}
+                        onFocus={() => setShowKeywordSuggestions(true)}
+                        onBlur={() => {
+                          setTimeout(() => setShowKeywordSuggestions(false), 200);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const matches = allKeywords.filter(k => 
+                              k.name.toLowerCase().includes(keywordInput.toLowerCase()) && 
+                              !keywordsList.includes(k.name)
+                            );
+                            if (matches.length > 0) {
+                              handleAddKeyword(matches[0].name);
+                            } else if (keywordInput.trim()) {
+                              handleAddKeyword(keywordInput);
+                            }
+                          }
+                        }}
+                        className="flex-1 bg-transparent border-none outline-none text-xs font-semibold py-1 min-w-[120px]"
+                      />
+                    </div>
+                    {showKeywordSuggestions && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 max-h-48 overflow-y-auto py-2 divide-y divide-gray-50">
+                        {(() => {
+                          const suggestions = keywordInput.trim()
+                            ? allKeywords.filter(k => k.name.toLowerCase().includes(keywordInput.toLowerCase()) && !keywordsList.includes(k.name))
+                            : allKeywords.filter(k => !keywordsList.includes(k.name)).slice(0, 8);
+                          
+                          return (
+                            <>
+                              {suggestions.map(k => (
+                                <button
+                                  key={k.id}
+                                  type="button"
+                                  onClick={() => handleAddKeyword(k.name)}
+                                  className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors"
+                                >
+                                  {k.name}
+                                </button>
+                              ))}
+                              {keywordInput.trim() && !allKeywords.some(k => k.name.toLowerCase() === keywordInput.toLowerCase()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddKeyword(keywordInput)}
+                                  className="w-full text-left px-4 py-2.5 hover:bg-primary-50 text-xs font-bold text-primary-600 transition-colors flex items-center gap-1.5"
+                                >
+                                  <span>+ Add custom keyword:</span>
+                                  <span className="italic">"{keywordInput}"</span>
+                                </button>
+                              )}
+                              {suggestions.length === 0 && !keywordInput.trim() && (
+                                <div className="px-4 py-2.5 text-xs text-gray-400 font-medium">All keywords selected</div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>

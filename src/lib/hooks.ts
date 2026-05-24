@@ -8,12 +8,6 @@ const CACHE_TTL_MS = 60_000; // 1 minute
 
 export interface UseRecipesOptions {
     limit?: number;
-    minimal?: boolean;
-}
-
-
-export interface UseRecipesOptions {
-    limit?: number;
     offset?: number;
     minimal?: boolean;
 }
@@ -38,7 +32,8 @@ export function useRecipes(options?: UseRecipesOptions) {
                     time_minutes, description, servings, alternative_titles,
                     author:author_id(username),
                     category:category_id(id, name, slug),
-                    recipe_tags(tags(id, name))
+                    recipe_tags(tags(id, name)),
+                    recipe_keywords(keywords(id, name))
                 `;
 
                 if (options?.minimal) {
@@ -78,6 +73,7 @@ export function useRecipes(options?: UseRecipesOptions) {
                     category: recipe.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
                     all_categories: recipe.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                     tags: recipe.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
+                    keywords: recipe.recipe_keywords?.map((rk: any) => rk.keywords).filter(Boolean) || [],
                     ingredients: options?.minimal ? [] : (recipe.recipe_ingredients || [])
                         .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
                         .map((ri: any) => ({
@@ -160,6 +156,7 @@ export function useRecipe(id: string | undefined) {
                         category:category_id(id, name, slug),
                         recipe_categories(categories(id, name, slug)),
                         recipe_tags(tags(id, name)),
+                        recipe_keywords(keywords(id, name)),
                         recipe_ingredients!recipe_id(
                             amount_in_grams, unit, group_name, order_index, note, 
                             ingredients(*), 
@@ -184,6 +181,7 @@ export function useRecipe(id: string | undefined) {
                         category: data.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
                         all_categories: data.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                         tags: data.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
+                        keywords: data.recipe_keywords?.map((rk: any) => rk.keywords).filter(Boolean) || [],
                         ingredients: (data.recipe_ingredients || [])
                             .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
                             .map((ri: any) => ({

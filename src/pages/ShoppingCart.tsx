@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import { addWeeks, subWeeks, startOfWeek, format, getYear, getISOWeek, setISOWeek, setYear, addDays } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function ShoppingCart() {
     const { cartItems, removeFromCart, toggleChecked, clearCart, clearWeek, updateQuantity, updatePrice, updateNote, addToCart, getAllWeeks, getWeeklyTotal, loading } = useShoppingCart();
@@ -31,7 +32,7 @@ export default function ShoppingCart() {
 
     const handleAddManualItem = () => {
         if (!manualItemName.trim() || !manualItemAmount || !manualItemUnit.trim()) {
-            alert('Please fill in all fields');
+            toast.error('Please fill in all fields');
             return;
         }
 
@@ -77,7 +78,7 @@ export default function ShoppingCart() {
         });
 
         if (!hasItems) {
-            alert("Cart is empty, nothing to share.");
+            toast.error("Cart is empty, nothing to share.");
             return;
         }
 
@@ -89,7 +90,7 @@ export default function ShoppingCart() {
                 });
             } else {
                 await navigator.clipboard.writeText(textCallback);
-                alert('Shopping list copied to clipboard!');
+                toast.success('Shopping list copied to clipboard!');
             }
         } catch (error) {
             console.error('Error sharing:', error);

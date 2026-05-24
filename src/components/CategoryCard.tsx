@@ -35,8 +35,11 @@ export default function CategoryCard({ category, index, isSubcategory }: Categor
 
                 {/* Compact Title */}
                 <div className="mt-2 px-1">
-                    <h3 className={`font-black text-gray-900 leading-tight group-hover:text-primary-600 transition-colors line-clamp-2 h-7 flex items-center justify-center text-center ${isSubcategory ? 'text-[18px]' : 'text-[10px] sm:text-[11px]'
-                        }`}>
+                    <h3 className={`leading-tight group-hover:text-primary-600 transition-colors line-clamp-2 h-7 flex items-center justify-center text-center ${
+                        isSubcategory 
+                            ? 'font-bold text-gray-700 text-[11px] sm:text-xs' 
+                            : 'font-extrabold text-gray-900 text-xs sm:text-sm md:text-base'
+                    }`}>
                         {category.name}
                     </h3>
                 </div>

@@ -173,9 +173,9 @@ export default function Categories() {
                             if (!matchesSearch && searchQuery) return null;
 
                             return (
-                                <div key={parent.id} className="flex gap-6 items-start shrink-0 bg-white/30 p-2 rounded-[2.5rem] border border-transparent hover:border-gray-100 transition-all relative group/parent">
+                                <div key={parent.id} className="flex flex-col sm:flex-row gap-6 items-start bg-white/30 p-4 rounded-[2.5rem] border border-transparent hover:border-gray-100 transition-all relative group/parent w-full sm:w-auto">
                                     {/* Parent Card */}
-                                    <div className="w-80 shrink-0 relative">
+                                    <div className="w-full max-w-xs sm:w-80 shrink-0 relative">
                                         <CategoryCard category={parent} index={0} />
                                         {isEditMode && (
                                             <div className="absolute top-4 right-4 flex gap-2 z-20">
@@ -213,55 +213,48 @@ export default function Categories() {
                                         )}
                                     </div>
 
-                                    {/* Children Grid - Stacking in 2 rows */}
+                                    {/* Children Container */}
                                     {children.length > 0 && (
-                                        <div className="shrink-0 overflow-hidden">
-                                            <div
-                                                className="grid grid-flow-col gap-2"
-                                                style={{
-                                                    gridTemplateRows: 'repeat(2, min-content)',
-                                                }}
-                                            >
-                                                {children.map((child, cIdx) => (
-                                                    <div key={child.id} className="w-48 scale-[0.6] origin-top-left -mr-16 -mb-16 relative group/child">
-                                                        <CategoryCard category={child} index={cIdx} isSubcategory={true} />
-                                                        {isEditMode && (
-                                                            <div className="absolute top-2 right-2 flex flex-col gap-1 z-20 scale-125">
-                                                                <div className="flex gap-1 mb-1">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleMove(child, 'up'); }}
-                                                                        className="p-1.5 bg-white/95 backdrop-blur-sm rounded-lg text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
-                                                                        title="Move Left"
-                                                                    >
-                                                                        <ChevronLeft size={12} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleMove(child, 'down'); }}
-                                                                        className="p-1.5 bg-white/95 backdrop-blur-sm rounded-lg text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
-                                                                        title="Move Right"
-                                                                    >
-                                                                        <ChevronLeft className="rotate-180" size={12} />
-                                                                    </button>
-                                                                </div>
+                                        <div className="flex flex-wrap gap-4 max-w-full sm:max-w-[24rem] md:max-w-[32rem] items-start pt-2">
+                                            {children.map((child, cIdx) => (
+                                                <div key={child.id} className="w-24 sm:w-28 relative group/child">
+                                                    <CategoryCard category={child} index={cIdx} isSubcategory={true} />
+                                                    {isEditMode && (
+                                                        <div className="absolute top-1 right-1 flex flex-col gap-1 z-20">
+                                                            <div className="flex gap-1 mb-1">
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); setSelectedCategory(child); setShowModal(true); }}
-                                                                    className="p-3 bg-white/95 backdrop-blur-sm rounded-xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-xl active:scale-95"
-                                                                    title="Edit Sub-Category"
+                                                                    onClick={(e) => { e.stopPropagation(); handleMove(child, 'up'); }}
+                                                                    className="p-1 bg-white/95 backdrop-blur-sm rounded text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-md active:scale-95"
+                                                                    title="Move Left"
                                                                 >
-                                                                    <Pencil size={16} />
+                                                                    <ChevronLeft size={10} />
                                                                 </button>
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(child.id); }}
-                                                                    className="p-3 bg-white/95 backdrop-blur-sm rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
-                                                                    title="Delete Sub-Category"
+                                                                    onClick={(e) => { e.stopPropagation(); handleMove(child, 'down'); }}
+                                                                    className="p-1 bg-white/95 backdrop-blur-sm rounded text-gray-600 hover:bg-primary-600 hover:text-white transition-all shadow-md active:scale-95"
+                                                                    title="Move Right"
                                                                 >
-                                                                    <Trash2 size={16} />
+                                                                    <ChevronLeft className="rotate-180" size={10} />
                                                                 </button>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setSelectedCategory(child); setShowModal(true); }}
+                                                                className="p-1.5 bg-white/95 backdrop-blur-sm rounded text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-md active:scale-95 flex justify-center"
+                                                                title="Edit Sub-Category"
+                                                            >
+                                                                <Pencil size={12} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDelete(child.id); }}
+                                                                className="p-1.5 bg-white/95 backdrop-blur-sm rounded text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-md active:scale-95 flex justify-center"
+                                                                title="Delete Sub-Category"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>

@@ -91,6 +91,7 @@ export default function Search() {
                 (recipe as any).alternative_titles?.toLowerCase().includes(searchTerms) ||
                 recipe.category?.name.toLowerCase().includes(searchTerms) ||
                 recipe.tags?.some(tag => tag.name.toLowerCase().includes(searchTerms)) ||
+                recipe.keywords?.some(kw => kw.name.toLowerCase().includes(searchTerms)) ||
                 recipe.ingredients?.some(ri => {
                     const ing = ri.ingredient as any;
                     return ing && (

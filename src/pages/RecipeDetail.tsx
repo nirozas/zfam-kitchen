@@ -7,6 +7,7 @@ import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetai
 import { supabase } from '@/lib/supabase';
 import { getOptimizedImageUrl } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
+import toast from 'react-hot-toast';
 import RecipeCard from '@/components/RecipeCard';
 import { Recipe } from '@/lib/types';
 
@@ -184,10 +185,10 @@ export default function RecipeDetail() {
 
             setReviewComment('');
             fetchReviews();
-            alert('Review submitted! Thank you.');
+            toast.success('Review submitted! Thank you.');
         } catch (error) {
             console.error('Error submitting review:', error);
-            alert('Failed to submit review.');
+            toast.error('Failed to submit review.');
         } finally {
             setSubmittingReview(false);
         }
@@ -225,10 +226,11 @@ export default function RecipeDetail() {
                 .eq('id', recipe!.id);
 
             if (error) throw error;
+            toast.success('Recipe deleted successfully!');
             navigate('/');
         } catch (error) {
             console.error('Error deleting recipe:', error);
-            alert('Failed to delete recipe');
+            toast.error('Failed to delete recipe');
             setIsDeleting(false);
         }
     };
@@ -250,7 +252,7 @@ export default function RecipeDetail() {
                     weekId: currentWeekId,
                 });
             }
-            alert(`${selectedForCart.length} items added to cart!`);
+            toast.success(`${selectedForCart.length} items added to cart!`);
             setSelectedForCart([]); // Clear selection after adding
         } finally {
             setAddingToCart(false);
@@ -361,7 +363,7 @@ export default function RecipeDetail() {
                 });
             } else {
                 await navigator.clipboard.writeText(window.location.href);
-                alert('Link copied to clipboard!');
+                toast.success('Link copied to clipboard!');
             }
         } catch (error) {
             console.error('Error sharing:', error);
@@ -654,6 +656,19 @@ export default function RecipeDetail() {
                                             className="px-3 py-1.5 bg-white/10 backdrop-blur-md text-white/70 text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10"
                                         >
                                             #{tag.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {recipe.keywords && recipe.keywords.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {recipe.keywords.map((kw: any) => (
+                                        <span
+                                            key={kw.id}
+                                            className="px-3 py-1.5 bg-indigo-500/25 backdrop-blur-md text-indigo-100 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-400/20 shadow-sm"
+                                        >
+                                            {kw.name}
                                         </span>
                                     ))}
                                 </div>
