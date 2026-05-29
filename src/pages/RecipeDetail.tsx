@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon } from 'lucide-react';
+import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon, GitMerge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
@@ -42,6 +42,11 @@ export default function RecipeDetail() {
     // Linked Recipes State
     const [linkedRecipes, setLinkedRecipes] = useState<Recipe[]>([]);
     const [loadingLinked, setLoadingLinked] = useState(false);
+
+    // Alterations State
+    const [alterations, setAlterations] = useState<Recipe[]>([]);
+    const [parentRecipe, setParentRecipe] = useState<Recipe | null>(null);
+    const [loadingAlterations, setLoadingAlterations] = useState(false);
 
     useEffect(() => {
         // User requested that ingredients start UNCHECKED and multiplier defaults to 1
@@ -133,6 +138,82 @@ export default function RecipeDetail() {
 
         fetchLinkedRecipes();
     }, [recipe?.id]);
+
+    // Fetch alterations — works in both directions:
+    // • If this IS a parent: fetch children (recipes where parent_recipe_id = this.id)
+    // • If this IS an alteration: fetch the parent + sibling alterations
+    useEffect(() => {
+        if (!recipe?.id) return;
+
+        const fetchAlterations = async () => {
+            try {
+                setLoadingAlterations(true);
+                const LIST_FIELDS = `
+                    id, slug, title, image_url, created_at, rating, category_id,
+                    time_minutes, description, servings, alternative_titles,
+                    author:author_id(username),
+                    category:category_id(id, name, slug),
+                    recipe_tags(tags(id, name)),
+                    recipe_ingredients!recipe_id(
+                      amount_in_grams, unit, group_name, order_index, note,
+                      ingredients(*),
+                      linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
+                    )
+                `;
+
+                const transformRows = (rows: any[]): Recipe[] =>
+                    rows.map((r: any) => ({
+                        ...r,
+                        rating: r.rating || 3,
+                        category: r.category || { id: 0, name: 'Uncategorized', slug: 'uncategorized', image_url: null, created_at: null },
+                        tags: r.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
+                        keywords: [],
+                        ingredients: (r.recipe_ingredients || [])
+                            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                            .map((ri: any) => ({
+                                amount_in_grams: ri.amount_in_grams,
+                                unit: ri.unit || 'g',
+                                group_name: ri.group_name || 'Ingredients',
+                                note: ri.note,
+                                ingredient: ri.ingredients,
+                                linked_recipe: ri.linked_recipe
+                            })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
+                        steps: r.steps || [],
+                    }));
+
+                if (recipe.parent_recipe_id) {
+                    // This recipe IS an alteration — fetch parent + siblings
+                    const [parentRes, siblingsRes] = await Promise.all([
+                        supabase.from('recipes').select(LIST_FIELDS).eq('id', recipe.parent_recipe_id).single(),
+                        supabase.from('recipes').select(LIST_FIELDS)
+                            .eq('parent_recipe_id', recipe.parent_recipe_id)
+                            .neq('id', recipe.id),  // exclude self
+                    ]);
+
+                    if (parentRes.data) {
+                        setParentRecipe(transformRows([parentRes.data])[0]);
+                    }
+                    setAlterations(transformRows(siblingsRes.data || []));
+                } else {
+                    // This recipe IS a parent — fetch its children
+                    const { data, error } = await supabase
+                        .from('recipes')
+                        .select(LIST_FIELDS)
+                        .eq('parent_recipe_id', recipe.id);
+
+                    if (error) throw error;
+                    setParentRecipe(null);
+                    setAlterations(transformRows(data || []));
+                }
+            } catch (err) {
+                console.error('Error fetching alterations:', err);
+            } finally {
+                setLoadingAlterations(false);
+            }
+        };
+
+        fetchAlterations();
+    }, [recipe?.id, recipe?.parent_recipe_id]);
 
     const [isAdmin, setIsAdmin] = useState(false);
 
@@ -545,6 +626,13 @@ export default function RecipeDetail() {
                             {(isOwner || isAdmin) && (
                                 <div className="flex gap-2 print:hidden relative z-[40]">
                                     <Link
+                                        to={`/alter/${recipe ? recipe.id : ''}`}
+                                        className="bg-violet-500/40 backdrop-blur-md p-3.5 rounded-2xl hover:bg-violet-500/60 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
+                                        title="Alter Recipe"
+                                    >
+                                        <GitMerge size={24} strokeWidth={2.5} />
+                                    </Link>
+                                    <Link
                                         to={`/edit/${recipe ? recipe.id : ''}`}
                                         className="bg-white/30 backdrop-blur-md p-3.5 rounded-2xl hover:bg-white/40 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
                                         title="Edit Recipe"
@@ -558,6 +646,17 @@ export default function RecipeDetail() {
                                     >
                                         <Trash2 size={24} strokeWidth={2.5} />
                                     </button>
+                                </div>
+                            )}
+                            {currentUserId && !isOwner && !isAdmin && (
+                                <div className="flex gap-2 print:hidden relative z-[40]">
+                                    <Link
+                                        to={`/alter/${recipe ? recipe.id : ''}`}
+                                        className="bg-violet-500/40 backdrop-blur-md p-3.5 rounded-2xl hover:bg-violet-500/60 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
+                                        title="Create your own Alteration"
+                                    >
+                                        <GitMerge size={24} strokeWidth={2.5} />
+                                    </Link>
                                 </div>
                             )}
                         </div>
@@ -1256,6 +1355,46 @@ export default function RecipeDetail() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
                                 {linkedRecipes.map(r => (
+                                    <RecipeCard key={r.id} recipe={r} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Alterations */}
+                {(loadingAlterations || alterations.length > 0 || parentRecipe) && (
+                    <div className="space-y-6 mt-10 pt-10 border-t border-gray-100">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-2xl bg-violet-50 flex items-center justify-center shadow-inner">
+                                <GitMerge size={20} className="text-violet-500" />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Alterations</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                    {recipe.parent_recipe_id
+                                        ? 'Original recipe and other variations'
+                                        : 'Variations created from this recipe'}
+                                </p>
+                            </div>
+                        </div>
+                        {loadingAlterations ? (
+                            <div className="flex justify-center py-12 bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
+                                <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                                {/* Parent card with "Original" badge — shown when this recipe is an alteration */}
+                                {parentRecipe && (
+                                    <div className="relative">
+                                        <div className="absolute -top-2 left-3 z-10 px-2.5 py-1 bg-violet-600 text-white text-[8px] font-black uppercase tracking-[0.2em] rounded-full shadow-md flex items-center gap-1">
+                                            <GitMerge size={9} />
+                                            Original
+                                        </div>
+                                        <RecipeCard recipe={parentRecipe} />
+                                    </div>
+                                )}
+                                {alterations.map(r => (
                                     <RecipeCard key={r.id} recipe={r} />
                                 ))}
                             </div>

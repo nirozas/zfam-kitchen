@@ -342,8 +342,10 @@ export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const isEditing = !!id;
+  const isEditing = !!id && location.pathname.startsWith('/edit/');
+  const isAltering = !!id && location.pathname.startsWith('/alter/');
   const { categories } = useCategories();
+  const [originalRecipeTitle, setOriginalRecipeTitle] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -386,15 +388,15 @@ export default function CreateRecipe() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const categoryFromUrl = searchParams.get('category');
-    if (categoryFromUrl && !isEditing) {
+    if (categoryFromUrl && !isEditing && !isAltering) {
       setFormData(prev => ({ ...prev, category_id: parseInt(categoryFromUrl) }));
     }
 
     const importFlag = searchParams.get('import');
-    if (importFlag === '1' && !isEditing) {
+    if (importFlag === '1' && !isEditing && !isAltering) {
       setShowImporter(true);
     }
-  }, [location.search, isEditing]);
+  }, [location.search, isEditing, isAltering]);
 
   const [tagsList, setTagsList] = useState<string[]>([]);
   const [keywordsList, setKeywordsList] = useState<string[]>([]);
@@ -516,7 +518,7 @@ export default function CreateRecipe() {
 
   useEffect(() => {
     async function loadRecipe() {
-      if (isEditing && id) {
+      if ((isEditing || isAltering) && id) {
         try {
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
           let query = supabase
@@ -550,9 +552,15 @@ export default function CreateRecipe() {
           }
 
           if (recipe) {
-            setActualRecipeId(recipe.id);
+            if (isEditing) {
+              setActualRecipeId(recipe.id);
+            }
+            // In alter mode, store the original title for validation
+            if (isAltering) {
+              setOriginalRecipeTitle(recipe.title);
+            }
             setFormData({
-              title: recipe.title || '',
+              title: isAltering ? '' : (recipe.title || ''),
               description: recipe.description || '',
               notes: recipe.notes || '',
               image_url: recipe.image_url || '',
@@ -609,10 +617,10 @@ export default function CreateRecipe() {
     loadRecipe();
     const params = new URLSearchParams(location.search);
     const urlTitle = params.get('title');
-    if (urlTitle && !isEditing && !formData.title) {
+    if (urlTitle && !isEditing && !isAltering && !formData.title) {
       setFormData(prev => ({ ...prev, title: urlTitle }));
     }
-  }, [id, isEditing, location.search]);
+  }, [id, isEditing, isAltering, location.search]);
 
   const handleFileUpload = async (file: File): Promise<string> => {
     return await uploadToB2(file, 'recipes');
@@ -638,6 +646,36 @@ export default function CreateRecipe() {
       setUploading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate('/auth'); return; }
+
+      // Validate title
+      if (!formData.title.trim()) {
+        toast.error('Please enter a title for your recipe.');
+        setUploading(false);
+        return;
+      }
+
+      const newSlug = generateSlug(formData.title);
+
+      // In alter mode: ensure the title is different from the original AND slug doesn't already exist
+      if (isAltering) {
+        if (formData.title.trim().toLowerCase() === (originalRecipeTitle || '').trim().toLowerCase()) {
+          toast.error('Alteration must have a different title than the original recipe.');
+          setUploading(false);
+          return;
+        }
+        // Check slug uniqueness
+        const { data: existing } = await supabase
+          .from('recipes')
+          .select('id')
+          .eq('slug', newSlug)
+          .maybeSingle();
+        if (existing) {
+          toast.error('A recipe with a similar title already exists. Please use a more unique title.');
+          setUploading(false);
+          return;
+        }
+      }
+
       const prep = parseInt(formData.prep_time) || 0;
       const cook = parseInt(formData.cook_time) || 0;
       const recipeData = {
@@ -663,7 +701,7 @@ export default function CreateRecipe() {
           carbs: parseInt(formData.nutrition.carbs) || 0
         },
         rating: formData.rating,
-        slug: generateSlug(formData.title),
+        slug: newSlug,
         country_origin: formData.country_origin || null,
       };
       let recipeIdForIngredients: string;
@@ -678,6 +716,12 @@ export default function CreateRecipe() {
         const { error } = await query;
         if (error) throw error;
         recipeIdForIngredients = actualRecipeId || id!;
+      } else if (isAltering) {
+        // Alteration: always insert as a new recipe, link to source via parent_recipe_id
+        const alterData = { ...recipeData, parent_recipe_id: id };
+        const { data, error } = await supabase.from('recipes').insert([alterData]).select().single();
+        if (error) throw error;
+        recipeIdForIngredients = data.id;
       } else {
         const { data, error } = await supabase.from('recipes').insert([recipeData]).select().single();
         if (error) throw error;
@@ -1012,8 +1056,10 @@ export default function CreateRecipe() {
           <div className="flex items-center gap-6">
             <button onClick={() => navigate(-1)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors text-gray-400"><ArrowLeft size={20} /></button>
             <div>
-              <h1 className="text-xl font-black gradient-text tracking-tighter leading-none">{isEditing ? 'Edit Recipe' : 'New Recipe'}</h1>
-              <p className="text-[10px] font-black uppercase tracking-widest text-primary-500 mt-1">{formData.title || 'Untitled'}</p>
+              <h1 className="text-xl font-black gradient-text tracking-tighter leading-none">
+                {isAltering ? 'Alter Recipe' : isEditing ? 'Edit Recipe' : 'New Recipe'}
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary-500 mt-1">{formData.title || (isAltering ? 'Enter a new title below' : 'Untitled')}</p>
             </div>
           </div>
           <div className="flex items-center gap-8">
@@ -1025,13 +1071,32 @@ export default function CreateRecipe() {
               </div>
             </div>
             <button onClick={handleSubmit} disabled={uploading} className="px-6 py-3 bg-gray-900 text-white rounded-2xl font-black text-sm shadow-xl hover:bg-primary-600 transition-all flex items-center gap-2">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={16} />} Save
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus size={16} />} {isAltering ? 'Save Alteration' : 'Save'}
             </button>
           </div>
         </div>
       </header>
 
       <div className="max-w-[1600px] mx-auto px-4 py-8 flex flex-col lg:flex-row gap-6">
+
+        {/* Alteration Banner */}
+        {isAltering && originalRecipeTitle && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full mx-0 mb-2 lg:mb-0 lg:absolute lg:top-[73px] lg:left-0 lg:right-0 lg:z-30"
+          >
+            <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-6 py-3 flex items-center gap-4">
+              <span className="text-xl">🔀</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">Creating an alteration of</span>
+                <p className="font-black text-sm truncate">{originalRecipeTitle}</p>
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest opacity-60 hidden sm:block">Give it a unique title to save</span>
+            </div>
+          </motion.div>
+        )}
+
         <aside className="hidden lg:block w-48 sticky top-24 h-fit space-y-1">
           {sections.map(s => (
             <button key={s.id} onClick={() => { document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setActiveSection(s.id); }} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl transition-all ${activeSection === s.id ? 'bg-white shadow-md text-gray-900 border border-gray-100' : 'text-gray-400 hover:bg-white/50'}`}>

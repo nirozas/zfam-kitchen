@@ -87,6 +87,7 @@ export interface Database {
                     servings: number | null
                     nutrition: Json | null
                     alternative_titles: string | null
+                    parent_recipe_id: string | null
                 }
                 Insert: {
                     id?: string
@@ -100,6 +101,7 @@ export interface Database {
                     description?: string | null
                     steps: string[]
                     alternative_titles?: string | null
+                    parent_recipe_id?: string | null
                 }
                 Update: {
                     id?: string
@@ -122,6 +124,7 @@ export interface Database {
                     cook_time_minutes?: number | null
                     servings?: number | null
                     nutrition?: Json | null
+                    parent_recipe_id?: string | null
                 }
             }
             ingredients: {

@@ -42,6 +42,7 @@ function App() {
                                 <Route path="planner" element={<Planner />} />
                                 <Route path="create" element={<CreateRecipe />} />
                                 <Route path="edit/:id" element={<CreateRecipe />} />
+                                <Route path="alter/:id" element={<CreateRecipe />} />
                                 <Route path="auth" element={<Auth />} />
                                 <Route path="admin" element={<AdminDashboard />} />
                                 <Route path="statistics" element={<Statistics />} />
