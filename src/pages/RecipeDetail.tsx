@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
-import { generateSlug, getOptimizedImageUrl, formatAmount } from '@/lib/utils';
+import { getOptimizedImageUrl, formatAmount } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 import RecipeCard from '@/components/RecipeCard';
@@ -32,7 +32,7 @@ export default function RecipeDetail() {
     const [submittingReview, setSubmittingReview] = useState(false);
     const { addToCart } = useShoppingCart();
     const { favorites, toggleFavorite } = useFavorites();
-    const [addingToCart, setAddingToCart] = useState(false);
+
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -316,29 +316,6 @@ export default function RecipeDetail() {
         }
     };
 
-    const handleAddSelectedToCart = async () => {
-        if (!recipe || selectedForCart.length === 0) return;
-        setAddingToCart(true);
-        const currentWeekId = getCurrentWeekId();
-
-        try {
-            for (const index of selectedForCart) {
-                const item = recipe.ingredients[index];
-                await addToCart({
-                    name: item.ingredient?.name || 'Unknown Ingredient',
-                    amount: Number((item.amount_in_grams * multiplier).toFixed(2)),
-                    unit: item.unit || 'g',
-                    recipeId: recipe.id,
-                    recipeName: recipe.title,
-                    weekId: currentWeekId,
-                });
-            }
-            toast.success(`${selectedForCart.length} items added to cart!`);
-            setSelectedForCart([]); // Clear selection after adding
-        } finally {
-            setAddingToCart(false);
-        }
-    };
 
     const toggleCrossed = (index: number) => {
         if (crossedIngredients.includes(index)) {
