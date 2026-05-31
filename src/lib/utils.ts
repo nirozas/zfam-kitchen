@@ -47,3 +47,33 @@ export function getOptimizedImageUrl(url: string | null | undefined, width: numb
 
     return fixedUrl;
 }
+
+export function formatAmount(amount: number): string {
+    if (!amount) return '';
+    const fractionMap: Record<string, string> = {
+        '0.25': '1/4', '0.5': '1/2', '0.75': '3/4', '0.33': '1/3', '0.67': '2/3',
+        '0.125': '1/8', '0.375': '3/8', '0.625': '5/8', '0.875': '7/8'
+    };
+    const whole = Math.floor(amount);
+    const decimal = amount - whole;
+    if (decimal === 0) return whole.toString();
+    
+    // Find closest fraction
+    let closestKey = '';
+    let minDiff = 1;
+    for (const key of Object.keys(fractionMap)) {
+        const diff = Math.abs(decimal - parseFloat(key));
+        if (diff <= 0.05) { // tolerance
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestKey = key;
+            }
+        }
+    }
+    
+    if (closestKey) {
+        return whole > 0 ? `${whole} ${fractionMap[closestKey]}` : fractionMap[closestKey];
+    }
+    
+    return Number(amount.toFixed(2)).toString();
+}

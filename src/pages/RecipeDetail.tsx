@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
-import { getOptimizedImageUrl } from '@/lib/utils';
+import { generateSlug, getOptimizedImageUrl, formatAmount } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 import RecipeCard from '@/components/RecipeCard';
@@ -326,7 +326,7 @@ export default function RecipeDetail() {
                 const item = recipe.ingredients[index];
                 await addToCart({
                     name: item.ingredient?.name || 'Unknown Ingredient',
-                    amount: Math.round(item.amount_in_grams * multiplier),
+                    amount: Number((item.amount_in_grams * multiplier).toFixed(2)),
                     unit: item.unit || 'g',
                     recipeId: recipe.id,
                     recipeName: recipe.title,
@@ -356,11 +356,27 @@ export default function RecipeDetail() {
         }
     };
 
-    const toggleSelectedForCart = (index: number) => {
-        if (selectedForCart.includes(index)) {
-            setSelectedForCart(selectedForCart.filter(i => i !== index));
-        } else {
-            setSelectedForCart([...selectedForCart, index]);
+    const handleSingleItemCartAdd = async (e: React.MouseEvent, index: number, ing: any) => {
+        e.stopPropagation();
+        if (!recipe) return;
+        
+        const currentWeekId = getCurrentWeekId();
+
+        try {
+            await addToCart({
+                name: ing.ingredient?.name || 'Unknown Ingredient',
+                amount: Number((ing.amount_in_grams * multiplier).toFixed(2)),
+                unit: ing.unit || 'g',
+                recipeId: recipe.id,
+                recipeName: recipe.title,
+                weekId: currentWeekId,
+            });
+            toast.success(`${ing.ingredient?.name || 'Item'} added to cart!`);
+            if (!selectedForCart.includes(index)) {
+                setSelectedForCart([...selectedForCart, index]);
+            }
+        } catch (error) {
+            toast.error('Failed to add to cart');
         }
     };
 
@@ -964,13 +980,14 @@ export default function RecipeDetail() {
                                                         </div>
                                                     ) : (
                                                         <button
-                                                            onClick={() => toggleSelectedForCart(ing.originalIndex)}
-                                                            className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(ing.originalIndex)
+                                                            onClick={(e) => handleSingleItemCartAdd(e, ing.originalIndex, ing)}
+                                                            className={`flex-shrink-0 w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${selectedForCart.includes(ing.originalIndex)
                                                                 ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-100'
-                                                                : 'border-gray-200 hover:border-primary-200'
+                                                                : 'border-gray-200 hover:border-primary-200 text-gray-400 hover:text-primary-500 hover:bg-primary-50'
                                                                 }`}
+                                                            title={selectedForCart.includes(ing.originalIndex) ? "Added to Cart" : "Add to Cart"}
                                                         >
-                                                            {selectedForCart.includes(ing.originalIndex) && <Check size={14} strokeWidth={4} />}
+                                                            {selectedForCart.includes(ing.originalIndex) ? <Check size={16} strokeWidth={3} /> : <ShoppingCart size={16} strokeWidth={2.5} />}
                                                         </button>
                                                     )}
 
@@ -998,7 +1015,7 @@ export default function RecipeDetail() {
                                                         </div>
                                                         {ing.amount_in_grams > 0 && (
                                                             <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
-                                                                {Math.round(ing.amount_in_grams * multiplier)} {ing.unit || 'g'}
+                                                                {formatAmount(ing.amount_in_grams * multiplier)} {ing.unit ? ing.unit.toUpperCase() : 'G'}
                                                             </span>
                                                         )}
                                                     </div>
@@ -1009,21 +1026,7 @@ export default function RecipeDetail() {
                                 ))}
                             </div>
 
-                            <div className="space-y-5">
-                                <button
-                                    onClick={handleAddSelectedToCart}
-                                    disabled={addingToCart || selectedForCart.length === 0}
-                                    className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 hover:bg-primary-600 transition-all shadow-2xl disabled:opacity-50 disabled:bg-gray-200 shadow-gray-200"
-                                >
-                                    {addingToCart ? <Loader2 className="animate-spin" /> : <ShoppingCart size={24} />}
-                                    {addingToCart ? 'Syncing...' : `Add ${selectedForCart.length} to Cart`}
-                                </button>
-                                <div className="flex justify-center">
-                                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] text-center">
-                                        Checked items join your weekly list
-                                    </span>
-                                </div>
-                            </div>
+                                {/* Bulk Add to Cart Button Removed */}
 
                             {/* Nutrition Facts Sidebar Item */}
                             <div className="mt-14 pt-10 border-t-4 border-gray-50 hidden lg:block">

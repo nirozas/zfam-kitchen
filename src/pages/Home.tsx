@@ -76,7 +76,7 @@ const Index = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-24 gap-2 sm:gap-4">
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-4 sm:gap-6">
                         {categoriesLoading ? (
                             Array.from({ length: 4 }).map((_, i) => (
                                 <CategoryCardSkeleton key={i} />

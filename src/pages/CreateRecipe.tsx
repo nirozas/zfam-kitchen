@@ -68,10 +68,18 @@ const UNIT_MAPPING: Record<string, string> = {
   'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
   'lb': 'lb', 'pound': 'lb', 'pounds': 'lb',
   'pack': 'pack', 'pkg': 'pack', 'package': 'pack',
-  'as liked': 'as liked', 'to taste': 'as liked'
+  'as liked': 'as liked', 'to taste': 'as liked',
+  'can': 'can', 'cans': 'can',
+  'dash': 'dash', 'dashes': 'dash',
+  'drop': 'drop', 'drops': 'drop',
+  'ea': 'ea', 'each': 'ea',
+  'count': 'count',
+  'box': 'box', 'boxes': 'box',
+  'jar': 'jar', 'jars': 'jar',
+  'bag': 'bag', 'bags': 'bag'
 };
 
-const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked'];
+const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked', 'can', 'dash', 'drop', 'ea', 'count', 'box', 'jar', 'bag'];
 
 const ARABIC_DIGITS_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
@@ -99,7 +107,7 @@ const cleanIngData = (ing: any) => {
   if (line.length < 20 && !/\d/.test(line)) return ing;
 
   // Basic regex fallback for "2 1/2 cups flour"
-  const units = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'can', 'bottle', 'bag'];
+  const units = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'can', 'bottle', 'bag', 'dash', 'drop', 'ea', 'count', 'box', 'jar'];
   const unitRegex = new RegExp(`^([\\d\\s\\/\\.\\u00BC-\\u00BE]+)\\s*(${units.join('|')})s?\\b\\s*(.*)`, 'i');
   const match = line.match(unitRegex);
 
