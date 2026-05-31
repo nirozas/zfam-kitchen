@@ -1007,10 +1007,17 @@ export default function RecipeDetail() {
 
                             {/* Nutrition Facts Sidebar Item */}
                             <div className="mt-14 pt-10 border-t-4 border-gray-50 hidden lg:block">
-                                <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-4 uppercase tracking-tighter">
-                                    <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
-                                    Nutrition Facts
-                                </h3>
+                                <div className="mb-8">
+                                    <h3 className="text-xl font-black text-gray-900 flex items-center gap-4 uppercase tracking-tighter">
+                                        <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
+                                        Nutrition Facts
+                                    </h3>
+                                    {recipe.nutrition?.serving_amount && (
+                                        <div className="ml-14 mt-1 text-xs font-black uppercase tracking-widest text-gray-400">
+                                            Serving Amount: <span className="text-gray-600">{recipe.nutrition.serving_amount}</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     {[
                                         { label: 'Prot', value: recipe.nutrition?.protein, unit: 'g', color: 'text-rose-600', bg: 'bg-rose-50' },
@@ -1300,10 +1307,17 @@ export default function RecipeDetail() {
 
                         {/* Mobile Nutrition Facts (Only visible on small screens) */}
                         <div className="block lg:hidden mt-20 pt-10 border-t-4 border-gray-50">
-                            <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-4 uppercase tracking-tighter">
-                                <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
-                                Nutrition Facts
-                            </h3>
+                            <div className="mb-8">
+                                <h3 className="text-xl font-black text-gray-900 flex items-center gap-4 uppercase tracking-tighter">
+                                    <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-xl shadow-inner">📊</div>
+                                    Nutrition Facts
+                                </h3>
+                                {recipe.nutrition?.serving_amount && (
+                                    <div className="ml-14 mt-1 text-xs font-black uppercase tracking-widest text-gray-400">
+                                        Serving Amount: <span className="text-gray-600">{recipe.nutrition.serving_amount}</span>
+                                    </div>
+                                )}
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {[
                                     { label: 'Prot', value: recipe.nutrition?.protein, unit: 'g', color: 'text-rose-600', bg: 'bg-rose-50' },

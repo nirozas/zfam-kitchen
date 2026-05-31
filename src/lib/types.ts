@@ -17,6 +17,7 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     cook_time_minutes?: number;
     servings?: number;
     nutrition?: {
+        serving_amount?: string;
         calories: number;
         protein: number;
         fat: number;

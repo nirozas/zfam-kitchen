@@ -373,7 +373,7 @@ export default function CreateRecipe() {
     prep_time: '15',
     cook_time: '30',
     servings: '4',
-    nutrition: { calories: '0', protein: '0', fat: '0', carbs: '0' }
+    nutrition: { serving_amount: '', calories: '0', protein: '0', fat: '0', carbs: '0' },
   });
 
   const [uploading, setUploading] = useState(false);
@@ -588,6 +588,7 @@ export default function CreateRecipe() {
               cook_time: (recipe.cook_time_minutes || 0).toString(),
               servings: (recipe.servings || 1).toString(),
               nutrition: {
+                serving_amount: recipe.nutrition?.serving_amount || '',
                 calories: (recipe.nutrition?.calories || 0).toString(),
                 protein: (recipe.nutrition?.protein || 0).toString(),
                 fat: (recipe.nutrition?.fat || 0).toString(),
@@ -703,6 +704,7 @@ export default function CreateRecipe() {
         cook_time_minutes: cook,
         servings: parseInt(formData.servings) || 1,
         nutrition: {
+          serving_amount: formData.nutrition.serving_amount,
           calories: parseInt(formData.nutrition.calories) || 0,
           protein: parseInt(formData.nutrition.protein) || 0,
           fat: parseInt(formData.nutrition.fat) || 0,
@@ -1688,6 +1690,16 @@ export default function CreateRecipe() {
 
               <section id="nutrition" className="section-card space-y-4">
                 <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-lg shadow-inner">📊</div><h2 className="text-xl font-black tracking-tighter">Nutrition Facts</h2></div>
+                <div className="space-y-1 relative">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Serving Amount (e.g., 1 slice, 100g, 1 cup)</label>
+                  <input
+                    type="text"
+                    className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors"
+                    placeholder="e.g., 1 slice, 100g, 1 cup"
+                    value={formData.nutrition.serving_amount}
+                    onChange={e => setFormData({ ...formData, nutrition: { ...formData.nutrition, serving_amount: e.target.value } })}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1 relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Calories (kcal)</label>
@@ -1797,6 +1809,7 @@ export default function CreateRecipe() {
             cook_time: '0',
             servings: String(data.servings || 4),
             nutrition: data.nutrition ? {
+              serving_amount: data.nutrition.serving_amount || '',
               calories: String(data.nutrition.calories || 0),
               protein: String(data.nutrition.protein || 0),
               fat: String(data.nutrition.fat || 0),
