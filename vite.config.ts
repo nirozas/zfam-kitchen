@@ -17,6 +17,12 @@ export default defineConfig({
         icons: [
             {
                 src: "/logo.png",
+                sizes: "192x192",
+                type: "image/png",
+                purpose: "any maskable"
+            },
+            {
+                src: "/logo.png",
                 sizes: "512x512",
                 type: "image/png",
                 purpose: "any maskable"
@@ -26,6 +32,10 @@ export default defineConfig({
         display: "standalone",
         theme_color: "#EA580C",
         background_color: "#ffffff"
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
       }
     })
   ],
