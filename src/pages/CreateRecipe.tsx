@@ -224,7 +224,7 @@ const IngredientReorderItem = ({
 
 const StepReorderItem = ({
   s, i, steps, setFormData, updateStep, addStep, removeStep,
-  setActiveRecipeLinkType, setActiveRecipeLinkIndex
+  setActiveRecipeLinkType, setActiveRecipeLinkIndex, is_image_recipe
 }: any) => {
   const controls = useDragControls();
   const prevStep = steps[i - 1];
@@ -261,7 +261,7 @@ const StepReorderItem = ({
         <div className="w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-1">{i + 1}</div>
 
         <div className="flex-1 flex flex-col gap-2 relative">
-          <textarea required className="w-full bg-transparent border-none text-sm font-semibold p-0 placeholder:text-gray-300 min-h-[30px] pt-0.5 resize-none transition-colors" rows={1} placeholder="Step description..." value={s.text} onChange={e => updateStep(i, { text: e.target.value })} onInput={(e) => {
+          <textarea required={!is_image_recipe} className={`w-full bg-transparent border-none text-sm p-0 placeholder:text-gray-300 min-h-[30px] pt-0.5 resize-none transition-colors ${is_image_recipe ? 'font-normal italic' : 'font-semibold'}`} rows={1} placeholder={is_image_recipe ? "Optional image description..." : "Step description..."} value={s.text} onChange={e => updateStep(i, { text: e.target.value })} onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
             target.style.height = 'auto';
             target.style.height = target.scrollHeight + 'px';
@@ -368,8 +368,8 @@ export default function CreateRecipe() {
     country_origin: '',
     steps: [{ id: Math.random().toString(), text: '', note: '', image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipes: [] }] as any[],
     gallery_urls: [] as GalleryItem[],
-    rating: 3,
     tags: '',
+    is_image_recipe: false,
     prep_time: '15',
     cook_time: '30',
     servings: '4',
@@ -583,6 +583,7 @@ export default function CreateRecipe() {
                 { ...s, id: s.id || Math.random().toString(), text: s.text || '', note: s.note || '', group_name: s.group_name || s.section || 'Main Steps', linked_recipes: s.linked_recipes || [] }),
               gallery_urls: recipe.gallery_urls || [],
               rating: recipe.rating || 3,
+              is_image_recipe: recipe.is_image_recipe || false,
               tags: recipe.recipe_tags?.map((rt: any) => rt.tags?.name ? `#${rt.tags.name}` : '').filter(Boolean).join(' ') || '',
               prep_time: (recipe.prep_time_minutes || 0).toString(),
               cook_time: (recipe.cook_time_minutes || 0).toString(),
@@ -711,6 +712,7 @@ export default function CreateRecipe() {
           carbs: parseInt(formData.nutrition.carbs) || 0
         },
         rating: formData.rating,
+        is_image_recipe: formData.is_image_recipe,
         slug: newSlug,
         country_origin: formData.country_origin || null,
       };
@@ -1633,16 +1635,33 @@ export default function CreateRecipe() {
 
               <section id="instructions" className="section-card space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg shadow-inner">👨‍🍳</div><h2 className="text-xl font-black tracking-tighter">Cooking Steps</h2></div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk</button>
-                    <button type="button" onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section', linked_recipes: [] }]
-                      }));
-                    }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
-                    <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg shadow-inner">👨‍🍳</div>
+                    <h2 className="text-xl font-black tracking-tighter">Cooking Steps</h2>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <div className={`relative w-8 h-4 transition-colors rounded-full ${formData.is_image_recipe ? 'bg-indigo-500' : 'bg-gray-200'}`}>
+                        <div className={`absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${formData.is_image_recipe ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-gray-500 group-hover:text-indigo-600 transition-colors">Image Carousel Recipe</span>
+                      <input 
+                        type="checkbox" 
+                        className="hidden" 
+                        checked={formData.is_image_recipe} 
+                        onChange={(e) => setFormData({ ...formData, is_image_recipe: e.target.checked })} 
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk</button>
+                      <button type="button" onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          steps: [...prev.steps, { id: Math.random().toString(), text: '', image_url: '', alignment: 'full', group_name: 'New Section', linked_recipes: [] }]
+                        }));
+                      }} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                      <button type="button" onClick={() => addStep()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Step</button>
+                    </div>
                   </div>
                 </div>
                 {showBulkSteps && (
@@ -1675,6 +1694,7 @@ export default function CreateRecipe() {
                       removeStep={removeStep}
                       setActiveRecipeLinkType={setActiveRecipeLinkType}
                       setActiveRecipeLinkIndex={setActiveRecipeLinkIndex}
+                      is_image_recipe={formData.is_image_recipe}
                     />
                   ))}
                 </Reorder.Group>

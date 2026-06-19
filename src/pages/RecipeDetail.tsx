@@ -1093,6 +1093,37 @@ export default function RecipeDetail() {
                                 <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Cooking Steps</h2>
                             </div>
 
+                            {recipe.is_image_recipe ? (
+                                <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 -mx-8 px-8 sm:-mx-14 sm:px-14 hide-scrollbar">
+                                    {recipe.steps.map((step, index) => {
+                                        const stepData = typeof step === 'string' ? { text: step } : (step as any);
+                                        return (
+                                            <div key={index} className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-[500px] flex flex-col gap-4">
+                                                <div className="relative aspect-[4/5] rounded-[2.5rem] overflow-hidden shadow-lg border border-gray-100 cursor-zoom-in" onClick={() => setSelectedImage(stepData.image_url || null)}>
+                                                    {stepData.image_url ? (
+                                                        <img src={getOptimizedImageUrl(stepData.image_url)} alt={`Step ${index + 1}`} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-gray-50 flex items-center justify-center text-4xl text-gray-200">📸</div>
+                                                    )}
+                                                    <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center font-black text-primary-600 shadow-sm border border-white">
+                                                        {index + 1}
+                                                    </div>
+                                                </div>
+                                                {stepData.text && (
+                                                    <p className="text-center font-bold text-gray-700 leading-relaxed px-4 text-lg">
+                                                        {stepData.text}
+                                                    </p>
+                                                )}
+                                                {stepData.note && (
+                                                    <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic px-4">
+                                                        {stepData.note}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
                             <div className="space-y-16">
                                 {recipe.steps.map((step, index) => {
                                     // Handle both old string steps and new object steps
@@ -1185,6 +1216,7 @@ export default function RecipeDetail() {
                                 );
                             })}
                             </div>
+                            )}
                         </section>
 
                         {/* Reviews Section */}

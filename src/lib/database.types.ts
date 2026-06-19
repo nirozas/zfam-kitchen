@@ -88,6 +88,7 @@ export interface Database {
                     nutrition: Json | null
                     alternative_titles: string | null
                     parent_recipe_id: string | null
+                    is_image_recipe: boolean | null
                 }
                 Insert: {
                     id?: string
@@ -102,6 +103,7 @@ export interface Database {
                     steps: string[]
                     alternative_titles?: string | null
                     parent_recipe_id?: string | null
+                    is_image_recipe?: boolean | null
                 }
                 Update: {
                     id?: string
@@ -125,6 +127,7 @@ export interface Database {
                     servings?: number | null
                     nutrition?: Json | null
                     parent_recipe_id?: string | null
+                    is_image_recipe?: boolean | null
                 }
             }
             ingredients: {

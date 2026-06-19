@@ -1,5 +1,5 @@
 import { Recipe } from '@/lib/types';
-import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus } from 'lucide-react';
+import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
@@ -100,10 +100,16 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                     {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                    <div className="absolute top-4 left-4 z-10">
+                    <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 items-start">
                         <span className="px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider text-primary-600 shadow-sm border border-white">
                             {recipe.category?.name || 'Recipe'}
                         </span>
+                        {recipe.is_image_recipe && (
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm border border-indigo-400">
+                                <ImageIcon size={12} />
+                                Images
+                            </span>
+                        )}
                     </div>
 
                     {/* Action Buttons - Always visible on mobile, hover on desktop */}
