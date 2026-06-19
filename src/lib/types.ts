@@ -42,7 +42,6 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     rating: number; // User rating from 1 to 5 stars
     likesCount?: number; // Pre-fetched likes count
     // parent_recipe_id is inherited from RecipeRow — links back to the source recipe for alterations
-    is_image_recipe?: boolean;
 }
 
 export interface RecipeIngredient {

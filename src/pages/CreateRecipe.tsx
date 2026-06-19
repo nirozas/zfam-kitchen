@@ -368,6 +368,7 @@ export default function CreateRecipe() {
     country_origin: '',
     steps: [{ id: Math.random().toString(), text: '', note: '', image_url: '', alignment: 'full', group_name: 'Main Steps', linked_recipes: [] }] as any[],
     gallery_urls: [] as GalleryItem[],
+    rating: 3,
     tags: '',
     is_image_recipe: false,
     prep_time: '15',
