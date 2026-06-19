@@ -38,6 +38,7 @@ export default function RecipeDetail() {
 
     // Media State
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [imageZoomLevel, setImageZoomLevel] = useState(4);
 
     // Linked Recipes State
     const [linkedRecipes, setLinkedRecipes] = useState<Recipe[]>([]);
@@ -52,7 +53,7 @@ export default function RecipeDetail() {
         // User requested that ingredients start UNCHECKED and multiplier defaults to 1
         setSelectedForCart([]);
         setMultiplier(1);
-        
+
         // Scroll to top when recipe changes
         window.scrollTo(0, 0);
     }, [id]);
@@ -282,13 +283,13 @@ export default function RecipeDetail() {
             // 1. Delete all associated images from B2
             const imagesToDelete: string[] = [];
             if (recipe.image_url) imagesToDelete.push(recipe.image_url);
-            
+
             if (recipe.gallery_urls && Array.isArray(recipe.gallery_urls)) {
                 recipe.gallery_urls.forEach((item: any) => {
                     if (item.url) imagesToDelete.push(item.url);
                 });
             }
-            
+
             if (recipe.steps && Array.isArray(recipe.steps)) {
                 recipe.steps.forEach((step: any) => {
                     if (step.image_url) imagesToDelete.push(step.image_url);
@@ -336,7 +337,7 @@ export default function RecipeDetail() {
     const handleSingleItemCartAdd = async (e: React.MouseEvent, index: number, ing: any) => {
         e.stopPropagation();
         if (!recipe) return;
-        
+
         const currentWeekId = getCurrentWeekId();
 
         try {
@@ -464,7 +465,7 @@ export default function RecipeDetail() {
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 mb-2">Recipe Load Failed</h2>
                     <p className="text-gray-500 mb-8 font-medium">{error}</p>
-                    <button 
+                    <button
                         onClick={() => window.location.reload()}
                         className="px-8 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg"
                     >
@@ -480,8 +481,8 @@ export default function RecipeDetail() {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                   <h2 className="text-2xl font-black text-gray-400 mb-4 uppercase tracking-widest">Recipe not found</h2>
-                   <Link to="/" className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg">Browse Recipes</Link>
+                    <h2 className="text-2xl font-black text-gray-400 mb-4 uppercase tracking-widest">Recipe not found</h2>
+                    <Link to="/" className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg">Browse Recipes</Link>
                 </div>
             </div>
         );
@@ -699,7 +700,7 @@ export default function RecipeDetail() {
                             </div>
                         </div>
 
-                        <h1 className="text-2xl sm:text-5xl md:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9]">
+                        <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-black text-white mb-2 shadow-sm tracking-tight sm:tracking-tighter leading-[1.1] sm:leading-[0.9] max-w-[65%] sm:max-w-[60%] md:max-w-[60%] lg:max-w-full">
                             {recipe.title}
                         </h1>
 
@@ -774,34 +775,38 @@ export default function RecipeDetail() {
                         transition={{ delay: 0.2 }}
                         className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 sm:gap-8 text-white font-black uppercase tracking-widest text-[9px] sm:text-[10px] w-full relative z-10 mt-6 sm:mt-12"
                     >
-                        <div className="flex items-center gap-6 sm:gap-8 flex-wrap">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/10 rounded-xl"><Clock size={16} /></div>
-                                <span>{recipe.time_minutes} min total</span>
+                        <div className="flex items-center gap-2 sm:gap-4 flex-wrap mt-2 sm:mt-0">
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><Clock size={14} className="sm:w-4 sm:h-4" /></div>
+                                <span className="text-[8px] sm:text-[10px]">{recipe.time_minutes} min total</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/10 rounded-xl"><Flame size={16} /></div>
-                                <span>{recipe.nutrition?.calories ? `${recipe.nutrition.calories} kcal` : `${Math.round(baseCalories)} kcal`}</span>
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><Flame size={14} className="sm:w-4 sm:h-4" /></div>
+                                <span className="text-[8px] sm:text-[10px]">{recipe.nutrition?.calories ? `${recipe.nutrition.calories} kcal` : `${Math.round(baseCalories)} kcal`}</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/10 rounded-xl"><span className="text-sm">👥</span></div>
-                                <span>{(recipe.servings || 1) * multiplier} servings</span>
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><span className="text-xs sm:text-sm">👥</span></div>
+                                <span className="text-[8px] sm:text-[10px]">{(recipe.servings || 1) * multiplier} servings</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><span className="text-xs sm:text-sm">👩‍🍳</span></div>
+                                <span className="text-[8px] sm:text-[10px]">by @{recipe.author?.username || 'Niroz'}</span>
                             </div>
                         </div>
 
                         {/* Usage Stats - Optimized for Mobile Grid */}
-                        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-16 py-4 sm:py-2 border-t sm:border-none border-white/5">
+                        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-8 lg:gap-16 py-4 sm:py-2 border-t sm:border-none border-white/5 w-full sm:w-auto">
                             <div className="flex flex-col items-center sm:items-start">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">MONTH</span>
-                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.month}</span>
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-0.5 font-black whitespace-nowrap">MONTH</span>
+                                <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none">{usageStats.month}</span>
                             </div>
-                            <div className="flex flex-col items-center sm:items-start border-l border-white/10 sm:border-none">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">YEAR</span>
-                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.year}</span>
+                            <div className="flex flex-col items-center sm:items-start">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-0.5 font-black whitespace-nowrap">YEAR</span>
+                                <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none">{usageStats.year}</span>
                             </div>
-                            <div className="flex flex-col items-center sm:items-start border-l border-white/10 sm:border-none">
-                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-1 font-black whitespace-nowrap">ALL</span>
-                                <span className="text-2xl sm:text-5xl font-black text-white leading-none">{usageStats.allTime}</span>
+                            <div className="flex flex-col items-center sm:items-start">
+                                <span className="text-[8px] sm:text-[10px] text-white/50 mb-0.5 font-black whitespace-nowrap">ALL</span>
+                                <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none">{usageStats.allTime}</span>
                             </div>
                         </div>
 
@@ -939,7 +944,7 @@ export default function RecipeDetail() {
                                                 >
                                                     {/* Checkbox for Cart Selection OR Image for Linked Recipe */}
                                                     {ing.linked_recipe ? (
-                                                        <div 
+                                                        <div
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 navigate(`/recipe/${ing.linked_recipe.slug || ing.linked_recipe.id}`);
@@ -1003,7 +1008,7 @@ export default function RecipeDetail() {
                                 ))}
                             </div>
 
-                                {/* Bulk Add to Cart Button Removed */}
+                            {/* Bulk Add to Cart Button Removed */}
 
                             {/* Nutrition Facts Sidebar Item */}
                             <div className="mt-14 pt-10 border-t-4 border-gray-50 hidden lg:block">
@@ -1088,34 +1093,83 @@ export default function RecipeDetail() {
                         )}
 
                         <section className="bg-white p-8 sm:p-14 rounded-[3.5rem] shadow-xl shadow-gray-100/50 border border-gray-100">
-                            <div className="flex items-center gap-5 mb-14">
-                                <div className="w-14 h-14 rounded-[1.5rem] bg-purple-50 flex items-center justify-center text-3xl shadow-inner">👩‍🍳</div>
-                                <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Cooking Steps</h2>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-14">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-14 h-14 rounded-[1.5rem] bg-purple-50 flex items-center justify-center text-3xl shadow-inner">👩‍🍳</div>
+                                    <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Cooking Steps</h2>
+                                </div>
+                                
+                                {recipe.is_image_recipe && (
+                                    <div className="flex items-center gap-1 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 shadow-sm self-start sm:self-auto">
+                                        {[
+                                            { level: 1, label: "25%" },
+                                            { level: 2, label: "50%" },
+                                            { level: 3, label: "75%" },
+                                            { level: 4, label: "100%" }
+                                        ].map(({ level, label }) => (
+                                            <button
+                                                key={level}
+                                                onClick={() => setImageZoomLevel(level)}
+                                                className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
+                                                    imageZoomLevel === level 
+                                                        ? 'bg-white shadow-sm text-primary-600 scale-105' 
+                                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {recipe.is_image_recipe ? (
                                 <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 -mx-8 px-8 sm:-mx-14 sm:px-14 hide-scrollbar">
                                     {recipe.steps.map((step, index) => {
                                         const stepData = typeof step === 'string' ? { text: step } : (step as any);
+                                        
+                                        // Define widths and text sizes based on zoom level
+                                        let widthClass = "w-[92vw] sm:w-[60vw] md:w-[500px]";
+                                        let textSizeClass = "text-xl sm:text-lg leading-relaxed";
+                                        let noteSizeClass = "text-xs tracking-[0.2em]";
+                                        let iconSizeClass = "w-10 h-10 text-base top-4 left-4";
+                                        
+                                        if (imageZoomLevel === 1) {
+                                            widthClass = "w-[28vw] sm:w-[18vw] md:w-[150px]";
+                                            textSizeClass = "text-[9px] sm:text-[10px] leading-tight";
+                                            noteSizeClass = "text-[7px] sm:text-[8px] tracking-normal";
+                                            iconSizeClass = "w-5 h-5 text-[9px] top-2 left-2";
+                                        } else if (imageZoomLevel === 2) {
+                                            widthClass = "w-[46vw] sm:w-[30vw] md:w-[250px]";
+                                            textSizeClass = "text-[11px] sm:text-xs leading-snug";
+                                            noteSizeClass = "text-[8px] sm:text-[9px] tracking-wide";
+                                            iconSizeClass = "w-7 h-7 text-xs top-3 left-3";
+                                        } else if (imageZoomLevel === 3) {
+                                            widthClass = "w-[69vw] sm:w-[45vw] md:w-[375px]";
+                                            textSizeClass = "text-sm sm:text-base leading-relaxed";
+                                            noteSizeClass = "text-[10px] sm:text-[11px] tracking-wider";
+                                            iconSizeClass = "w-8 h-8 text-sm top-4 left-4";
+                                        }
+                                        
                                         return (
-                                            <div key={index} className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-[500px] flex flex-col gap-4">
-                                                <div className="relative aspect-[4/5] rounded-[2.5rem] overflow-hidden shadow-lg border border-gray-100 cursor-zoom-in" onClick={() => setSelectedImage(stepData.image_url || null)}>
+                                            <div key={index} className={`snap-center shrink-0 flex flex-col gap-4 transition-all duration-500 ease-out ${widthClass}`}>
+                                                <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-lg border border-gray-100 cursor-zoom-in" onClick={() => setSelectedImage(stepData.image_url || null)}>
                                                     {stepData.image_url ? (
-                                                        <img src={getOptimizedImageUrl(stepData.image_url)} alt={`Step ${index + 1}`} className="w-full h-full object-cover" />
+                                                        <img src={getOptimizedImageUrl(stepData.image_url)} alt={`Step ${index + 1}`} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
                                                     ) : (
                                                         <div className="w-full h-full bg-gray-50 flex items-center justify-center text-4xl text-gray-200">📸</div>
                                                     )}
-                                                    <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center font-black text-primary-600 shadow-sm border border-white">
+                                                    <div className={`absolute rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center font-black text-primary-600 shadow-sm border border-white transition-all duration-500 ${iconSizeClass}`}>
                                                         {index + 1}
                                                     </div>
                                                 </div>
                                                 {stepData.text && (
-                                                    <p className="text-center font-bold text-gray-700 leading-relaxed px-4 text-lg">
+                                                    <p className={`text-center font-bold text-gray-800 px-2 transition-all duration-500 ${textSizeClass}`}>
                                                         {stepData.text}
                                                     </p>
                                                 )}
                                                 {stepData.note && (
-                                                    <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic px-4">
+                                                    <p className={`text-center font-black uppercase text-indigo-400 italic px-2 transition-all duration-500 ${noteSizeClass}`}>
                                                         {stepData.note}
                                                     </p>
                                                 )}
@@ -1124,98 +1178,98 @@ export default function RecipeDetail() {
                                     })}
                                 </div>
                             ) : (
-                            <div className="space-y-16">
-                                {recipe.steps.map((step, index) => {
-                                    // Handle both old string steps and new object steps
-                                    const stepData = typeof step === 'string' ? { text: step } : (step as any);
-                                    
-                                    // Logic for section headers
-                                    const prevStep = index > 0 ? (typeof recipe.steps[index - 1] === 'string' ? null : (recipe.steps[index - 1] as any)) : null;
-                                    const isNewSection = stepData.group_name && stepData.group_name !== (prevStep?.group_name);
+                                <div className="space-y-16">
+                                    {recipe.steps.map((step, index) => {
+                                        // Handle both old string steps and new object steps
+                                        const stepData = typeof step === 'string' ? { text: step } : (step as any);
 
-                                    return (
-                                        <React.Fragment key={index}>
-                                            {isNewSection && (
-                                                <div className="pt-8 pb-4 border-b-2 border-gray-100 mb-8">
-                                                    <h3 className="text-xl font-black text-primary-600 uppercase tracking-[0.2em]">
-                                                        {stepData.group_name}
-                                                    </h3>
-                                                </div>
-                                            )}
-                                            <div
-                                                className="flex flex-col gap-8 group cursor-pointer"
-                                                onClick={() => toggleStepCrossed(index)}
-                                            >
-                                            <div className="flex items-start gap-8">
-                                                <div className={`flex-shrink-0 w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-2xl font-black transition-all shadow-inner ${crossedSteps.includes(index)
-                                                    ? 'bg-gray-100 text-gray-300'
-                                                    : 'bg-gray-50 text-gray-200 group-hover:bg-primary-50 group-hover:text-primary-600'
-                                                    }`}>
-                                                    {index + 1}
-                                                </div>
-                                                <div className="pt-3 flex-1">
-                                                    <p className={`leading-relaxed font-bold text-xl tracking-tight transition-all break-words whitespace-pre-wrap ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
-                                                        }`}>
-                                                        {stepData.text}
-                                                    </p>
-                                                    {stepData.note && (
-                                                       <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Chef's Tip: {stepData.note}</p>
-                                                    )}
+                                        // Logic for section headers
+                                        const prevStep = index > 0 ? (typeof recipe.steps[index - 1] === 'string' ? null : (recipe.steps[index - 1] as any)) : null;
+                                        const isNewSection = stepData.group_name && stepData.group_name !== (prevStep?.group_name);
 
-                                                    {stepData.linked_recipes && stepData.linked_recipes.length > 0 && (
-                                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
-                                                            {stepData.linked_recipes.map((lr: any, lrIndex: number) => (
-                                                                <Link 
-                                                                    key={lr.id || lrIndex}
-                                                                    to={`/recipe/${lr.slug || lr.id}`}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    className="flex flex-row items-stretch gap-4 p-3 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 rounded-[2rem] transition-all group/link w-full shadow-sm hover:shadow-md"
-                                                                >
-                                                                    <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                                                                        {lr.image_url ? (
-                                                                            <img src={getOptimizedImageUrl(lr.image_url)} alt="Linked recipe" className="w-full h-full object-cover group-hover/link:scale-105 transition-transform duration-500" />
-                                                                        ) : (
-                                                                            <span className="text-xl">🍽️</span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex flex-col justify-center min-w-0 pr-2">
-                                                                        <span className="text-[9px] font-black uppercase text-indigo-500 tracking-[0.2em] flex items-center gap-1.5 mb-1 transition-colors group-hover/link:text-indigo-600">
-                                                                            <ExternalLink size={10} /> RECIPE LINK
-                                                                        </span>
-                                                                        <h4 className="font-bold text-gray-900 group-hover/link:text-primary-600 transition-colors line-clamp-2 text-sm leading-tight">{lr.title}</h4>
-                                                                    </div>
-                                                                </Link>
-                                                            ))}
+                                        return (
+                                            <React.Fragment key={index}>
+                                                {isNewSection && (
+                                                    <div className="pt-8 pb-4 border-b-2 border-gray-100 mb-8">
+                                                        <h3 className="text-xl font-black text-primary-600 uppercase tracking-[0.2em]">
+                                                            {stepData.group_name}
+                                                        </h3>
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className="flex flex-col gap-8 group cursor-pointer"
+                                                    onClick={() => toggleStepCrossed(index)}
+                                                >
+                                                    <div className="flex items-start gap-8">
+                                                        <div className={`flex-shrink-0 w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-2xl font-black transition-all shadow-inner ${crossedSteps.includes(index)
+                                                            ? 'bg-gray-100 text-gray-300'
+                                                            : 'bg-gray-50 text-gray-200 group-hover:bg-primary-50 group-hover:text-primary-600'
+                                                            }`}>
+                                                            {index + 1}
+                                                        </div>
+                                                        <div className="pt-3 flex-1">
+                                                            <p className={`leading-relaxed font-bold text-xl tracking-tight transition-all break-words whitespace-pre-wrap ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
+                                                                }`}>
+                                                                {stepData.text}
+                                                            </p>
+                                                            {stepData.note && (
+                                                                <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Chef's Tip: {stepData.note}</p>
+                                                            )}
+
+                                                            {stepData.linked_recipes && stepData.linked_recipes.length > 0 && (
+                                                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
+                                                                    {stepData.linked_recipes.map((lr: any, lrIndex: number) => (
+                                                                        <Link
+                                                                            key={lr.id || lrIndex}
+                                                                            to={`/recipe/${lr.slug || lr.id}`}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="flex flex-row items-stretch gap-4 p-3 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 rounded-[2rem] transition-all group/link w-full shadow-sm hover:shadow-md"
+                                                                        >
+                                                                            <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                                                                {lr.image_url ? (
+                                                                                    <img src={getOptimizedImageUrl(lr.image_url)} alt="Linked recipe" className="w-full h-full object-cover group-hover/link:scale-105 transition-transform duration-500" />
+                                                                                ) : (
+                                                                                    <span className="text-xl">🍽️</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex flex-col justify-center min-w-0 pr-2">
+                                                                                <span className="text-[9px] font-black uppercase text-indigo-500 tracking-[0.2em] flex items-center gap-1.5 mb-1 transition-colors group-hover/link:text-indigo-600">
+                                                                                    <ExternalLink size={10} /> RECIPE LINK
+                                                                                </span>
+                                                                                <h4 className="font-bold text-gray-900 group-hover/link:text-primary-600 transition-colors line-clamp-2 text-sm leading-tight">{lr.title}</h4>
+                                                                            </div>
+                                                                        </Link>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Step Image (New Feature) */}
+                                                    {stepData.image_url && (
+                                                        <div className={`w-full flex ${stepData.alignment === 'center' ? 'justify-center' : stepData.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
+                                                            <motion.div
+                                                                whileHover={{ scale: 1.01 }}
+                                                                className={`relative overflow-hidden rounded-[2.5rem] shadow-lg border border-gray-100 cursor-zoom-in group ${stepData.alignment === 'full' ? 'w-full' : 'max-w-md'
+                                                                    }`}
+                                                                onClick={() => setSelectedImage(stepData.image_url || null)}
+                                                            >
+                                                                <img
+                                                                    src={getOptimizedImageUrl(stepData.image_url)}
+                                                                    alt={`Step ${index + 1}`}
+                                                                    className="w-full h-full object-cover max-h-[400px]"
+                                                                />
+                                                                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <Maximize2 size={16} className="text-white" />
+                                                                </div>
+                                                            </motion.div>
                                                         </div>
                                                     )}
                                                 </div>
-                                            </div>
-
-                                            {/* Step Image (New Feature) */}
-                                            {stepData.image_url && (
-                                                <div className={`w-full flex ${stepData.alignment === 'center' ? 'justify-center' : stepData.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
-                                                    <motion.div
-                                                        whileHover={{ scale: 1.01 }}
-                                                        className={`relative overflow-hidden rounded-[2.5rem] shadow-lg border border-gray-100 cursor-zoom-in group ${stepData.alignment === 'full' ? 'w-full' : 'max-w-md'
-                                                            }`}
-                                                        onClick={() => setSelectedImage(stepData.image_url || null)}
-                                                    >
-                                                        <img
-                                                            src={getOptimizedImageUrl(stepData.image_url)}
-                                                            alt={`Step ${index + 1}`}
-                                                            className="w-full h-full object-cover max-h-[400px]"
-                                                        />
-                                                        <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Maximize2 size={16} className="text-white" />
-                                                        </div>
-                                                    </motion.div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </React.Fragment>
-                                );
-                            })}
-                            </div>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </section>
 

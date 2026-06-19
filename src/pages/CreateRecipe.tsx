@@ -650,6 +650,31 @@ export default function CreateRecipe() {
     finally { setUploading(false); }
   };
 
+  const handleBulkStepImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      if (!event.target.files) return;
+      const newSteps: RecipeStep[] = [];
+      const currentGroupName = formData.steps.length > 0 
+        ? formData.steps[formData.steps.length - 1].group_name 
+        : 'Main Steps';
+      
+      for (const file of Array.from(event.target.files)) {
+        const url = await handleFileUpload(file);
+        newSteps.push({
+          id: Math.random().toString(),
+          text: '',
+          image_url: url,
+          alignment: 'full',
+          group_name: currentGroupName,
+          linked_recipes: []
+        });
+      }
+      setFormData(prev => ({ ...prev, steps: [...prev.steps, ...newSteps] }));
+    } catch (error) { toast.error((error as Error).message); }
+    finally { setUploading(false); }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -698,7 +723,7 @@ export default function CreateRecipe() {
         alternative_titles: formData.alternative_titles || null,
         gallery_urls: formData.gallery_urls,
         category_id: formData.category_id || null,
-        steps: formData.steps.filter((s: RecipeStep) => s.text.trim() !== ''),
+        steps: formData.steps.filter((s: RecipeStep) => s.text.trim() !== '' || s.image_url),
         author_id: session.user.id,
         time_minutes: prep + cook,
         prep_time_minutes: prep,
@@ -1653,7 +1678,15 @@ export default function CreateRecipe() {
                       />
                     </label>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk</button>
+                      {formData.is_image_recipe && (
+                        <div className="relative overflow-hidden cursor-pointer">
+                          <button type="button" className="text-[10px] font-black uppercase text-indigo-500 hover:text-indigo-700 px-3 py-1.5 bg-indigo-50/50 rounded-lg shadow-sm border border-indigo-100 flex items-center gap-1 transition-colors">
+                            <ImageIcon size={10} /> Bulk Images
+                          </button>
+                          <input type="file" multiple accept="image/*" onChange={handleBulkStepImagesUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        </div>
+                      )}
+                      <button type="button" onClick={() => setShowBulkSteps(!showBulkSteps)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600">Bulk Text</button>
                       <button type="button" onClick={() => {
                         setFormData(prev => ({
                           ...prev,
