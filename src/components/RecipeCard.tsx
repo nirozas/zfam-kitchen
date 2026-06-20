@@ -176,7 +176,8 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                         </div>
                     </div>
 
-                    <h3 className="font-extrabold text-[11px] sm:text-xs md:text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors min-h-[1.5rem] sm:min-h-[2.5rem] leading-tight flex items-center">
+                    <h3 className="font-extrabold text-[11px] sm:text-xs md:text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors min-h-[1.5rem] sm:min-h-[2.5rem] leading-tight flex items-center gap-1.5">
+                        {recipe.is_image_recipe && <ImageIcon size={14} className="text-indigo-500 shrink-0" />}
                         {recipe.title}
                     </h3>
 

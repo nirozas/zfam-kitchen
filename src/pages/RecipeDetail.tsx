@@ -999,7 +999,7 @@ export default function RecipeDetail() {
                                                         </div>
                                                         {ing.amount_in_grams > 0 && (
                                                             <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
-                                                                {formatAmount(ing.amount_in_grams * multiplier)} {ing.unit ? ing.unit.toUpperCase() : 'G'}
+                                                                {formatAmount(ing.amount_in_grams * multiplier)} {ing.unit ? ing.unit.charAt(0).toUpperCase() + ing.unit.slice(1).toLowerCase() : 'G'}
                                                             </span>
                                                         )}
                                                         {ing.purchaseUrl && (
@@ -1106,28 +1106,26 @@ export default function RecipeDetail() {
                                     <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Cooking Steps</h2>
                                 </div>
                                 
-                                {recipe.is_image_recipe && (
-                                    <div className="flex items-center gap-1 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 shadow-sm self-start sm:self-auto">
-                                        {[
-                                            { level: 1, label: "25%" },
-                                            { level: 2, label: "50%" },
-                                            { level: 3, label: "75%" },
-                                            { level: 4, label: "100%" }
-                                        ].map(({ level, label }) => (
-                                            <button
-                                                key={level}
-                                                onClick={() => setImageZoomLevel(level)}
-                                                className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
-                                                    imageZoomLevel === level 
-                                                        ? 'bg-white shadow-sm text-primary-600 scale-105' 
-                                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                                                }`}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-1 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 shadow-sm self-start sm:self-auto">
+                                    {[
+                                        { level: 1, label: "25%" },
+                                        { level: 2, label: "50%" },
+                                        { level: 3, label: "75%" },
+                                        { level: 4, label: "100%" }
+                                    ].map(({ level, label }) => (
+                                        <button
+                                            key={level}
+                                            onClick={() => setImageZoomLevel(level)}
+                                            className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
+                                                imageZoomLevel === level 
+                                                    ? 'bg-white shadow-sm text-primary-600 scale-105' 
+                                                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {recipe.is_image_recipe ? (
@@ -1194,6 +1192,13 @@ export default function RecipeDetail() {
                                         const prevStep = index > 0 ? (typeof recipe.steps[index - 1] === 'string' ? null : (recipe.steps[index - 1] as any)) : null;
                                         const isNewSection = stepData.group_name && stepData.group_name !== (prevStep?.group_name);
 
+                                        let normalTextSizeClass = "text-xl";
+                                        let normalIconClass = "w-14 h-14 text-2xl rounded-[1.5rem]";
+                                        let normalNoteClass = "text-xs";
+                                        if (imageZoomLevel === 1) { normalTextSizeClass = "text-sm"; normalIconClass = "w-8 h-8 text-sm rounded-[0.75rem]"; normalNoteClass = "text-[9px]"; }
+                                        else if (imageZoomLevel === 2) { normalTextSizeClass = "text-base"; normalIconClass = "w-10 h-10 text-base rounded-[1rem]"; normalNoteClass = "text-[10px]"; }
+                                        else if (imageZoomLevel === 3) { normalTextSizeClass = "text-lg"; normalIconClass = "w-12 h-12 text-lg rounded-[1.25rem]"; normalNoteClass = "text-[11px]"; }
+
                                         return (
                                             <React.Fragment key={index}>
                                                 {isNewSection && (
@@ -1208,19 +1213,19 @@ export default function RecipeDetail() {
                                                     onClick={() => toggleStepCrossed(index)}
                                                 >
                                                     <div className="flex items-start gap-8">
-                                                        <div className={`flex-shrink-0 w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-2xl font-black transition-all shadow-inner ${crossedSteps.includes(index)
+                                                        <div className={`flex-shrink-0 flex items-center justify-center font-black transition-all shadow-inner ${normalIconClass} ${crossedSteps.includes(index)
                                                             ? 'bg-gray-100 text-gray-300'
                                                             : 'bg-gray-50 text-gray-200 group-hover:bg-primary-50 group-hover:text-primary-600'
                                                             }`}>
                                                             {index + 1}
                                                         </div>
                                                         <div className="pt-3 flex-1">
-                                                            <p className={`leading-relaxed font-bold text-xl tracking-tight transition-all break-words whitespace-pre-wrap ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
+                                                            <p className={`leading-relaxed font-bold tracking-tight transition-all break-words whitespace-pre-wrap ${normalTextSizeClass} ${crossedSteps.includes(index) ? 'text-gray-300 line-through' : 'text-gray-700'
                                                                 }`}>
                                                                 {stepData.text}
                                                             </p>
                                                             {stepData.note && (
-                                                                <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400 italic">Chef's Tip: {stepData.note}</p>
+                                                                <p className={`mt-2 font-black uppercase tracking-[0.2em] text-indigo-400 italic ${normalNoteClass}`}>Chef's Tip: {stepData.note}</p>
                                                             )}
 
                                                             {stepData.linked_recipes && stepData.linked_recipes.length > 0 && (

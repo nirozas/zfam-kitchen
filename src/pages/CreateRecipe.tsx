@@ -79,7 +79,7 @@ const UNIT_MAPPING: Record<string, string> = {
   'bag': 'bag', 'bags': 'bag'
 };
 
-const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'g', 'kg', 'ml', 'l', 'pcs', 'pinch', 'clove', 'oz', 'lb', 'pack', 'as liked', 'can', 'dash', 'drop', 'ea', 'count', 'box', 'jar', 'bag'];
+const COMMON_UNITS = ['cup', 'tbsp', 'tsp', 'ml', 'l', 'dash', 'drop', 'oz', 'g', 'kg', 'lb', 'pcs', 'ea', 'count', 'clove', 'pinch', 'pack', 'can', 'box', 'jar', 'bag', 'as liked'];
 
 const ARABIC_DIGITS_MAP: Record<string, string> = {
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
@@ -209,7 +209,7 @@ const IngredientReorderItem = ({
           </div>
           <div className="flex gap-1">
             <input type="text" placeholder="Amt" className="w-16 sm:w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 sm:px-3 text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-            <input type="text" placeholder="Unit" list="unit-options" className="w-16 sm:w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 sm:px-3 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+            <input type="text" placeholder="Unit" list="unit-options" className="w-16 sm:w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 sm:px-3 text-sm font-medium border-none capitalize" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
           </div>
           <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
             <button type="button" onClick={() => addAlternative(i)} className="px-1.5 py-1 text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all hidden sm:block">or</button>
@@ -861,6 +861,41 @@ export default function CreateRecipe() {
           await supabase.from('recipe_keywords').upsert({ recipe_id: recipeIdForIngredients, keyword_id: kw.id });
         }
       }
+
+      // Background Cleanup: Remove orphaned ingredients
+      (async () => {
+        try {
+          let usedIds = new Set<number>();
+          let hasMore = true;
+          let from = 0;
+          const limit = 1000;
+          while (hasMore) {
+            const { data, error } = await supabase.from('recipe_ingredients').select('ingredient_id').range(from, from + limit - 1);
+            if (error) break;
+            data.forEach((d: any) => usedIds.add(d.ingredient_id));
+            if (data.length < limit) hasMore = false;
+            from += limit;
+          }
+
+          let allIngredients: any[] = [];
+          hasMore = true;
+          from = 0;
+          while (hasMore) {
+            const { data, error } = await supabase.from('ingredients').select('id').range(from, from + limit - 1);
+            if (error) break;
+            allIngredients.push(...data);
+            if (data.length < limit) hasMore = false;
+            from += limit;
+          }
+
+          const toDelete = allIngredients.filter(i => !usedIds.has(i.id)).map(i => i.id);
+          for (let i = 0; i < toDelete.length; i += 50) {
+            await supabase.from('ingredients').delete().in('id', toDelete.slice(i, i + 50));
+          }
+        } catch (e) {
+          console.error('Failed to cleanup ingredients', e);
+        }
+      })();
 
       toast.success(isEditing ? 'Recipe updated successfully!' : 'Recipe published successfully!');
       navigate(`/recipe/${recipeData.slug}`);
@@ -1860,7 +1895,7 @@ export default function CreateRecipe() {
 
       <datalist id="unit-options">
         {COMMON_UNITS.map(u => (
-          <option key={u} value={u} />
+          <option key={u} value={u.charAt(0).toUpperCase() + u.slice(1)} />
         ))}
       </datalist>
       <LinkImporterModal
