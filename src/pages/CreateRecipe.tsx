@@ -905,25 +905,7 @@ export default function CreateRecipe() {
     next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: lastGroup, linked_recipe: null, is_alternative: false });
     setIngredients(next);
   };
-  const addAlternative = (index: number) => {
-    const targetIdx = index;
-    const parent = ingredients[targetIdx];
-    const next = [...ingredients];
-    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: parent.amount, unit: parent.unit, note: '', purchase_url: '', group_name: parent.group_name, linked_recipe: null, is_alternative: true });
-    setIngredients(next);
-  };
-  const removeIngredient = (idx: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== idx));
-  };
-  const updateIngredient = (idx: number, field: string, val: any) => {
-    const next = [...ingredients];
-    let finalVal = val;
-    if (field === 'unit' && typeof val === 'string' && UNIT_MAPPING[val.trim().toLowerCase()]) finalVal = UNIT_MAPPING[val.trim().toLowerCase()];
-    if (field === 'amount' && typeof val === 'string') finalVal = val.replace(/[٠-٩]/g, m => ARABIC_DIGITS_MAP[m] || m).replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75');
 
-    next[idx] = { ...next[idx], [field]: finalVal };
-    setIngredients(next);
-  };
 
   const parseBulkIngredients = () => {
     const lines = bulkIngredientsText.split('\n').filter(l => l.trim() !== '');

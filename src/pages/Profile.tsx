@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ChefHat, Settings, Award, TrendingUp, DollarSign, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare, Bug, ShoppingCart, Calendar } from 'lucide-react';
+import { Heart, ChefHat, Settings, Award, TrendingUp, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare, Bug, ShoppingCart, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import RecipeCard from '@/components/RecipeCard';
 import { useRecipes, useFavorites, useCategories, useUserStats } from '@/lib/hooks';
