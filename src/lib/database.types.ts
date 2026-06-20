@@ -137,6 +137,7 @@ export interface Database {
                     calories_per_100g: number
                     protein_per_100g: number
                     created_at: string | null
+                    purchase_url: string | null
                 }
                 Insert: {
                     id?: number
@@ -144,6 +145,7 @@ export interface Database {
                     calories_per_100g?: number
                     protein_per_100g?: number
                     created_at?: string | null
+                    purchase_url?: string | null
                 }
                 Update: {
                     id?: number
@@ -151,6 +153,7 @@ export interface Database {
                     calories_per_100g?: number
                     protein_per_100g?: number
                     created_at?: string | null
+                    purchase_url?: string | null
                 }
             }
             recipe_ingredients: {

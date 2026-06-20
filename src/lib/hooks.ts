@@ -81,6 +81,7 @@ export function useRecipes(options?: UseRecipesOptions) {
                             unit: ri.unit || 'g',
                             group_name: ri.group_name || 'Ingredients',
                             note: ri.note,
+                            purchaseUrl: ri.ingredients?.purchase_url || null,
                             ingredient: ri.ingredients,
                             linked_recipe: ri.linked_recipe
                         })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
@@ -189,6 +190,7 @@ export function useRecipe(id: string | undefined) {
                                 unit: ri.unit || 'g',
                                 group_name: ri.group_name || 'Main',
                                 note: ri.note,
+                                purchaseUrl: ri.ingredients?.purchase_url || null,
                                 ingredient: ri.ingredients,
                                 linked_recipe: ri.linked_recipe
                             }))

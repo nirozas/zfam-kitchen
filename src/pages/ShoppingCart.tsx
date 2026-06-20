@@ -389,9 +389,16 @@ export default function ShoppingCart() {
                                             </button>
 
                                             <div className="flex-1 min-w-0 py-1">
-                                                <p className={`text-sm md:text-base font-medium leading-relaxed ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                                                    {item.name}
-                                                </p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className={`text-sm md:text-base font-medium leading-relaxed ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                                                        {item.name}
+                                                    </p>
+                                                    {item.purchaseUrl && (
+                                                        <a href={item.purchaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 transition-colors" title="Buy this ingredient">
+                                                            <CartIcon size={14} />
+                                                        </a>
+                                                    )}
+                                                </div>
                                                 <div className="flex flex-wrap gap-1 mt-0.5">
                                                     {item.recipeNames.map((name: string, idx: number) => (
                                                         <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-gray-50 text-gray-400 rounded-lg font-black uppercase tracking-tighter border border-gray-100">

@@ -12,6 +12,7 @@ export interface CartItem {
     weekId: string; // Format: "YYYY-WW" (ISO week number)
     price?: number; // Price for this specific item (user can enter manually)
     note?: string; // Optional user note
+    purchaseUrl?: string | null; // Added purchase link
 }
 
 interface ShoppingCartContextType {
@@ -79,6 +80,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                 checked: item.checked,
                 price: parseFloat(item.price || 0),
                 note: item.note || '',
+                purchaseUrl: item.purchase_url || null,
                 recipeIds: item.recipe_ids || [],
                 recipeNames: item.recipe_names || []
             }));
@@ -118,6 +120,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
             checked: item.checked,
             price: parseFloat(item.price || 0),
             note: item.note || '',
+            purchaseUrl: item.purchase_url || null,
             recipeIds: item.recipe_ids || [],
             recipeNames: item.recipe_names || []
         }));
@@ -139,6 +142,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
 
             if (existingInBatch) {
                 existingInBatch.amount += item.amount;
+                if (item.purchaseUrl) existingInBatch.purchase_url = item.purchaseUrl; // Prefer latest purchase url
                 if (item.recipeId && !existingInBatch.recipe_ids.includes(item.recipeId)) {
                     existingInBatch.recipe_ids.push(item.recipeId);
                     if (item.recipeName) existingInBatch.recipe_names.push(item.recipeName);
@@ -173,6 +177,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     checked: false,
                     price: existingItem.price || 0,
                     note: existingItem.note || '',
+                    purchase_url: item.purchaseUrl || existingItem.purchaseUrl || null,
                     recipe_ids: updatedRecipeIds,
                     recipe_names: updatedRecipeNames
                 });
@@ -186,6 +191,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     checked: false,
                     price: item.price || 0,
                     note: item.note || '',
+                    purchase_url: item.purchaseUrl || null,
                     recipe_ids: item.recipeId ? [item.recipeId] : [],
                     recipe_names: item.recipeName ? [item.recipeName] : []
                 });

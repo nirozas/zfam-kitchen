@@ -50,6 +50,7 @@ export interface RecipeIngredient {
     unit?: string; // 'g', 'ml', 'cup', 'lb', or 'pcs'
     group_name?: string;
     note?: string;
+    purchaseUrl?: string | null;
     linked_recipe?: { id: string; title: string; image_url: string | null; slug: string | null };
 }
 

@@ -7,7 +7,7 @@ import { HeroSection } from '@/components/HeroSection';
 import { useRecipes, useCategories } from '@/lib/hooks';
 import RecipeCardSkeleton from '@/components/RecipeCardSkeleton';
 import CategoryCardSkeleton from '@/components/CategoryCardSkeleton';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 
 /* Button Styles Helper */
@@ -27,7 +27,7 @@ const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', siz
 };
 
 const Index = () => {
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ limit: 40, minimal: true });
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ minimal: true });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     useEffect(() => {
@@ -43,9 +43,50 @@ const Index = () => {
     }, [categoriesError]);
 
 
-    // Use all recipes for now, or filter if we had "featured" flag
-    const featuredRecipes = recipes.slice(0, 10);
-    const popularRecipes = recipes.slice(10, 40);
+    // Present Featured Recipes randomly
+    const featuredRecipes = useMemo(() => {
+        if (!recipes.length) return [];
+        return [...recipes].sort(() => 0.5 - Math.random()).slice(0, 10);
+    }, [recipes]);
+    
+    const popularRecipes = recipes.slice(0, 30); // Changed from 10,40 since we randomized featured
+
+    // Sort categories using the same logic as Categories.tsx (parent -> children)
+    const sortedCategoriesList = useMemo(() => {
+        const sorted = [...categories].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const parents = sorted.filter(c => !c.parent_id);
+        const children = sorted.filter(c => c.parent_id);
+        const result: typeof categories = [];
+        
+        parents.forEach(parent => {
+            result.push(parent);
+            const parentChildren = children.filter(child => child.parent_id === parent.id);
+            result.push(...parentChildren);
+        });
+        
+        const orphans = children.filter(child => !result.find(r => r.id === child.id));
+        result.push(...orphans);
+        return result;
+    }, [categories]);
+
+    // Group 12 random recipes for each category
+    const categoriesWithRecipes = useMemo(() => {
+        if (!recipes.length || !sortedCategoriesList.length) return [];
+        
+        return sortedCategoriesList.map(cat => {
+            const catRecipes = recipes.filter(r => 
+                r.category?.id === cat.id || 
+                r.all_categories?.some(c => c.id === cat.id)
+            );
+            
+            const randomRecipes = [...catRecipes].sort(() => 0.5 - Math.random()).slice(0, 12);
+            
+            return {
+                category: cat,
+                recipes: randomRecipes
+            };
+        }).filter(item => item.recipes.length > 0);
+    }, [recipes, sortedCategoriesList]);
 
     return (
         <div className="min-h-screen bg-gray-50/50">
@@ -82,7 +123,7 @@ const Index = () => {
                                 <CategoryCardSkeleton key={i} />
                             ))
                         ) : (
-                            categories
+                            sortedCategoriesList
                                 .filter(category => !category.parent_id)
                                 .map((category, index) => (
                                     <CategoryCard key={category.id} category={category} index={index} />
@@ -184,6 +225,36 @@ const Index = () => {
                     </div>
                 </div>
             </section>
+
+            {/* Category Featured Recipes */}
+            {categoriesWithRecipes.map(({ category, recipes }) => (
+                <section key={category.id} className="py-16 border-b border-gray-100 bg-white/30">
+                    <div className="w-full max-w-[1800px] mx-auto px-6 md:px-12">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h2 className="font-display text-2xl md:text-3xl font-bold mb-2 text-gray-900 capitalize">
+                                    {category.name}
+                                </h2>
+                                <p className="text-gray-500">
+                                    Featured recipes from {category.name}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Link to={`/categories`} className={buttonVariants('outline')}>
+                                    See All
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-6">
+                            {recipes.map((recipe) => (
+                                <RecipeCard key={recipe.id} recipe={recipe} />
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            ))}
 
             {/* CTA Section */}
             <section className="py-20">

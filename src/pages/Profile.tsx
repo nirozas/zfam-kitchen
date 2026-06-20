@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ChefHat, Settings, Award, TrendingUp, DollarSign, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare, Bug } from 'lucide-react';
+import { Heart, ChefHat, Settings, Award, TrendingUp, DollarSign, LogOut, Loader2, Save, Star, Users, UserPlus, X, Mail, Copy, Trash2, MessageSquare, Bug, ShoppingCart, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import RecipeCard from '@/components/RecipeCard';
 import { useRecipes, useFavorites, useCategories, useUserStats } from '@/lib/hooks';
@@ -366,10 +366,10 @@ export default function ProfilePage() {
                 {/* Sub-stats Summary Row */}
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
                     {[
-                        { label: 'Liked', value: myStats.likesGiven, icon: Heart, color: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-100', path: '/activity?type=likes' },
-                        { label: 'Favorites', value: myStats.favoritesGiven, icon: Star, color: 'from-amber-400 to-orange-500', shadow: 'shadow-amber-100', path: '/activity?type=favorites' },
+                        { label: 'Shopping', value: cartItems.length, icon: ShoppingCart, color: 'from-emerald-400 to-teal-500', shadow: 'shadow-emerald-100', path: '/cart' },
+                        { label: 'Planner', value: Object.values(plannedMeals).flat().length, icon: Calendar, color: 'from-blue-400 to-indigo-500', shadow: 'shadow-blue-100', path: '/planner' },
                         { label: 'My Recipes', value: myStats.recipesCount, icon: ChefHat, color: 'from-orange-400 to-amber-600', shadow: 'shadow-orange-100', tab: 'my-recipes' },
-                        { label: 'Likes Recv', value: myStats.likesReceived, icon: Award, color: 'from-yellow-400 to-amber-500', shadow: 'shadow-yellow-100', path: '/activity?type=likes' },
+                        { label: 'Favorites', value: myStats.favoritesGiven, icon: Star, color: 'from-amber-400 to-orange-500', shadow: 'shadow-amber-100', path: '/activity?type=favorites' },
                         { label: 'Reviews', value: myStats.reviewsGiven, icon: MessageSquare, color: 'from-primary-500 to-indigo-600', shadow: 'shadow-primary-100', path: '/activity?type=reviews' },
                     ].map((stat, i) => (
                         <motion.div
@@ -602,13 +602,13 @@ export default function ProfilePage() {
                                         <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
                                             <h3 className="text-2xl font-black text-gray-900 mb-8 flex items-center gap-4">
                                                 <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                                                    <DollarSign size={24} />
+                                                    <ShoppingCart size={24} />
                                                 </div>
-                                                Spending Summary
+                                                Cart Value Summary
                                             </h3>
                                             <div className="space-y-6">
                                                 <div className="flex justify-between items-center p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                                                    <div className="text-sm font-bold text-emerald-700">Total Spent to Date</div>
+                                                    <div className="text-sm font-bold text-emerald-700">Estimated Cart Cost</div>
                                                     <div className="text-2xl font-black text-emerald-900">${totalSpent.toFixed(2)}</div>
                                                 </div>
                                                 <div className="space-y-2">

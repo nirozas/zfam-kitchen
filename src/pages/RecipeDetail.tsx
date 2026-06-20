@@ -176,6 +176,7 @@ export default function RecipeDetail() {
                                 unit: ri.unit || 'g',
                                 group_name: ri.group_name || 'Ingredients',
                                 note: ri.note,
+                                purchaseUrl: ri.ingredients?.purchase_url || null,
                                 ingredient: ri.ingredients,
                                 linked_recipe: ri.linked_recipe
                             })).filter((ing: any) => ing.ingredient || ing.linked_recipe) || [],
@@ -348,6 +349,7 @@ export default function RecipeDetail() {
                 recipeId: recipe.id,
                 recipeName: recipe.title,
                 weekId: currentWeekId,
+                purchaseUrl: ing.purchaseUrl || undefined,
             });
             toast.success(`${ing.ingredient?.name || 'Item'} added to cart!`);
             if (!selectedForCart.includes(index)) {
@@ -999,6 +1001,11 @@ export default function RecipeDetail() {
                                                             <span className={`text-[10px] font-black transition-all uppercase tracking-widest ${crossedIngredients.includes(ing.originalIndex) ? 'text-gray-200' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full'}`}>
                                                                 {formatAmount(ing.amount_in_grams * multiplier)} {ing.unit ? ing.unit.toUpperCase() : 'G'}
                                                             </span>
+                                                        )}
+                                                        {ing.purchaseUrl && (
+                                                            <a href={ing.purchaseUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-500 hover:text-blue-600 transition-colors" title="Buy this ingredient">
+                                                                <ShoppingCart size={14} />
+                                                            </a>
                                                         )}
                                                     </div>
                                                 </div>

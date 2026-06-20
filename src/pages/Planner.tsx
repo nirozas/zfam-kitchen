@@ -188,6 +188,7 @@ export default function Planner() {
                     recipeId: recipe.id,
                     recipeName: recipe.title,
                     weekId: weekId,
+                    purchaseUrl: item.ingredient.purchase_url || undefined,
                 });
             });
         });

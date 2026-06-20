@@ -179,6 +179,7 @@ const IngredientReorderItem = ({
           <div className="flex-1 relative">
             <input
               type="text"
+              list="ingredient-names"
               placeholder="Item"
               className="w-full bg-gray-50 focus:bg-white rounded-lg py-2.5 pl-10 pr-3 text-sm font-medium border-none transition-all"
               value={ing.linked_recipe ? ing.linked_recipe.title : ing.name}
@@ -207,16 +208,19 @@ const IngredientReorderItem = ({
 
           </div>
           <div className="flex gap-1">
-            <input type="text" placeholder="Amt" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
-            <input type="text" placeholder="Unit" list="unit-options" className="w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-3 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
+            <input type="text" placeholder="Amt" className="w-16 sm:w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 sm:px-3 text-sm font-medium border-none" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} />
+            <input type="text" placeholder="Unit" list="unit-options" className="w-16 sm:w-20 bg-gray-50 focus:bg-white rounded-lg py-2.5 px-2 sm:px-3 text-sm font-medium border-none" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} />
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button type="button" onClick={() => addAlternative(i)} className="px-1.5 py-1 text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all">or</button>
+          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <button type="button" onClick={() => addAlternative(i)} className="px-1.5 py-1 text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all hidden sm:block">or</button>
             <button type="button" onClick={() => addIngredient(i)} className="p-1.5 text-gray-300 hover:text-primary-600 transition-colors"><Plus size={16} /></button>
             <button type="button" onClick={() => removeIngredient(i)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"><X size={16} /></button>
           </div>
         </div>
-        <input type="text" placeholder="Add a note (e.g. toasted and crushed)" className="w-full bg-gray-50/50 focus:bg-white rounded-lg py-1.5 px-3 text-[10px] font-bold text-gray-500 border-none italic" value={ing.note} onChange={e => updateIngredient(i, 'note', e.target.value)} />
+        <div className="flex gap-2">
+            <input type="text" placeholder="Add a note (e.g. toasted and crushed)" className="flex-1 bg-gray-50/50 focus:bg-white rounded-lg py-1.5 px-3 text-[10px] font-bold text-gray-500 border-none italic" value={ing.note} onChange={e => updateIngredient(i, 'note', e.target.value)} />
+            <input type="url" placeholder="Purchase Link (e.g. Amazon URL)" className="flex-1 bg-blue-50/30 focus:bg-white focus:border-blue-200 border-transparent border rounded-lg py-1.5 px-3 text-[10px] font-bold text-blue-500 placeholder:text-blue-300" value={ing.purchase_url || ''} onChange={e => updateIngredient(i, 'purchase_url', e.target.value)} />
+        </div>
       </div>
     </Reorder.Item>
   );
@@ -383,7 +387,8 @@ export default function CreateRecipe() {
   const [showBulkSteps, setShowBulkSteps] = useState(false);
   const [bulkIngredientsText, setBulkIngredientsText] = useState('');
   const [bulkStepsText, setBulkStepsText] = useState('');
-  const [ingredients, setIngredients] = useState([{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients', linked_recipe: null as any, is_alternative: false }]);
+  const [ingredients, setIngredients] = useState([{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients', linked_recipe: null as any, is_alternative: false, purchase_url: '' }]);
+  const [allIngredientNames, setAllIngredientNames] = useState<string[]>([]);
   const [activeSection, setActiveSection] = useState('fundamentals');
   const [completeness, setCompleteness] = useState(0);
   const [actualRecipeId, setActualRecipeId] = useState<string | null>(null);
@@ -451,7 +456,14 @@ export default function CreateRecipe() {
         setAllKeywords(data);
       }
     };
+    const fetchAllIngredients = async () => {
+      const { data, error } = await supabase.from('ingredients').select('name').order('name');
+      if (!error && data) {
+        setAllIngredientNames(data.map(d => d.name));
+      }
+    };
     fetchAllKeywords();
+    fetchAllIngredients();
   }, []);
 
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -609,15 +621,16 @@ export default function CreateRecipe() {
               .map((i: any) => ({
                 id: Math.random().toString(),
                 name: i.ingredients?.name || '',
-                amount: i.amount_in_grams ? i.amount_in_grams.toString() : '',
+                amount: i.amount_in_grams?.toString() || '',
                 unit: i.unit || '',
                 note: i.note || '',
+                purchase_url: i.ingredients?.purchase_url || '',
                 group_name: i.group_name || 'Ingredients',
                 linked_recipe: i.linked_recipe || null,
                 is_alternative: i.is_alternative || false
               }));
 
-            setIngredients(loadedIngredients.length > 0 ? loadedIngredients : [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'Ingredients', linked_recipe: null }]);
+            setIngredients(loadedIngredients.length > 0 ? loadedIngredients : [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: 'Ingredients', linked_recipe: null, is_alternative: false }]);
           }
         } catch (error) {
           console.error('Load recipe error:', error);
@@ -781,12 +794,19 @@ export default function CreateRecipe() {
       if (isEditing) await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeIdForIngredients);
       for (const ing of currentIngredients) {
         const finalIngName = (ing.name || '').trim() || ing.linked_recipe?.title || 'Unknown Ingredient';
-        let { data: existingIng } = await supabase.from('ingredients').select('id').eq('name', finalIngName).single();
+        let { data: existingIng } = await supabase.from('ingredients').select('id, purchase_url').eq('name', finalIngName).single();
         let ingredientId: number;
+
         if (!existingIng) {
-          const { data: newIng } = await supabase.from('ingredients').insert([{ name: finalIngName }]).select().single();
+          const { data: newIng } = await supabase.from('ingredients').insert([{ name: finalIngName, purchase_url: ing.purchase_url || null }]).select().single();
           ingredientId = newIng.id;
-        } else ingredientId = existingIng.id;
+        } else {
+          ingredientId = existingIng.id;
+          // Overwrite existing purchase_url if provided and different
+          if (ing.purchase_url && ing.purchase_url !== existingIng.purchase_url) {
+            await supabase.from('ingredients').update({ purchase_url: ing.purchase_url }).eq('id', ingredientId);
+          }
+        }
 
         await supabase.from('recipe_ingredients').insert([{
           recipe_id: recipeIdForIngredients,
@@ -882,14 +902,14 @@ export default function CreateRecipe() {
     const targetIdx = index !== undefined ? index : ingredients.length - 1;
     const lastGroup = ingredients.length > 0 ? (ingredients[targetIdx >= 0 ? targetIdx : 0]?.group_name || 'Ingredients') : 'Ingredients';
     const next = [...ingredients];
-    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: lastGroup, linked_recipe: null, is_alternative: false });
+    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: lastGroup, linked_recipe: null, is_alternative: false });
     setIngredients(next);
   };
   const addAlternative = (index: number) => {
     const targetIdx = index;
     const parent = ingredients[targetIdx];
     const next = [...ingredients];
-    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: parent.amount, unit: parent.unit, note: '', group_name: parent.group_name, linked_recipe: null, is_alternative: true });
+    next.splice(targetIdx + 1, 0, { id: Math.random().toString(), name: '', amount: parent.amount, unit: parent.unit, note: '', purchase_url: '', group_name: parent.group_name, linked_recipe: null, is_alternative: true });
     setIngredients(next);
   };
   const removeIngredient = (idx: number) => {
@@ -1016,6 +1036,7 @@ export default function CreateRecipe() {
           unit, 
           name: finalName, 
           note, 
+          purchase_url: '',
           group_name: currentGroup, 
           linked_recipe: null,
           is_alternative: isAlt
@@ -1079,6 +1100,7 @@ export default function CreateRecipe() {
         amount: String(cleaned.amount || ''),
         unit: cleaned.unit || '',
         note: cleaned.note || '',
+        purchase_url: '',
         group_name: cleaned.group_name || ing.group_name || 'Ingredients',
         is_alternative: false,
         isNewSuggestion: true 
@@ -1618,7 +1640,7 @@ export default function CreateRecipe() {
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg shadow-inner">🥗</div><h2 className="text-xl font-black tracking-tighter">Ingredients</h2></div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setShowBulkAdd(!showBulkAdd)} className="text-[10px] font-black uppercase text-gray-400 hover:text-primary-600 flex items-center mr-2">Bulk Import</button>
-                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', group_name: 'New Section', linked_recipe: null, is_alternative: false }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
+                    <button type="button" onClick={() => setIngredients([...ingredients, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: 'New Section', linked_recipe: null, is_alternative: false }])} className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-gray-100 transition-all">+ Section</button>
                     <button type="button" onClick={() => addIngredient()} className="px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-black text-[10px] uppercase shadow-sm hover:bg-primary-100 transition-all">+ Item</button>
                   </div>
                 </div>
@@ -1647,16 +1669,35 @@ export default function CreateRecipe() {
                       i={i}
                       ingredients={ingredients}
                       setIngredients={setIngredients}
-                      updateIngredient={updateIngredient}
-                      addIngredient={addIngredient}
-                      removeIngredient={removeIngredient}
-                      addAlternative={addAlternative}
+                      updateIngredient={(idx: number, field: string, val: any) => {
+                        const next = [...ingredients];
+                        next[idx] = { ...next[idx], [field]: val };
+                        setIngredients(next);
+                      }}
+                      addIngredient={(idx: number) => {
+                        const next = [...ingredients];
+                        const lastGroup = ingredients.length > 0 ? (ingredients[idx >= 0 ? idx : 0]?.group_name || 'Ingredients') : 'Ingredients';
+                        next.splice(idx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: lastGroup, linked_recipe: null, is_alternative: false });
+                        setIngredients(next);
+                      }}
+                      removeIngredient={(idx: number) => {
+                        setIngredients(ingredients.filter((_, _i) => _i !== idx));
+                      }}
+                      addAlternative={(idx: number) => {
+                        const next = [...ingredients];
+                        const parent = next[idx];
+                        next.splice(idx + 1, 0, { id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: parent.group_name, linked_recipe: null, is_alternative: true });
+                        setIngredients(next);
+                      }}
                       setActiveRecipeLinkType={setActiveRecipeLinkType}
                       setActiveRecipeLinkIndex={setActiveRecipeLinkIndex}
                       isMagicFilling={isMagicFilling}
                     />
                   ))}
                 </Reorder.Group>
+                <datalist id="ingredient-names">
+                  {allIngredientNames.map((name, i) => <option key={i} value={name} />)}
+                </datalist>
               </section>
 
               <section id="instructions" className="section-card space-y-4">
