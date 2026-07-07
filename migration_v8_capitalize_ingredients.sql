@@ -6,7 +6,7 @@ DECLARE
   word TEXT;
   result TEXT := '';
 BEGIN
-  words := regexp_split_to_array(lower(str), '\s+');
+  words := regexp_split_to_array(trim(lower(str)), '\s+');
   FOREACH word IN ARRAY words
   LOOP
     IF result != '' THEN
@@ -27,9 +27,9 @@ DECLARE
     dup_ids BIGINT[];
 BEGIN
     FOR r IN 
-        SELECT lower(name) as lname, array_agg(id ORDER BY id) as ids
+        SELECT to_title_case(trim(name)) as cname, array_agg(id ORDER BY id) as ids
         FROM ingredients
-        GROUP BY lower(name)
+        GROUP BY to_title_case(trim(name))
         HAVING count(id) > 1
     LOOP
         primary_id := r.ids[1];
@@ -45,10 +45,10 @@ BEGIN
     END LOOP;
 END $$;
 
--- 3. Capitalize all remaining ingredients in the `ingredients` table.
+-- 3. Capitalize and trim all remaining ingredients in the `ingredients` table.
 UPDATE ingredients
-SET name = to_title_case(name)
-WHERE name != to_title_case(name);
+SET name = to_title_case(trim(name))
+WHERE name != to_title_case(trim(name));
 
 -- 4. Capitalize all items in the `shopping_cart` table.
 UPDATE shopping_cart
