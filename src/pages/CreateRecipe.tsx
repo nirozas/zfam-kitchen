@@ -154,7 +154,7 @@ const IngredientReorderItem = ({
   return (
     <Reorder.Item
       value={ing}
-      className={`space-y-4 ${ing.is_alternative ? 'ml-8' : ''}`}
+      className={`space-y-4 ${ing.is_alternative ? 'ml-8' : ''} relative ${isFocused ? 'z-50' : 'z-0'}`}
       dragListener={false}
       dragControls={controls}
       initial={isMagicFilling ? { opacity: 0, x: -20 } : false}
