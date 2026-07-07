@@ -1,5 +1,5 @@
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
-import { ShoppingCart as CartIcon, Trash2, X, Check, DollarSign, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer, Share2, Receipt, PieChart, Plus, Edit3 } from 'lucide-react';
+import { ShoppingCart as CartIcon, Trash2, Check, DollarSign, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer, Share2, Receipt, PieChart, Plus, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useState, useMemo, useEffect } from 'react';
@@ -15,7 +15,7 @@ import { CartItem } from '@/contexts/ShoppingCartContext';
 
 
 export default function ShoppingCart() {
-    const { cartItems, removeFromCart, toggleChecked, clearCart, clearWeek, updateQuantity, updatePrice, updateNote, addToCart, getAllWeeks, getWeeklyTotal, loading } = useShoppingCart();
+    const { cartItems, removeFromCart, toggleChecked, clearCart, updateQuantity, updatePrice, updateNote, addToCart, getAllWeeks, getWeeklyTotal, loading } = useShoppingCart();
     const [viewDate, setViewDate] = useState(new Date());
     const [manualItemName, setManualItemName] = useState('');
     const [manualItemAmount, setManualItemAmount] = useState('');

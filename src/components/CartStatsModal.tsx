@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, BarChart3, TrendingUp, ShoppingBag, Store, Calendar, PieChart, Receipt } from 'lucide-react';
+import { X, BarChart3, TrendingUp, ShoppingBag, Store, PieChart, Receipt } from 'lucide-react';
 import { useShoppingCart, ShoppingReceipt } from '@/contexts/ShoppingCartContext';
 import { format, parseISO, isSameMonth, isSameYear } from 'date-fns';
 import { LogReceiptModal } from './LogReceiptModal';

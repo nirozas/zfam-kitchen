@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Receipt, ChevronDown, ChevronUp, Edit3, Trash2, Calendar, Store } from 'lucide-react';
 import { useShoppingCart, ShoppingReceipt } from '@/contexts/ShoppingCartContext';

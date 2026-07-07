@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PieChart, TrendingUp, Calendar, Utensils, DollarSign, Store, ShoppingBag } from 'lucide-react';
+import { X, PieChart, TrendingUp, Utensils, Store, ShoppingBag } from 'lucide-react';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { format } from 'date-fns';
 

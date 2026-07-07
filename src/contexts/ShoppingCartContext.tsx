@@ -381,7 +381,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const updateReceipt = async (id: string, updates: Partial<Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }>) => {
+    const updateReceipt = async (id: string, updates: Partial<Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }>, oldData?: { weekId: string, storeName: string, itemNames: string[] }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
