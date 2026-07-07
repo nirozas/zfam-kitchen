@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon, GitMerge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useRecipe, useFavorites, useReviews, useLikes, useRecipeLikes, useDetailedRecipeStats } from '@/lib/hooks';
+import { getStoreNameFromUrl } from '@/utils/stringUtils';
 import { supabase } from '@/lib/supabase';
 import { getOptimizedImageUrl, formatAmount } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
@@ -341,15 +341,23 @@ export default function RecipeDetail() {
     const handleSingleItemCartAdd = async (e: React.MouseEvent, index: number, ing: any) => {
         e.stopPropagation();
         if (!recipe) return;
+        
+        const autoStore = getStoreNameFromUrl(ing.ingredient?.purchase_url);
+        if (autoStore) {
+            await confirmAddToCart(autoStore, { index, ing });
+            return;
+        }
+
         setPendingCartItem({ index, ing });
         setIsStoreModalOpen(true);
     };
 
-    const confirmAddToCart = async (storeName: string) => {
-        if (!recipe || !pendingCartItem) return;
+    const confirmAddToCart = async (storeName: string, directItem?: {index: number, ing: any}) => {
+        const itemToUse = directItem || pendingCartItem;
+        if (!recipe || !itemToUse) return;
         
         const currentWeekId = getCurrentWeekId();
-        const { index, ing } = pendingCartItem;
+        const { index, ing } = itemToUse;
 
         try {
             await addToCart({
@@ -359,7 +367,7 @@ export default function RecipeDetail() {
                 recipeId: recipe.id,
                 recipeName: recipe.title,
                 weekId: currentWeekId,
-                purchaseUrl: ing.purchaseUrl || undefined,
+                purchaseUrl: ing.ingredient?.purchase_url || undefined,
                 storeName
             });
             toast.success(`${ing.ingredient?.name || 'Item'} added to cart!`);

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
 import { useFavorites, useLikes } from '@/lib/hooks';
+import { getStoreNameFromUrl } from '@/utils/stringUtils';
 import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { getOptimizedImageUrl } from '@/lib/utils';
@@ -61,6 +62,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
     const confirmAddToCart = (storeName: string) => {
         const currentWeekId = getCurrentWeekId();
         recipe.ingredients.forEach((item) => {
+            const autoStore = getStoreNameFromUrl(item.purchaseUrl);
             addToCart({
                 name: item.ingredient.name,
                 amount: item.amount_in_grams,
@@ -68,7 +70,8 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                 recipeId: recipe.id,
                 recipeName: recipe.title,
                 weekId: currentWeekId,
-                storeName
+                purchaseUrl: item.purchaseUrl,
+                storeName: autoStore || storeName
             });
         });
         toast.success(`Success! Items for "${recipe.title}" added to cart.`, {

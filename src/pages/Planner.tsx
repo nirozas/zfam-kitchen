@@ -8,6 +8,7 @@ import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { useRecipes } from '@/lib/hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PlannerStatsModal } from '@/components/PlannerStatsModal';
+import { getStoreNameFromUrl } from '@/utils/stringUtils';
 
 const DebouncedInput = ({ value, onChange, placeholder, className, delay = 500 }: any) => {
     const [localValue, setLocalValue] = useState(value);
@@ -184,10 +185,10 @@ export default function Planner() {
             });
         });
 
-        // Collect all items to add
         const itemsToBatch: any[] = [];
         allRecipesThisWeek.forEach(recipe => {
             recipe.ingredients.forEach(item => {
+                const autoStore = getStoreNameFromUrl(item.ingredient.purchase_url);
                 item.ingredient && itemsToBatch.push({
                     name: item.ingredient.name,
                     amount: item.amount_in_grams,
@@ -196,6 +197,7 @@ export default function Planner() {
                     recipeName: recipe.title,
                     weekId: weekId,
                     purchaseUrl: item.ingredient.purchase_url || undefined,
+                    storeName: autoStore || undefined
                 });
             });
         });

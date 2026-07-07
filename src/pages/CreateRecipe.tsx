@@ -1009,6 +1009,13 @@ export default function CreateRecipe() {
       let amount = '';
       let unit = '';
       let name = '';
+      let purchase_url = '';
+
+      const urlMatch = trimmed.match(/(https?:\/\/[^\s]+)/);
+      if (urlMatch) {
+        purchase_url = urlMatch[1];
+        trimmed = trimmed.replace(urlMatch[0], '').trim();
+      }
 
       // Safer extraction: Supports both [Amount] [Unit] [Name] and [Name] [Amount] [Unit]
       const amountMatch = trimmed.match(/^([\d\/\.\s-]+)/);
@@ -1094,7 +1101,7 @@ export default function CreateRecipe() {
           unit, 
           name: finalName, 
           note, 
-          purchase_url: '',
+          purchase_url,
           group_name: currentGroup, 
           linked_recipe: null,
           is_alternative: isAlt
