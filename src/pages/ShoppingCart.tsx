@@ -254,12 +254,26 @@ export default function ShoppingCart() {
                                 onChange={(e) => setManualItemAmount(e.target.value)}
                                 className="w-14 px-2 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
                             />
+                            <datalist id="unit-suggestions">
+                                <option value="unit" />
+                                <option value="lbs" />
+                                <option value="oz" />
+                                <option value="gal" />
+                                <option value="pcs" />
+                                <option value="pk" />
+                                <option value="box" />
+                                <option value="bag" />
+                                <option value="kg" />
+                                <option value="g" />
+                                <option value="bunch" />
+                            </datalist>
                             <input
                                 type="text"
+                                list="unit-suggestions"
                                 placeholder="Unit"
                                 value={manualItemUnit}
                                 onChange={(e) => setManualItemUnit(e.target.value)}
-                                className="w-14 px-2 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
+                                className="w-16 px-2 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
                             />
                             <datalist id="cart-store-names">
                                 {COMMON_STORES.map(store => (
