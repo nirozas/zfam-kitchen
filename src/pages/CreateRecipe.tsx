@@ -8,6 +8,7 @@ import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
 import RecipeSelectorModal from '@/components/RecipeSelectorModal';
 import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
+import { toTitleCase } from '@/utils/stringUtils';
 import { uploadToB2, deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 
@@ -793,7 +794,8 @@ export default function CreateRecipe() {
       const currentIngredients = ingredients.filter(ing => ing.name.trim() !== '' || ing.linked_recipe);
       if (isEditing) await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipeIdForIngredients);
       for (const ing of currentIngredients) {
-        const finalIngName = (ing.name || '').trim() || ing.linked_recipe?.title || 'Unknown Ingredient';
+        let finalIngName = (ing.name || '').trim() || ing.linked_recipe?.title || 'Unknown Ingredient';
+        finalIngName = toTitleCase(finalIngName);
         let { data: existingIng } = await supabase.from('ingredients').select('id, purchase_url').eq('name', finalIngName).single();
         let ingredientId: number;
 

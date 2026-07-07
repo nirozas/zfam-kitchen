@@ -12,8 +12,7 @@ import { ReceiptsModal } from '@/components/ReceiptsModal';
 import { ShareStoreModal } from '@/components/ShareStoreModal';
 import { supabase } from '@/lib/supabase';
 import { CartItem } from '@/contexts/ShoppingCartContext';
-
-
+import { toTitleCase } from '@/utils/stringUtils';
 export default function ShoppingCart() {
     const { cartItems, removeFromCart, toggleChecked, clearCart, updateQuantity, updatePrice, updateNote, addToCart, getAllWeeks, getWeeklyTotal, loading } = useShoppingCart();
     const [viewDate, setViewDate] = useState(new Date());
@@ -91,7 +90,7 @@ export default function ShoppingCart() {
         }
 
         addToCart({
-            name: manualItemName.trim(),
+            name: toTitleCase(manualItemName.trim()),
             amount: parseFloat(manualItemAmount),
             unit: manualItemUnit.trim(),
             weekId: currentWeekId,

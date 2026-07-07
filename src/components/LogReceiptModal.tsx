@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Receipt, Plus, Trash2 } from 'lucide-react';
 import { useShoppingCart, getWeekId, ShoppingReceipt } from '@/contexts/ShoppingCartContext';
 import { format, parseISO } from 'date-fns';
+import { toTitleCase } from '@/utils/stringUtils';
 import toast from 'react-hot-toast';
 
 interface LogReceiptModalProps {
@@ -108,7 +109,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
         let total = 0;
         
         for (const item of items) {
-            const name = item.name.trim();
+            const name = toTitleCase(item.name.trim());
             const price = parseFloat(item.price);
             const amount = item.amount.trim() || '1 unit';
             
