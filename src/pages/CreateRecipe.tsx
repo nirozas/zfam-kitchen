@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
@@ -136,11 +136,20 @@ const cleanIngData = (ing: any) => {
 
 const IngredientReorderItem = ({
   ing, i, ingredients, setIngredients, updateIngredient, addIngredient, removeIngredient, addAlternative,
-  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling
+  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling, allIngredientNames
 }: any) => {
   const controls = useDragControls();
   const prevIng = ingredients[i - 1];
   const showHeader = !prevIng || prevIng.group_name !== ing.group_name;
+
+  const [isFocused, setIsFocused] = useState(false);
+  const suggestions = useMemo(() => {
+    if (!ing.name.trim() || ing.linked_recipe) return [];
+    const search = ing.name.toLowerCase();
+    return (allIngredientNames || [])
+      .filter((n: string) => n.toLowerCase().includes(search) && n.toLowerCase() !== search)
+      .slice(0, 10);
+  }, [ing.name, ing.linked_recipe, allIngredientNames]);
 
   return (
     <Reorder.Item
@@ -180,12 +189,32 @@ const IngredientReorderItem = ({
           <div className="flex-1 relative">
             <input
               type="text"
-              list="ingredient-names"
               placeholder="Item"
               className="w-full bg-gray-50 focus:bg-white rounded-lg py-2.5 pl-10 pr-3 text-sm font-medium border-none transition-all"
               value={ing.linked_recipe ? ing.linked_recipe.title : ing.name}
               onChange={e => updateIngredient(i, 'name', e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
             />
+            {isFocused && suggestions.length > 0 && !ing.linked_recipe && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-100 rounded-lg shadow-xl overflow-hidden">
+                <ul className="max-h-48 overflow-y-auto py-1">
+                  {suggestions.map((suggestion: string, idx: number) => (
+                    <li
+                      key={idx}
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        updateIngredient(i, 'name', suggestion);
+                        setIsFocused(false);
+                      }}
+                    >
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1721,12 +1750,10 @@ export default function CreateRecipe() {
                       setActiveRecipeLinkType={setActiveRecipeLinkType}
                       setActiveRecipeLinkIndex={setActiveRecipeLinkIndex}
                       isMagicFilling={isMagicFilling}
+                      allIngredientNames={allIngredientNames}
                     />
                   ))}
                 </Reorder.Group>
-                <datalist id="ingredient-names">
-                  {allIngredientNames.map((name, i) => <option key={i} value={name} />)}
-                </datalist>
               </section>
 
               <section id="instructions" className="section-card space-y-4">
