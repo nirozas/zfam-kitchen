@@ -6,7 +6,6 @@ export function toTitleCase(str: string): string {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }
-}
 
 export function getStoreNameFromUrl(url: string | null | undefined): string | null {
     if (!url) return null;
