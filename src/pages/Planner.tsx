@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipe, PlannerMeal } from '@/lib/types';
-import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart, History, ExternalLink, CheckCircle2, Circle, StickyNote } from 'lucide-react';
+import { Plus, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ShoppingCart, History, ExternalLink, CheckCircle2, Circle, StickyNote, PieChart } from 'lucide-react';
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
 import { useRecipes } from '@/lib/hooks';
 import { Link, useSearchParams } from 'react-router-dom';
+import { PlannerStatsModal } from '@/components/PlannerStatsModal';
 
 const DebouncedInput = ({ value, onChange, placeholder, className, delay = 500 }: any) => {
     const [localValue, setLocalValue] = useState(value);
@@ -92,7 +93,11 @@ export default function Planner() {
     };
 
     const { addMultipleToCart } = useShoppingCart();
-    const { plannedMeals, dailyNotes, addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, saveDailyNote, updateMealNote, toggleMealCompleted } = useMealPlanner();
+    const { 
+        plannedMeals, dailyNotes, dailyExpenses, 
+        addRecipeToDate, addCustomMealToDate, removeRecipeFromDate, assignRecipeToMeal, 
+        saveDailyNote, saveDailyExpense, updateMealNote, toggleMealCompleted 
+    } = useMealPlanner();
     const { recipes, loading, error } = useRecipes();
 
     const [plannerSearchQuery, setPlannerSearchQuery] = useState('');
@@ -109,6 +114,8 @@ export default function Planner() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchDate, setSearchDate] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [isStatsOpen, setIsStatsOpen] = useState(false);
 
     /* 
     const handleDrop = (dateStr: string) => {
@@ -344,13 +351,22 @@ export default function Planner() {
                             )}
                         </form>
                     </div>
-                    <button
-                        onClick={addWeekToCart}
-                        className="flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-100 flex-shrink-0"
-                    >
-                        <ShoppingCart size={18} />
-                        Add Week to Cart
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsStatsOpen(true)}
+                            className="flex items-center gap-2 bg-white text-gray-700 px-6 py-2.5 rounded-2xl font-bold hover:bg-gray-50 border border-gray-200 transition-all shadow-sm flex-shrink-0 hidden sm:flex"
+                        >
+                            <PieChart size={18} />
+                            Stats
+                        </button>
+                        <button
+                            onClick={addWeekToCart}
+                            className="flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-100 flex-shrink-0"
+                        >
+                            <ShoppingCart size={18} />
+                            Add Week to Cart
+                        </button>
+                    </div>
                 </div>
 
                 {/* Mobile Search */}
@@ -518,7 +534,7 @@ export default function Planner() {
                                                                     {meal.completed ? <CheckCircle2 size={20} strokeWidth={3} /> : <Circle size={20} strokeWidth={3} />}
                                                                 </button>
                                                                 <Link
-                                                                    to={`/create?title=${encodeURIComponent(meal.title)}`}
+                                                                    to={`/create?title=${encodeURIComponent(meal.title)}&mealId=${meal.id}&date=${dateStr}`}
                                                                     className={`flex-1 block bg-primary-50 p-4 rounded-2xl shadow-sm border border-primary-100 hover:shadow-md hover:border-primary-200 transition-all border-dashed cursor-pointer group/custom ${meal.completed ? 'opacity-60' : ''}`}
                                                                     title="Create recipe from this entry"
                                                                 >
@@ -574,7 +590,7 @@ export default function Planner() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                    <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-2">
                                         <DebouncedTextArea
                                             placeholder="Notes..."
                                             className="w-full text-xs bg-gray-50 border-none rounded-xl p-3 min-h-[60px] resize-none focus:ring-1 focus:ring-primary-500 transition-all font-medium text-gray-600 placeholder:text-gray-300 relative z-10 touch-auto"
@@ -582,6 +598,38 @@ export default function Planner() {
                                             onChange={(newVal: string) => saveDailyNote(dateStr, newVal)}
                                             onTouchStart={(e: any) => e.stopPropagation()} // Fix for mobile scroll/touch conflict
                                         />
+                                        <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-1">
+                                                    <span className="text-xs font-semibold text-gray-500">Expense $</span>
+                                                    <input 
+                                                        type="number" 
+                                                        min="0"
+                                                        step="0.01"
+                                                        className="w-16 text-xs bg-white border border-gray-200 rounded px-2 py-1 focus:ring-1 focus:ring-primary-500"
+                                                        value={dailyExpenses[dateStr]?.expense_amount || ''}
+                                                        onChange={(e) => saveDailyExpense(dateStr, parseFloat(e.target.value) || 0, dailyExpenses[dateStr]?.is_restaurant || false, dailyExpenses[dateStr]?.restaurant_name || '')}
+                                                    />
+                                                </div>
+                                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="rounded text-primary-500 focus:ring-primary-500 h-3.5 w-3.5 border-gray-300"
+                                                        checked={dailyExpenses[dateStr]?.is_restaurant || false}
+                                                        onChange={(e) => saveDailyExpense(dateStr, dailyExpenses[dateStr]?.expense_amount || 0, e.target.checked, dailyExpenses[dateStr]?.restaurant_name || '')}
+                                                    />
+                                                    <span className="text-xs font-semibold text-gray-500">Restaurant</span>
+                                                </label>
+                                            </div>
+                                            {dailyExpenses[dateStr]?.is_restaurant && (
+                                                <DebouncedInput
+                                                    placeholder="Restaurant Name..."
+                                                    className="w-full text-xs bg-white border border-gray-200 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500"
+                                                    value={dailyExpenses[dateStr]?.restaurant_name || ''}
+                                                    onChange={(newVal: string) => saveDailyExpense(dateStr, dailyExpenses[dateStr]?.expense_amount || 0, true, newVal)}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
 
                                     <button
@@ -815,6 +863,11 @@ export default function Planner() {
                     </div>
                 )}
             </AnimatePresence>
+            {/* Stats Modal */}
+            <PlannerStatsModal 
+                isOpen={isStatsOpen}
+                onClose={() => setIsStatsOpen(false)}
+            />
         </div>
     );
 }

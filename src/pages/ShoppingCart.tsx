@@ -1,29 +1,83 @@
 import { useShoppingCart, getWeekId } from '@/contexts/ShoppingCartContext';
-import { ShoppingCart as CartIcon, Trash2, X, Check, DollarSign, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer, Share2 } from 'lucide-react';
+import { ShoppingCart as CartIcon, Trash2, X, Check, DollarSign, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer, Share2, Receipt, PieChart, Plus, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useState, useMemo } from 'react';
-import { addWeeks, subWeeks, startOfWeek, format, getYear, getISOWeek, setISOWeek, setYear, addDays } from 'date-fns';
+import { useState, useMemo, useEffect } from 'react';
+import { addWeeks, subWeeks, startOfWeek, format, getYear, getISOWeek, setISOWeek, setYear, addDays, isSameMonth } from 'date-fns';
 import toast from 'react-hot-toast';
+import { CartStatsModal } from '@/components/CartStatsModal';
+import { LogReceiptModal } from '@/components/LogReceiptModal';
+import { EditItemModal } from '@/components/EditItemModal';
+import { ReceiptsModal } from '@/components/ReceiptsModal';
+import { ShareStoreModal } from '@/components/ShareStoreModal';
+import { supabase } from '@/lib/supabase';
+import { CartItem } from '@/contexts/ShoppingCartContext';
+
 
 export default function ShoppingCart() {
     const { cartItems, removeFromCart, toggleChecked, clearCart, clearWeek, updateQuantity, updatePrice, updateNote, addToCart, getAllWeeks, getWeeklyTotal, loading } = useShoppingCart();
-    const [selectedWeek, setSelectedWeek] = useState<string | 'all'>(getWeekId(new Date()));
     const [viewDate, setViewDate] = useState(new Date());
     const [manualItemName, setManualItemName] = useState('');
     const [manualItemAmount, setManualItemAmount] = useState('');
     const [manualItemUnit, setManualItemUnit] = useState('');
+    const [isStatsOpen, setIsStatsOpen] = useState(false);
+    const [isLogReceiptOpen, setIsLogReceiptOpen] = useState(false);
+    const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [allIngredients, setAllIngredients] = useState<string[]>([]);
+    const [manualStoreName, setManualStoreName] = useState('');
+    const [viewMode, setViewMode] = useState<'week' | 'month' | 'all'>('week');
+    const [globalStoreFilter, setGlobalStoreFilter] = useState<string>('all');
+    const [itemToEdit, setItemToEdit] = useState<CartItem | null>(null);
+
+    const COMMON_STORES = [
+        "Unassigned",
+        "Walmart",
+        "Safeway",
+        "Costco",
+        "Real Produce",
+        "Amazon",
+        "Smart&Final",
+        "Trader Joe's",
+        "Whole Foods"
+    ];
+
+    const getDateFromWeekId = (weekId: string) => {
+        if (!weekId || !weekId.includes('-')) return new Date();
+        const [year, week] = weekId.split('-');
+        const d = setYear(new Date(), parseInt(year));
+        return setISOWeek(d, parseInt(week));
+    };
+
+    const itemsToDisplay = useMemo(() => {
+        return cartItems.filter((item: any) => {
+            if (viewMode === 'all') return true;
+            if (viewMode === 'week') return item.weekId === getWeekId(viewDate);
+            if (viewMode === 'month') {
+                const itemDate = getDateFromWeekId(item.weekId);
+                return isSameMonth(itemDate, viewDate);
+            }
+            return true;
+        });
+    }, [cartItems, viewMode, viewDate]);
+
+    useEffect(() => {
+        const fetchIngredients = async () => {
+            const { data } = await supabase.from('ingredients').select('name');
+            if (data) {
+                setAllIngredients(data.map(d => d.name));
+            }
+        };
+        fetchIngredients();
+    }, []);
 
     const weeksWithItems = getAllWeeks();
 
     const currentWeekId = useMemo(() => getWeekId(viewDate), [viewDate]);
 
-    // Update selected week when view date changes, unless 'all' is selected
+    // Update selected week when view date changes
     const handleWeekChange = (newDate: Date) => {
         setViewDate(newDate);
-        if (selectedWeek !== 'all') {
-            setSelectedWeek(getWeekId(newDate));
-        }
     };
 
     const goToPreviousWeek = () => handleWeekChange(subWeeks(viewDate, 1));
@@ -41,7 +95,8 @@ export default function ShoppingCart() {
             amount: parseFloat(manualItemAmount),
             unit: manualItemUnit.trim(),
             weekId: currentWeekId,
-            price: 0
+            price: 0,
+            storeName: manualStoreName
         });
 
         // Reset form
@@ -54,14 +109,21 @@ export default function ShoppingCart() {
         window.print();
     };
 
-    const handleShare = async () => {
+    const handleShareClick = () => {
+        setIsShareModalOpen(true);
+    };
+
+    const handleShare = async (storeFilter: string | 'all') => {
+        setIsShareModalOpen(false);
         // Generate text list
         let textCallback = `Shopping List from Niroz's Kitchen:\n\n`;
 
         // Filter items based on current view
-        const visibleWeeks = selectedWeek === 'all'
+        const visibleWeeks = viewMode === 'all'
             ? [...new Set([...weeksWithItems, currentWeekId])].sort().reverse()
-            : [selectedWeek];
+            : viewMode === 'month' 
+            ? [...new Set(cartItems.filter((i: any) => isSameMonth(getDateFromWeekId(i.weekId), viewDate)).map((i: any) => i.weekId))]
+            : [currentWeekId];
 
         let hasItems = false;
 
@@ -70,8 +132,24 @@ export default function ShoppingCart() {
             if (items.length > 0) {
                 hasItems = true;
                 textCallback += `Week ${weekId}:\n`;
-                items.forEach((item: any) => {
-                    textCallback += `- [${item.checked ? 'x' : ' '}] ${item.name} (${item.amount} ${item.unit})\n`;
+                
+                // Group by store
+                const groupedItems = items.reduce((acc: any, item: any) => {
+                    const store = item.storeName || 'Unassigned';
+                    if (!acc[store]) acc[store] = [];
+                    acc[store].push(item);
+                    return acc;
+                }, {});
+
+                const storesToShare = storeFilter === 'all' 
+                    ? Object.entries(groupedItems) 
+                    : Object.entries(groupedItems).filter(([store]) => store === storeFilter);
+
+                storesToShare.forEach(([store, storeItems]: [string, any]) => {
+                    textCallback += `\n[${store}]\n`;
+                    storeItems.forEach((item: any) => {
+                        textCallback += `- [${item.checked ? 'x' : ' '}] ${item.name} (${item.amount} ${item.unit})\n`;
+                    });
                 });
                 textCallback += '\n';
             }
@@ -125,7 +203,7 @@ export default function ShoppingCart() {
         );
     }
 
-    if (cartItems.length === 0 && selectedWeek === 'all') {
+    if (cartItems.length === 0 && viewMode === 'all') {
         return (
             <div className="max-w-6xl mx-auto px-4 py-16 text-center">
                 <CartIcon className="w-24 h-24 mx-auto text-gray-300 mb-4" />
@@ -143,14 +221,70 @@ export default function ShoppingCart() {
 
     return (
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Shopping List</h1>
-                    <p className="text-gray-500 mt-1 font-medium">
-                        {uncheckedCount} {uncheckedCount === 1 ? 'item' : 'items'} to buy
-                    </p>
+            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6 mb-8">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Shopping List</h1>
+                        <p className="text-gray-500 mt-1 font-medium">
+                            {uncheckedCount} {uncheckedCount === 1 ? 'item' : 'items'} to buy
+                        </p>
+                    </div>
+                    
+                    {/* Quick Add Form */}
+                    <div className="bg-gradient-to-br from-primary-50 to-white rounded-2xl px-4 py-3 border-2 border-dashed border-primary-200 flex-shrink-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-primary-700 mr-2">Quick Add</span>
+                            <datalist id="cart-item-names">
+                                {Array.from(new Set([...cartItems.map(item => item.name), ...allIngredients])).map(name => (
+                                    <option key={name} value={name} />
+                                ))}
+                            </datalist>
+                            <input
+                                type="text"
+                                list="cart-item-names"
+                                placeholder="What do you need?"
+                                value={manualItemName}
+                                onChange={(e) => setManualItemName(e.target.value)}
+                                className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-medium text-sm bg-white"
+                            />
+                            <input
+                                type="number"
+                                placeholder="Q"
+                                value={manualItemAmount}
+                                onChange={(e) => setManualItemAmount(e.target.value)}
+                                className="w-14 px-2 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Unit"
+                                value={manualItemUnit}
+                                onChange={(e) => setManualItemUnit(e.target.value)}
+                                className="w-14 px-2 py-1.5 rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
+                            />
+                            <datalist id="cart-store-names">
+                                {COMMON_STORES.map(store => (
+                                    <option key={store} value={store} />
+                                ))}
+                            </datalist>
+                            <input
+                                type="text"
+                                list="cart-store-names"
+                                placeholder="Store (optional)"
+                                value={manualStoreName}
+                                onChange={(e) => setManualStoreName(e.target.value)}
+                                className="px-3 py-1.5 min-w-[100px] rounded-lg border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs bg-white text-gray-700"
+                            />
+                            <button
+                                onClick={handleAddManualItem}
+                                className="px-3 py-1.5 flex items-center gap-1 bg-primary-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-primary-700 transition-colors whitespace-nowrap"
+                            >
+                                <Plus size={14} strokeWidth={3} />
+                                Add
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-4 xl:mt-2">
                     {grandTotal > 0 && (
                         <div className="text-right">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Amount</p>
@@ -158,7 +292,14 @@ export default function ShoppingCart() {
                         </div>
                     )}
                     <button
-                        onClick={handleShare}
+                        onClick={() => setIsStatsOpen(true)}
+                        className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 border border-gray-200 transition-all shadow-sm flex-shrink-0 text-sm print:hidden"
+                    >
+                        <PieChart size={16} />
+                        Stats
+                    </button>
+                    <button
+                        onClick={handleShareClick}
                         className="flex items-center gap-2 px-4 py-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all font-bold border border-transparent hover:border-primary-100 print:hidden text-sm"
                     >
                         <Share2 size={16} />
@@ -181,26 +322,72 @@ export default function ShoppingCart() {
                 </div>
             </div>
 
-            {/* Calendar Navigation Header - Redesigned to match Planner */}
+            {/* Calendar Navigation Header & Store Filters */}
             <div className="mb-8 space-y-4">
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setSelectedWeek('all')}
-                        className={`px-5 py-2 rounded-xl font-bold transition-all text-sm ${selectedWeek === 'all'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
-                            : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100 shadow-sm'
-                            }`}
-                    >
-                        Full History
-                    </button>
-                    {selectedWeek === 'all' && (
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
-                            onClick={() => setSelectedWeek(currentWeekId)}
-                            className="px-5 py-2 rounded-xl font-bold transition-all bg-white text-gray-400 hover:text-primary-600 border border-gray-100 shadow-sm text-sm"
+                            onClick={() => setViewMode('all')}
+                            className={`px-5 py-2 rounded-xl font-bold transition-all text-sm ${viewMode === 'all'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
+                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100 shadow-sm'
+                                }`}
+                        >
+                            Full History
+                        </button>
+                        <button
+                            onClick={() => setViewMode('month')}
+                            className={`px-5 py-2 rounded-xl font-bold transition-all text-sm ${viewMode === 'month'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
+                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100 shadow-sm'
+                                }`}
+                        >
+                            Monthly View
+                        </button>
+                        <button
+                            onClick={() => setViewMode('week')}
+                            className={`px-5 py-2 rounded-xl font-bold transition-all text-sm ${viewMode === 'week'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
+                                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100 shadow-sm'
+                                }`}
                         >
                             Focus Week
                         </button>
-                    )}
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsLogReceiptOpen(true)}
+                            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-100 flex-shrink-0 text-sm print:hidden"
+                        >
+                            <Receipt size={16} />
+                            Log Receipt
+                        </button>
+                        <button
+                            onClick={() => setIsReceiptsModalOpen(true)}
+                            className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 border border-gray-200 transition-all shadow-sm flex-shrink-0 text-sm print:hidden"
+                        >
+                            <Receipt size={16} />
+                            See Receipts
+                        </button>
+                        <div className="w-px h-8 bg-gray-200 mx-2 hidden sm:block"></div>
+                        <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Store:</span>
+                        <select
+                            value={globalStoreFilter}
+                            onChange={(e) => setGlobalStoreFilter(e.target.value)}
+                            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-0 focus:border-primary-400 cursor-pointer shadow-sm min-w-[150px]"
+                        >
+                            <option value="all">All Stores</option>
+                            {Object.keys(
+                                cartItems.reduce((acc: any, item: any) => {
+                                    acc[item.storeName || 'Unassigned'] = true;
+                                    return acc;
+                                }, {})
+                            ).sort().map(store => (
+                                <option key={store} value={store}>{store}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100 gap-4">
@@ -209,7 +396,7 @@ export default function ShoppingCart() {
                         className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full sm:w-auto justify-center"
                     >
                         <ChevronLeft size={20} />
-                        <span className="font-medium">Previous Week</span>
+                        <span className="font-medium">Previous</span>
                     </button>
 
                     <div className="flex flex-col items-center gap-1">
@@ -254,7 +441,7 @@ export default function ShoppingCart() {
                         onClick={goToNextWeek}
                         className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors w-full sm:w-auto justify-center"
                     >
-                        <span className="font-medium">Next Week</span>
+                        <span className="font-medium">Next</span>
                         <ChevronRight size={20} />
                     </button>
                 </div>
@@ -262,116 +449,71 @@ export default function ShoppingCart() {
 
             <div className="space-y-12">
                 <AnimatePresence mode="popLayout">
-                    {/* Combine navigation week and all historical weeks */}
-                    {[...new Set([...weeksWithItems, currentWeekId])].sort().reverse().map((weekId: string) => {
-                        const weekTotal = getWeeklyTotal(weekId);
-                        const items = cartItems.filter((item: any) => item.weekId === weekId);
-                        const isSelected = selectedWeek === 'all' || selectedWeek === weekId;
-
-                        if (!isSelected) return null;
-
-                        // Only show empty state if this specific week is selected
-                        if (items.length === 0) {
-                            if (selectedWeek === weekId) {
-                                return (
-                                    <motion.div
-                                        key={`empty-${weekId}`}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        className="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 shadow-sm"
-                                    >
-                                        <div className="w-20 h-20 bg-gray-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 transform rotate-3">
-                                            <CartIcon className="text-gray-300" size={36} />
-                                        </div>
-                                        <h3 className="text-2xl font-black text-gray-900 mb-2">Week {weekId} is Empty</h3>
-                                        <p className="text-gray-500 max-w-sm mx-auto mb-8 font-medium">Ready to fill your kitchen? Head back to the planner to add some delicious recipes!</p>
-                                        <Link to="/planner" className="inline-flex items-center gap-3 bg-primary-600 text-white px-8 py-3.5 rounded-2xl font-bold hover:bg-primary-700 transition-all shadow-lg shadow-primary-100 active:scale-95">
-                                            Open Meal Planner
-                                            <ChevronRight size={20} />
-                                        </Link>
-                                    </motion.div>
-                                );
-                            }
-                            return null;
+                    {(() => {
+                        const currentTotal = itemsToDisplay.reduce((total: number, item: any) => total + (item.price || 0), 0);
+                        
+                        if (itemsToDisplay.length === 0) {
+                            return (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 shadow-sm"
+                                >
+                                    <div className="w-20 h-20 bg-gray-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 transform rotate-3">
+                                        <CartIcon className="text-gray-300" size={36} />
+                                    </div>
+                                    <h3 className="text-2xl font-black text-gray-900 mb-2">Nothing here!</h3>
+                                    <p className="text-gray-500 max-w-sm mx-auto mb-8 font-medium">Ready to fill your kitchen? Add some items to get started!</p>
+                                </motion.div>
+                            );
                         }
 
                         return (
                             <motion.div
-                                key={weekId}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, height: 0 }}
                                 className="space-y-6 pt-4 first:pt-0"
                             >
-                                {/* Week Header Styled like Planner Day Headers */}
                                 <div className="flex items-center justify-between px-2">
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black uppercase tracking-[0.2em] text-primary-500 mb-1 leading-none">
-                                            Shopping List
+                                            {viewMode === 'all' ? 'All Time' : viewMode === 'month' ? format(viewDate, 'MMMM yyyy') : `Week ${getWeekId(viewDate)}`}
                                         </span>
-                                        <h2 className="text-2xl font-black text-gray-900 leading-none">Week {weekId}</h2>
+                                        <h2 className="text-2xl font-black text-gray-900 leading-none">Shopping List</h2>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        {weekTotal > 0 && (
-                                            <div className="px-4 py-2 bg-primary-50 rounded-xl border border-primary-100">
-                                                <span className="text-[10px] font-black uppercase tracking-tighter text-primary-600 block leading-none mb-1">Estimated</span>
-                                                <div className="flex items-center gap-1 text-primary-900">
-                                                    <DollarSign size={16} strokeWidth={3} />
-                                                    <span className="text-lg font-black leading-none">{weekTotal.toFixed(2)}</span>
-                                                </div>
+                                    {currentTotal > 0 && (
+                                        <div className="px-4 py-2 bg-primary-50 rounded-xl border border-primary-100">
+                                            <span className="text-[10px] font-black uppercase tracking-tighter text-primary-600 block leading-none mb-1">Estimated</span>
+                                            <div className="flex items-center gap-1 text-primary-900">
+                                                <DollarSign size={16} strokeWidth={3} />
+                                                <span className="text-lg font-black leading-none">{currentTotal.toFixed(2)}</span>
                                             </div>
-                                        )}
-                                        <button
-                                            onClick={() => clearWeek(weekId)}
-                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                            title="Clear Week"
-                                        >
-                                            <Trash2 size={20} />
-                                        </button>
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Manual Add Form */}
-                                {selectedWeek === weekId && (
-                                    <div className="bg-gradient-to-br from-primary-50 to-white rounded-[1.5rem] p-4 border-2 border-dashed border-primary-200 mb-3 md:max-w-lg">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="text-[10px] font-black uppercase tracking-wider text-primary-700">Quick Add</h3>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="What do you need?"
-                                                value={manualItemName}
-                                                onChange={(e) => setManualItemName(e.target.value)}
-                                                className="flex-1 min-w-[150px] px-4 py-2 rounded-xl border border-primary-100 focus:border-primary-400 focus:ring-0 font-medium text-sm bg-white"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Q"
-                                                value={manualItemAmount}
-                                                onChange={(e) => setManualItemAmount(e.target.value)}
-                                                className="w-16 px-2 py-1.5 rounded-xl border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Unit"
-                                                value={manualItemUnit}
-                                                onChange={(e) => setManualItemUnit(e.target.value)}
-                                                className="w-16 px-2 py-1.5 rounded-xl border border-primary-100 focus:border-primary-400 focus:ring-0 font-bold text-xs text-center"
-                                            />
-                                            <button
-                                                onClick={handleAddManualItem}
-                                                className="px-4 py-1.5 bg-primary-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-primary-700 transition-colors whitespace-nowrap"
-                                            >
-                                                Add
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-50 overflow-hidden divide-y divide-gray-50">
-                                    {items.map((item: any) => (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                                    {Object.entries(
+                                        itemsToDisplay
+                                            .filter((item: any) => {
+                                                if (globalStoreFilter === 'all') return true;
+                                                return (item.storeName || 'Unassigned') === globalStoreFilter;
+                                            })
+                                            .reduce((acc: any, item: any) => {
+                                                const store = item.storeName || 'Unassigned';
+                                                if (!acc[store]) acc[store] = [];
+                                                acc[store].push(item);
+                                                return acc;
+                                            }, {})
+                                    ).map(([storeName, storeItems]: [string, any]) => (
+                                        <div key={storeName} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-50 overflow-hidden divide-y divide-gray-50">
+                                            <div className="bg-gray-50 px-4 py-2 font-bold text-sm text-gray-700 flex items-center justify-between">
+                                                <span>{storeName}</span>
+                                                <span className="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-full shadow-sm">{storeItems.length} items</span>
+                                            </div>
+                                            {storeItems.map((item: any) => (
                                         <motion.div
                                             key={item.id}
                                             layout
@@ -393,10 +535,20 @@ export default function ShoppingCart() {
                                                     <p className={`text-sm md:text-base font-medium leading-relaxed ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                                                         {item.name}
                                                     </p>
+                                                    {(viewMode === 'month' || viewMode === 'all') && (
+                                                        <span className="text-[10px] text-primary-600 font-medium bg-primary-50 px-1.5 py-0.5 rounded ml-2">
+                                                            Week {item.weekId}
+                                                        </span>
+                                                    )}
                                                     {item.purchaseUrl && (
                                                         <a href={item.purchaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 transition-colors" title="Buy this ingredient">
                                                             <CartIcon size={14} />
                                                         </a>
+                                                    )}
+                                                    {item.checked && item.purchasedAt && (
+                                                        <span className="text-[10px] text-gray-400 font-medium bg-gray-100 px-1.5 py-0.5 rounded ml-2">
+                                                            Bought at {format(new Date(item.purchasedAt), 'h:mm a')}
+                                                        </span>
                                                     )}
                                                 </div>
                                                 <div className="flex flex-wrap gap-1 mt-0.5">
@@ -452,20 +604,51 @@ export default function ShoppingCart() {
                                                 </div>
 
                                                 <button
-                                                    onClick={() => removeFromCart(item.id)}
-                                                    className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    onClick={() => setItemToEdit(item)}
+                                                    className="p-1.5 md:p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-500 opacity-0 group-hover:opacity-100"
+                                                    title="Edit Item"
                                                 >
-                                                    <X size={18} />
+                                                    <Edit3 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => removeFromCart(item.id)}
+                                                    className="p-1.5 md:p-2 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors text-gray-400 opacity-0 group-hover:opacity-100"
+                                                    title="Remove item"
+                                                >
+                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
-                                        </motion.div>
+                                            </motion.div>
+                                        ))}
+                                        </div>
                                     ))}
                                 </div>
                             </motion.div>
                         );
-                    })}
+                    })()}
                 </AnimatePresence>
             </div>
+            {/* Modals */}
+            <CartStatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} />
+            <LogReceiptModal isOpen={isLogReceiptOpen} onClose={() => setIsLogReceiptOpen(false)} />
+            <ReceiptsModal isOpen={isReceiptsModalOpen} onClose={() => setIsReceiptsModalOpen(false)} />
+            <ShareStoreModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                availableStores={Object.keys(
+                    itemsToDisplay
+                        .reduce((acc: any, item: any) => {
+                            acc[item.storeName || 'Unassigned'] = true;
+                            return acc;
+                        }, {})
+                )}
+                onShare={handleShare}
+            />
+            <EditItemModal
+                isOpen={itemToEdit !== null}
+                onClose={() => setItemToEdit(null)}
+                item={itemToEdit}
+            />
         </div>
     );
 }

@@ -9,6 +9,7 @@ import { getOptimizedImageUrl, formatAmount } from '@/lib/utils';
 import { deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
 import RecipeCard from '@/components/RecipeCard';
+import { StoreSelectModal } from '@/components/StoreSelectModal';
 import { Recipe } from '@/lib/types';
 
 export default function RecipeDetail() {
@@ -35,6 +36,8 @@ export default function RecipeDetail() {
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+    const [pendingCartItem, setPendingCartItem] = useState<{index: number, ing: any} | null>(null);
 
     // Media State
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -338,8 +341,15 @@ export default function RecipeDetail() {
     const handleSingleItemCartAdd = async (e: React.MouseEvent, index: number, ing: any) => {
         e.stopPropagation();
         if (!recipe) return;
+        setPendingCartItem({ index, ing });
+        setIsStoreModalOpen(true);
+    };
 
+    const confirmAddToCart = async (storeName: string) => {
+        if (!recipe || !pendingCartItem) return;
+        
         const currentWeekId = getCurrentWeekId();
+        const { index, ing } = pendingCartItem;
 
         try {
             await addToCart({
@@ -350,6 +360,7 @@ export default function RecipeDetail() {
                 recipeName: recipe.title,
                 weekId: currentWeekId,
                 purchaseUrl: ing.purchaseUrl || undefined,
+                storeName
             });
             toast.success(`${ing.ingredient?.name || 'Item'} added to cart!`);
             if (!selectedForCart.includes(index)) {
@@ -357,6 +368,8 @@ export default function RecipeDetail() {
             }
         } catch (error) {
             toast.error('Failed to add to cart');
+        } finally {
+            setPendingCartItem(null);
         }
     };
 
@@ -536,6 +549,12 @@ export default function RecipeDetail() {
                     </div>
                 )}
             </AnimatePresence>
+            
+            <StoreSelectModal
+                isOpen={isStoreModalOpen}
+                onClose={() => setIsStoreModalOpen(false)}
+                onSelect={confirmAddToCart}
+            />
 
             {/* Media Lightbox */}
             <AnimatePresence>

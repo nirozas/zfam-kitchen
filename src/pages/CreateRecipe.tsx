@@ -898,7 +898,17 @@ export default function CreateRecipe() {
       })();
 
       toast.success(isEditing ? 'Recipe updated successfully!' : 'Recipe published successfully!');
-      navigate(`/recipe/${recipeData.slug}`);
+      
+      const searchParams = new URLSearchParams(window.location.search);
+      const mealId = searchParams.get('mealId');
+      const dateStr = searchParams.get('date');
+      
+      if (mealId && dateStr) {
+         await supabase.from('meal_planner').update({ recipe_id: recipeIdForIngredients, custom_title: null }).eq('id', mealId);
+         navigate(`/planner?week=${dateStr}`);
+      } else {
+         navigate(`/recipe/${recipeData.slug}`);
+      }
     } catch (error) {
       console.error('Save error:', error);
       toast.error('Failed to save recipe: ' + (error as Error).message);

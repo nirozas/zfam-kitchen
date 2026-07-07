@@ -13,12 +13,23 @@ export interface CartItem {
     price?: number; // Price for this specific item (user can enter manually)
     note?: string; // Optional user note
     purchaseUrl?: string | null; // Added purchase link
+    storeName?: string; // Added store name
+    purchasedAt?: string | null; // Added purchased timestamp
+}
+
+export interface ShoppingReceipt {
+    id: string;
+    date: string;
+    weekId: string;
+    storeName: string;
+    totalAmount: number;
+    categoryBreakdown: Record<string, number>;
 }
 
 interface ShoppingCartContextType {
     cartItems: CartItem[];
-    addToCart: (item: Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string }) => void;
-    addMultipleToCart: (items: (Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string })[]) => void;
+    addToCart: (item: Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string, checked?: boolean, purchasedAt?: string | null }) => void;
+    addMultipleToCart: (items: (Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string, checked?: boolean, purchasedAt?: string | null })[]) => void;
     removeFromCart: (id: string) => void;
     toggleChecked: (id: string) => void;
     clearCart: () => void;
@@ -31,6 +42,11 @@ interface ShoppingCartContextType {
     getAllWeeks: () => string[];
     cartCount: number;
     loading: boolean;
+    receipts: ShoppingReceipt[];
+    addReceipt: (receipt: Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }) => Promise<void>;
+    updateReceipt: (id: string, updates: Partial<Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }>, oldData?: { weekId: string, storeName: string, itemNames: string[] }) => Promise<void>;
+    updateItem: (id: string, updates: Partial<CartItem>) => Promise<void>;
+    removeReceipt: (id: string) => Promise<void>;
 }
 
 // Utility: Get ISO week number from date
@@ -52,6 +68,7 @@ const ShoppingCartContext = createContext<ShoppingCartContextType | undefined>(u
 
 export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [receipts, setReceipts] = useState<ShoppingReceipt[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Load from Supabase
@@ -81,11 +98,32 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                 price: parseFloat(item.price || 0),
                 note: item.note || '',
                 purchaseUrl: item.purchase_url || null,
+                storeName: item.store_name || 'Unassigned',
                 recipeIds: item.recipe_ids || [],
                 recipeNames: item.recipe_names || []
             }));
             setCartItems(items);
         }
+
+        const { data: receiptData, error: receiptError } = await supabase
+            .from('shopping_receipts')
+            .select('*')
+            .eq('user_id', user.id);
+
+        if (receiptError) {
+            console.error('Error fetching receipts:', receiptError);
+        } else if (receiptData) {
+            const parsedReceipts = receiptData.map((r: any) => ({
+                id: r.id,
+                date: r.date,
+                weekId: r.week_id,
+                storeName: r.store_name,
+                totalAmount: parseFloat(r.total_amount),
+                categoryBreakdown: typeof r.category_breakdown === 'string' ? JSON.parse(r.category_breakdown) : (r.category_breakdown || {})
+            }));
+            setReceipts(parsedReceipts);
+        }
+
         setLoading(false);
     };
 
@@ -97,11 +135,11 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const addToCart = async (item: Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string }) => {
+    const addToCart = async (item: Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string, checked?: boolean, purchasedAt?: string | null }) => {
         await addMultipleToCart([item]);
     };
 
-    const addMultipleToCart = async (newItems: (Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string })[]) => {
+    const addMultipleToCart = async (newItems: (Omit<CartItem, 'id' | 'checked' | 'recipeIds' | 'recipeNames'> & { recipeId?: string, recipeName?: string, checked?: boolean, purchasedAt?: string | null })[]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -121,6 +159,8 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
             price: parseFloat(item.price || 0),
             note: item.note || '',
             purchaseUrl: item.purchase_url || null,
+            storeName: item.store_name || 'Unassigned',
+            purchasedAt: item.purchased_at || null,
             recipeIds: item.recipe_ids || [],
             recipeNames: item.recipe_names || []
         }));
@@ -133,11 +173,13 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
             const existingInBatch = itemsToUpdate.find(i =>
                 i.name.toLowerCase() === item.name.toLowerCase() &&
                 i.unit.toLowerCase() === item.unit.toLowerCase() &&
-                i.week_id === item.weekId
+                i.week_id === item.weekId &&
+                i.store_name === (item.storeName || 'Unassigned')
             ) || itemsToInsert.find(i =>
                 i.name.toLowerCase() === item.name.toLowerCase() &&
                 i.unit.toLowerCase() === item.unit.toLowerCase() &&
-                i.week_id === item.weekId
+                i.week_id === item.weekId &&
+                i.store_name === (item.storeName || 'Unassigned')
             );
 
             if (existingInBatch) {
@@ -155,6 +197,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                 i.name.toLowerCase() === item.name.toLowerCase() &&
                 i.unit.toLowerCase() === item.unit.toLowerCase() &&
                 i.weekId === item.weekId &&
+                i.storeName === (item.storeName || 'Unassigned') &&
                 !i.checked
             );
 
@@ -174,12 +217,14 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     amount: existingItem.amount + item.amount,
                     unit: existingItem.unit,
                     week_id: existingItem.weekId,
-                    checked: false,
-                    price: existingItem.price || 0,
+                    checked: item.checked ?? false,
+                    price: item.price || existingItem.price || 0,
                     note: existingItem.note || '',
                     purchase_url: item.purchaseUrl || existingItem.purchaseUrl || null,
+                    store_name: existingItem.storeName,
                     recipe_ids: updatedRecipeIds,
-                    recipe_names: updatedRecipeNames
+                    recipe_names: updatedRecipeNames,
+                    purchased_at: item.purchasedAt ?? existingItem.purchasedAt ?? null
                 });
             } else {
                 itemsToInsert.push({
@@ -188,12 +233,14 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     amount: item.amount,
                     unit: item.unit,
                     week_id: item.weekId,
-                    checked: false,
+                    checked: item.checked ?? false,
                     price: item.price || 0,
                     note: item.note || '',
                     purchase_url: item.purchaseUrl || null,
+                    store_name: item.storeName || 'Unassigned',
                     recipe_ids: item.recipeId ? [item.recipeId] : [],
-                    recipe_names: item.recipeName ? [item.recipeName] : []
+                    recipe_names: item.recipeName ? [item.recipeName] : [],
+                    purchased_at: item.purchasedAt ?? null
                 });
             }
         }
@@ -220,7 +267,10 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
 
         const { error } = await supabase
             .from('shopping_cart')
-            .update({ checked: !item.checked })
+            .update({ 
+                checked: !item.checked,
+                purchased_at: !item.checked ? new Date().toISOString() : null
+            })
             .eq('id', id);
 
         if (!error) fetchCart();
@@ -284,6 +334,159 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
 
     const cartCount = cartItems.filter(item => !item.checked).length;
 
+    const addReceipt = async (receipt: Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase.from('shopping_receipts').insert({
+            user_id: user.id,
+            date: receipt.date,
+            week_id: receipt.weekId,
+            store_name: receipt.storeName,
+            total_amount: receipt.totalAmount,
+            category_breakdown: receipt.categoryBreakdown
+        });
+
+        if (error) {
+            console.error('Error adding receipt:', error);
+        } else {
+            // Add items to cart if provided
+            if (receipt.items && receipt.items.length > 0) {
+                const cartItemsToAdd = receipt.items.map(item => {
+                    // Try to parse amount and unit (e.g. "2 lbs" -> amount 2, unit "lbs")
+                    const match = item.amount.match(/^([\d.]+)\s*(.*)$/);
+                    let amt = 1;
+                    let unit = 'unit';
+                    if (match) {
+                        amt = parseFloat(match[1]) || 1;
+                        unit = match[2] || 'unit';
+                    } else if (item.amount) {
+                        unit = item.amount;
+                    }
+
+                    return {
+                        name: item.name,
+                        amount: amt,
+                        unit: unit,
+                        weekId: receipt.weekId,
+                        storeName: receipt.storeName,
+                        price: item.price,
+                        checked: true,
+                        purchasedAt: new Date().toISOString()
+                    };
+                });
+                await addMultipleToCart(cartItemsToAdd);
+            }
+            fetchCart(); // Refetch everything
+        }
+    };
+
+    const updateReceipt = async (id: string, updates: Partial<Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }>) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const dbUpdates: any = {};
+        if (updates.date !== undefined) dbUpdates.date = updates.date;
+        if (updates.weekId !== undefined) dbUpdates.week_id = updates.weekId;
+        if (updates.storeName !== undefined) dbUpdates.store_name = updates.storeName;
+        if (updates.totalAmount !== undefined) dbUpdates.total_amount = updates.totalAmount;
+        if (updates.categoryBreakdown !== undefined) dbUpdates.category_breakdown = updates.categoryBreakdown;
+
+        if (Object.keys(dbUpdates).length > 0) {
+            const { error } = await supabase
+                .from('shopping_receipts')
+                .update(dbUpdates)
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error updating receipt:', error);
+                return;
+            }
+
+            // Move existing cart items if weekId or storeName changed
+            if (oldData && (updates.weekId || updates.storeName)) {
+                const newWeekId = updates.weekId || oldData.weekId;
+                const newStoreName = updates.storeName || oldData.storeName;
+
+                if (newWeekId !== oldData.weekId || newStoreName !== oldData.storeName) {
+                    const matchingItems = cartItems.filter(item => 
+                        item.weekId === oldData.weekId && 
+                        item.storeName === oldData.storeName && 
+                        oldData.itemNames.includes(item.name)
+                    );
+
+                    if (matchingItems.length > 0) {
+                        for (const item of matchingItems) {
+                            await supabase
+                                .from('shopping_cart')
+                                .update({
+                                    week_id: newWeekId,
+                                    store_name: newStoreName
+                                })
+                                .eq('id', item.id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add items to cart if provided
+        if (updates.items && updates.items.length > 0) {
+            const cartItemsToAdd = updates.items.map(item => {
+                const match = item.amount.match(/^([\d.]+)\s*(.*)$/);
+                let amt = 1;
+                let unit = 'unit';
+                if (match) {
+                    amt = parseFloat(match[1]) || 1;
+                    unit = match[2] || 'unit';
+                } else if (item.amount) {
+                    unit = item.amount;
+                }
+                return {
+                    name: item.name,
+                    amount: amt,
+                    unit: unit,
+                    weekId: updates.weekId || getWeekId(new Date()),
+                    storeName: updates.storeName || 'Unassigned',
+                    price: item.price,
+                    checked: true,
+                    purchasedAt: new Date().toISOString()
+                };
+            });
+            await addMultipleToCart(cartItemsToAdd);
+        }
+
+        fetchCart();
+    };
+
+    const updateItem = async (id: string, updates: Partial<CartItem>) => {
+        const dbUpdates: any = {};
+        if (updates.name !== undefined) dbUpdates.name = updates.name;
+        if (updates.amount !== undefined) dbUpdates.amount = updates.amount;
+        if (updates.unit !== undefined) dbUpdates.unit = updates.unit;
+        if (updates.weekId !== undefined) dbUpdates.week_id = updates.weekId;
+        if (updates.checked !== undefined) dbUpdates.checked = updates.checked;
+        if (updates.price !== undefined) dbUpdates.price = updates.price;
+        if (updates.storeName !== undefined) dbUpdates.store_name = updates.storeName;
+        if (updates.purchasedAt !== undefined) dbUpdates.purchased_at = updates.purchasedAt;
+
+        const { error } = await supabase
+            .from('shopping_cart')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (!error) fetchCart();
+    };
+
+    const removeReceipt = async (id: string) => {
+        const { error } = await supabase.from('shopping_receipts').delete().eq('id', id);
+        if (error) {
+            console.error('Error removing receipt:', error);
+        } else {
+            fetchCart();
+        }
+    };
+
     return (
         <ShoppingCartContext.Provider
             value={{
@@ -301,7 +504,12 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                 getWeeklyTotal,
                 getAllWeeks,
                 cartCount,
-                loading
+                loading,
+                receipts,
+                addReceipt,
+                updateReceipt,
+                removeReceipt,
+                updateItem
             }}
         >
             {children}

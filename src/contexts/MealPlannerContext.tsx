@@ -13,6 +13,8 @@ interface MealPlannerContextType {
     updateMealNote: (dateStr: string, mealIndex: number, note: string) => Promise<void>;
     toggleMealCompleted: (dateStr: string, mealIndex: number) => Promise<void>;
     saveDailyNote: (dateStr: string, note: string) => Promise<void>;
+    dailyExpenses: Record<string, { expense_amount: number; is_restaurant: boolean; restaurant_name: string }>;
+    saveDailyExpense: (dateStr: string, expense: number, isRestaurant: boolean, restaurantName: string) => Promise<void>;
     refreshMealPlan: () => Promise<void>;
     loading: boolean;
 }
@@ -22,6 +24,7 @@ const MealPlannerContext = createContext<MealPlannerContextType | undefined>(und
 export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     const [plannedMeals, setPlannedMeals] = useState<Record<string, PlannerMeal[]>>({});
     const [dailyNotes, setDailyNotes] = useState<Record<string, string>>({});
+    const [dailyExpenses, setDailyExpenses] = useState<Record<string, { expense_amount: number; is_restaurant: boolean; restaurant_name: string }>>({});
     const [loading, setLoading] = useState(true);
 
     const fetchMealPlan = async () => {
@@ -29,11 +32,12 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         if (!user) {
             setPlannedMeals({});
             setDailyNotes({});
+            setDailyExpenses({});
             setLoading(false);
             return;
         }
 
-        const [mealsResult, notesResult] = await Promise.all([
+        const [mealsResult, notesResult, expensesResult] = await Promise.all([
             supabase
                 .from('meal_planner')
                 .select('*, recipes(*, category:category_id(*), recipe_ingredients!recipe_id(*, ingredients(*)), recipe_tags(*, tags(*)))')
@@ -42,6 +46,10 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             supabase
                 .from('daily_notes')
                 .select('date, note')
+                .eq('user_id', user.id),
+            supabase
+                .from('daily_expenses')
+                .select('date, expense_amount, is_restaurant, restaurant_name')
                 .eq('user_id', user.id)
         ]);
 
@@ -95,6 +103,20 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                 notesMap[item.date] = item.note;
             });
             setDailyNotes(notesMap);
+        }
+
+        if (expensesResult.error) {
+            console.error('Error fetching expenses:', expensesResult.error);
+        } else if (expensesResult.data) {
+            const expensesMap: Record<string, any> = {};
+            expensesResult.data.forEach((item: any) => {
+                expensesMap[item.date] = {
+                    expense_amount: item.expense_amount,
+                    is_restaurant: item.is_restaurant,
+                    restaurant_name: item.restaurant_name
+                };
+            });
+            setDailyExpenses(expensesMap);
         }
 
         setLoading(false);
@@ -372,10 +394,36 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const saveDailyExpense = async (dateStr: string, expense: number, isRestaurant: boolean, restaurantName: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Optimistic
+        setDailyExpenses(prev => ({
+            ...prev,
+            [dateStr]: { expense_amount: expense, is_restaurant: isRestaurant, restaurant_name: restaurantName }
+        }));
+
+        if (!expense && !isRestaurant && !restaurantName.trim()) {
+            await supabase.from('daily_expenses').delete().match({ user_id: user.id, date: dateStr });
+        } else {
+            const { error } = await supabase.from('daily_expenses').upsert({
+                user_id: user.id,
+                date: dateStr,
+                expense_amount: expense,
+                is_restaurant: isRestaurant,
+                restaurant_name: restaurantName.trim()
+            }, { onConflict: 'user_id,date' });
+
+            if (error) console.error('Error saving expense:', error);
+        }
+    };
+
     return (
         <MealPlannerContext.Provider value={{
             plannedMeals,
             dailyNotes,
+            dailyExpenses,
             addRecipeToDate,
             addCustomMealToDate,
             removeRecipeFromDate,
@@ -383,6 +431,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             updateMealNote,
             toggleMealCompleted,
             saveDailyNote,
+            saveDailyExpense,
             loading,
             refreshMealPlan: fetchMealPlan
         }}>

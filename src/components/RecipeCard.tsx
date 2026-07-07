@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { getOptimizedImageUrl } from '@/lib/utils';
 import AddToPlannerModal from './AddToPlannerModal';
+import { StoreSelectModal } from './StoreSelectModal';
 
 interface RecipeCardProps {
     recipe: Recipe;
@@ -19,6 +20,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
     const { likes, toggleLike } = useLikes();
     const [localLikesCount, setLocalLikesCount] = useState(recipe.likesCount || 0);
     const [isPlannerOpen, setIsPlannerOpen] = useState(false);
+    const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
 
     // Sync if parent updates the pre-fetched likesCount
     useEffect(() => {
@@ -53,6 +55,10 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         e.preventDefault();
         e.stopPropagation();
 
+        setIsStoreModalOpen(true);
+    };
+
+    const confirmAddToCart = (storeName: string) => {
         const currentWeekId = getCurrentWeekId();
         recipe.ingredients.forEach((item) => {
             addToCart({
@@ -62,6 +68,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                 recipeId: recipe.id,
                 recipeName: recipe.title,
                 weekId: currentWeekId,
+                storeName
             });
         });
         toast.success(`Success! Items for "${recipe.title}" added to cart.`, {
@@ -202,6 +209,12 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
                 isOpen={isPlannerOpen} 
                 onClose={() => setIsPlannerOpen(false)} 
                 recipe={recipe} 
+            />
+
+            <StoreSelectModal
+                isOpen={isStoreModalOpen}
+                onClose={() => setIsStoreModalOpen(false)}
+                onSelect={confirmAddToCart}
             />
         </motion.div>
     );
