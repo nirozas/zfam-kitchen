@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Loader2, Receipt, FileText, CheckCircle2, ChevronRight, Store, Calendar, DollarSign, ListOrdered, ArrowLeft } from 'lucide-react';
+import { Camera, Upload, Loader2, Receipt, FileText, CheckCircle2, Store, Calendar, DollarSign, ListOrdered, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
