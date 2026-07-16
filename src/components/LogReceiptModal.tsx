@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Receipt, Plus, Trash2 } from 'lucide-react';
+import { X, Receipt, Plus, Trash2, Camera, Loader2 } from 'lucide-react';
 import { useShoppingCart, getWeekId, ShoppingReceipt } from '@/contexts/ShoppingCartContext';
+import { supabase } from '@/lib/supabase';
 import { format, parseISO } from 'date-fns';
 import { toTitleCase } from '@/utils/stringUtils';
 import toast from 'react-hot-toast';
@@ -22,6 +23,8 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showBulkAdd, setShowBulkAdd] = useState(false);
     const [bulkText, setBulkText] = useState('');
+    const [isScanning, setIsScanning] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen && existingReceipt) {
@@ -39,6 +42,69 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
             setItems([{ name: '', amount: '1 unit', price: '' }]);
         }
     }, [isOpen, existingReceipt]);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            scanReceiptImage(dataUrl, file.type);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const scanReceiptImage = async (dataUrl: string, mimeType: string) => {
+        setIsScanning(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-receipt`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token || anonKey}`,
+                    'apikey': anonKey
+                },
+                body: JSON.stringify({ image: dataUrl, mimeType })
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to scan receipt');
+            }
+
+            const data = await response.json();
+            
+            if (data.store) setStoreName(data.store);
+            if (data.date) {
+                try {
+                    const d = parseISO(data.date);
+                    if (!isNaN(d.getTime())) {
+                        setDate(format(d, 'yyyy-MM-dd'));
+                    }
+                } catch(e) {}
+            }
+            if (data.items && Array.isArray(data.items)) {
+                const newItems = data.items.map((i: any) => ({
+                    name: i.name || '',
+                    amount: '1 unit',
+                    price: (i.price || 0).toString()
+                }));
+                setItems(newItems.length > 0 ? newItems : [{ name: '', amount: '1 unit', price: '' }]);
+            }
+
+            toast.success('Receipt scanned successfully!');
+        } catch (error: any) {
+            console.error('Scanning error:', error);
+            toast.error(error.message || 'Failed to analyze receipt. Please try again.');
+        } finally {
+            setIsScanning(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const handleAddItem = () => {
         setItems([...items, { name: '', amount: '1 unit', price: '' }]);
@@ -190,9 +256,30 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
                             </div>
                             <h2 className="text-xl font-bold text-gray-900">{existingReceipt ? 'Edit Receipt' : 'Log Shopping Receipt'}</h2>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {!existingReceipt && (
+                                <>
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isScanning}
+                                        className="flex items-center gap-2 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                                    >
+                                        {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                                        Scan AI
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                    />
+                                </>
+                            )}
+                            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-6">

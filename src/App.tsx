@@ -19,6 +19,7 @@ const Statistics = React.lazy(() => import('./pages/Statistics'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 const Activity = React.lazy(() => import('./pages/Activity'));
 const Categories = React.lazy(() => import('./pages/Categories'));
+const ScanReceipt = React.lazy(() => import('./pages/ScanReceipt'));
 
 // A simple loading placeholder for Suspense
 const PageLoader = () => (
@@ -47,6 +48,7 @@ function App() {
                                 <Route path="admin" element={<AdminDashboard />} />
                                 <Route path="statistics" element={<Statistics />} />
                                 <Route path="cart" element={<ShoppingCart />} />
+                                <Route path="scan" element={<ScanReceipt />} />
                                 <Route path="categories" element={<Categories />} />
                                 <Route path="category/*" element={<CategoryDetail />} />
                                 <Route path="profile" element={<Profile />} />
