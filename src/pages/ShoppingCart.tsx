@@ -530,7 +530,7 @@ export default function ShoppingCart() {
                                         <motion.div
                                             key={item.id}
                                             layout
-                                            className={`flex items-center gap-3 p-2.5 hover:bg-gray-50/50 transition-colors ${item.checked ? 'opacity-40' : ''
+                                            className={`group flex items-center gap-3 p-2.5 hover:bg-gray-50/50 transition-colors ${item.checked ? 'opacity-40' : ''
                                                 }`}
                                         >
                                             <button

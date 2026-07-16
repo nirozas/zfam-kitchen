@@ -195,10 +195,9 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
             // Check for existing item in DB state to merge
             const existingItem = currentItems.find(i =>
                 i.name.toLowerCase() === item.name.toLowerCase() &&
-                i.unit.toLowerCase() === item.unit.toLowerCase() &&
                 i.weekId === item.weekId &&
-                i.storeName === (item.storeName || 'Unassigned') &&
-                !i.checked
+                !i.checked &&
+                (i.storeName === (item.storeName || 'Unassigned') || i.storeName === 'Unassigned')
             );
 
             if (existingItem) {
@@ -214,14 +213,14 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     id: existingItem.id,
                     user_id: user.id,
                     name: existingItem.name,
-                    amount: existingItem.amount + item.amount,
+                    amount: item.checked ? existingItem.amount : existingItem.amount + item.amount,
                     unit: existingItem.unit,
                     week_id: existingItem.weekId,
                     checked: item.checked ?? false,
                     price: item.price || existingItem.price || 0,
                     note: existingItem.note || '',
                     purchase_url: item.purchaseUrl || existingItem.purchaseUrl || null,
-                    store_name: existingItem.storeName,
+                    store_name: (item.storeName && item.storeName !== 'Unassigned') ? item.storeName : existingItem.storeName,
                     recipe_ids: updatedRecipeIds,
                     recipe_names: updatedRecipeNames,
                     purchased_at: item.purchasedAt ?? existingItem.purchasedAt ?? null

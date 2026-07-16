@@ -14,8 +14,9 @@ interface LogReceiptModalProps {
 }
 
 export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceiptModalProps) => {
-    const { addReceipt, updateReceipt } = useShoppingCart();
+    const { addReceipt, updateReceipt, getAllWeeks } = useShoppingCart();
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [selectedWeekId, setSelectedWeekId] = useState(getWeekId(new Date()));
     const [storeName, setStoreName] = useState('');
     const [items, setItems] = useState<{ name: string, amount: string, price: string }[]>([
         { name: '', amount: '1 unit', price: '' }
@@ -29,6 +30,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
     useEffect(() => {
         if (isOpen && existingReceipt) {
             setDate(existingReceipt.date);
+            setSelectedWeekId(existingReceipt.weekId);
             setStoreName(existingReceipt.storeName);
             const loadedItems = Object.entries(existingReceipt.categoryBreakdown).map(([name, price]) => ({
                 name,
@@ -38,6 +40,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
             setItems(loadedItems.length > 0 ? loadedItems : [{ name: '', amount: '1 unit', price: '' }]);
         } else if (isOpen && !existingReceipt) {
             setDate(format(new Date(), 'yyyy-MM-dd'));
+            setSelectedWeekId(getWeekId(new Date()));
             setStoreName('');
             setItems([{ name: '', amount: '1 unit', price: '' }]);
         }
@@ -196,7 +199,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
             if (existingReceipt) {
                 await updateReceipt(existingReceipt.id, {
                     date,
-                    weekId: getWeekId(parseISO(date)),
+                    weekId: selectedWeekId,
                     storeName: storeName.trim(),
                     totalAmount: total,
                     categoryBreakdown: breakdown,
@@ -212,7 +215,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
             } else {
                 await addReceipt({
                     date,
-                    weekId: getWeekId(parseISO(date)),
+                    weekId: selectedWeekId,
                     storeName: storeName.trim(),
                     totalAmount: total,
                     categoryBreakdown: breakdown,
@@ -283,7 +286,7 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-6">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Store Name</label>
                                 <datalist id="store-suggestions">
@@ -315,6 +318,20 @@ export const LogReceiptModal = ({ isOpen, onClose, existingReceipt }: LogReceipt
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Shopping List</label>
+                                <select
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                                    value={selectedWeekId}
+                                    onChange={(e) => setSelectedWeekId(e.target.value)}
+                                >
+                                    {Array.from(new Set([...getAllWeeks(), getWeekId(new Date()), existingReceipt?.weekId].filter(Boolean))).sort().reverse().map(week => (
+                                        <option key={week as string} value={week as string}>
+                                            Week {week} {(week === getWeekId(new Date())) && '(Current)'}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 

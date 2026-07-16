@@ -53,7 +53,7 @@ serve(async (req) => {
             ]
         }`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey.trim()}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey.trim()}`;
         
         const aiResponse = await fetch(geminiUrl, {
             method: 'POST',
