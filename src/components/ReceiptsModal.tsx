@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Receipt, ChevronDown, ChevronUp, Edit3, Trash2, Calendar, Store } from 'lucide-react';
+import { X, Receipt, ChevronDown, ChevronUp, Edit3, Trash2, Calendar, Store, Filter, ArrowDownUp } from 'lucide-react';
 import { useShoppingCart, ShoppingReceipt } from '@/contexts/ShoppingCartContext';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { LogReceiptModal } from './LogReceiptModal';
 
 interface ReceiptsModalProps {
@@ -14,8 +14,26 @@ export const ReceiptsModal = ({ isOpen, onClose }: ReceiptsModalProps) => {
     const { receipts, removeReceipt } = useShoppingCart();
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [editingReceipt, setEditingReceipt] = useState<ShoppingReceipt | null>(null);
+    const [filterType, setFilterType] = useState<'all' | 'day' | 'week' | 'month' | 'year'>('all');
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
-    const sortedReceipts = [...receipts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const filteredReceipts = useMemo(() => {
+        return receipts.filter(receipt => {
+            const date = parseISO(receipt.date);
+            if (filterType === 'day') return isToday(date);
+            if (filterType === 'week') return isThisWeek(date, { weekStartsOn: 1 });
+            if (filterType === 'month') return isThisMonth(date);
+            if (filterType === 'year') return isThisYear(date);
+            return true;
+        });
+    }, [receipts, filterType]);
+
+    const sortedReceipts = useMemo(() => {
+        return [...filteredReceipts].sort((a, b) => {
+            const diff = new Date(b.date).getTime() - new Date(a.date).getTime();
+            return sortOrder === 'desc' ? diff : -diff;
+        });
+    }, [filteredReceipts, sortOrder]);
 
     if (!isOpen) return null;
 
@@ -44,6 +62,34 @@ export const ReceiptsModal = ({ isOpen, onClose }: ReceiptsModalProps) => {
                         </div>
                         <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
                             <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap bg-white">
+                        <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+                            <Filter size={16} className="text-gray-400 mr-1" />
+                            {(['all', 'day', 'week', 'month', 'year'] as const).map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => setFilterType(type)}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-full whitespace-nowrap transition-colors ${
+                                        filterType === type 
+                                            ? 'bg-primary-100 text-primary-700' 
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {type === 'all' ? 'All Time' : 
+                                     type === 'day' ? 'Today' : 
+                                     `This ${type.charAt(0).toUpperCase() + type.slice(1)}`}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors shrink-0"
+                        >
+                            <ArrowDownUp size={14} />
+                            {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
                         </button>
                     </div>
 

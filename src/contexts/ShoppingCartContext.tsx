@@ -47,6 +47,8 @@ interface ShoppingCartContextType {
     updateReceipt: (id: string, updates: Partial<Omit<ShoppingReceipt, 'id'> & { items?: { name: string, amount: string, price: number }[] }>, oldData?: { weekId: string, storeName: string, itemNames: string[] }) => Promise<void>;
     updateItem: (id: string, updates: Partial<CartItem>) => Promise<void>;
     removeReceipt: (id: string) => Promise<void>;
+    weeklyBudget: number;
+    setWeeklyBudget: (budget: number) => void;
 }
 
 // Utility: Get ISO week number from date
@@ -70,6 +72,15 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [receipts, setReceipts] = useState<ShoppingReceipt[]>([]);
     const [loading, setLoading] = useState(true);
+    const [weeklyBudget, setWeeklyBudgetState] = useState<number>(() => {
+        const stored = localStorage.getItem('shoppingCart_weeklyBudget');
+        return stored ? parseFloat(stored) : 200; // Default budget $200
+    });
+
+    const setWeeklyBudget = (budget: number) => {
+        setWeeklyBudgetState(budget);
+        localStorage.setItem('shoppingCart_weeklyBudget', budget.toString());
+    };
 
     // Load from Supabase
     const fetchCart = async () => {
@@ -209,6 +220,15 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     ? [...existingItem.recipeNames, item.recipeName]
                     : existingItem.recipeNames;
 
+                // Smart Price Memory for updates (if no price provided, keep existing or find recent)
+                let finalPrice = item.price || existingItem.price || 0;
+                if (!finalPrice) {
+                    const historicalPriceMatch = currentItems.find(i => 
+                        i.name.toLowerCase() === item.name.toLowerCase() && (i.price || 0) > 0
+                    );
+                    if (historicalPriceMatch) finalPrice = historicalPriceMatch.price || 0;
+                }
+
                 itemsToUpdate.push({
                     id: existingItem.id,
                     user_id: user.id,
@@ -217,7 +237,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     unit: existingItem.unit,
                     week_id: existingItem.weekId,
                     checked: item.checked ?? false,
-                    price: item.price || existingItem.price || 0,
+                    price: finalPrice,
                     note: existingItem.note || '',
                     purchase_url: item.purchaseUrl || existingItem.purchaseUrl || null,
                     store_name: (item.storeName && item.storeName !== 'Unassigned') ? item.storeName : existingItem.storeName,
@@ -226,6 +246,15 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     purchased_at: item.purchasedAt ?? existingItem.purchasedAt ?? null
                 });
             } else {
+                // Smart Price Memory for inserts
+                let finalPrice = item.price || 0;
+                if (!finalPrice) {
+                    const historicalPriceMatch = currentItems.find(i => 
+                        i.name.toLowerCase() === item.name.toLowerCase() && (i.price || 0) > 0
+                    );
+                    if (historicalPriceMatch) finalPrice = historicalPriceMatch.price || 0;
+                }
+
                 itemsToInsert.push({
                     user_id: user.id,
                     name: item.name,
@@ -233,7 +262,7 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                     unit: item.unit,
                     week_id: item.weekId,
                     checked: item.checked ?? false,
-                    price: item.price || 0,
+                    price: finalPrice,
                     note: item.note || '',
                     purchase_url: item.purchaseUrl || null,
                     store_name: item.storeName || 'Unassigned',
@@ -508,7 +537,9 @@ export const ShoppingCartProvider = ({ children }: { children: ReactNode }) => {
                 addReceipt,
                 updateReceipt,
                 removeReceipt,
-                updateItem
+                updateItem,
+                weeklyBudget,
+                setWeeklyBudget
             }}
         >
             {children}

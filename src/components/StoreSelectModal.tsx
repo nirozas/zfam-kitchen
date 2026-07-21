@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Store, Check } from 'lucide-react';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface StoreSelectModalProps {
     isOpen: boolean;
@@ -36,7 +37,7 @@ export function StoreSelectModal({ isOpen, onClose, onSelect }: StoreSelectModal
         }
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -113,6 +114,7 @@ export function StoreSelectModal({ isOpen, onClose, onSelect }: StoreSelectModal
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }

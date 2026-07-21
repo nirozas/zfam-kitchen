@@ -72,6 +72,7 @@ export type PlannerMeal = {
     custom_title?: string;
     note?: string;
     completed?: boolean;
+    rating?: number;
 };
 
 // Album Layouts Types

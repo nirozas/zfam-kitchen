@@ -15,6 +15,9 @@ interface MealPlannerContextType {
     saveDailyNote: (dateStr: string, note: string) => Promise<void>;
     dailyExpenses: Record<string, { expense_amount: number; is_restaurant: boolean; restaurant_name: string }>;
     saveDailyExpense: (dateStr: string, expense: number, isRestaurant: boolean, restaurantName: string) => Promise<void>;
+    moveRecipeToDate: (fromDate: string, mealIndex: number, toDate: string) => Promise<void>;
+    copyWeekMeals: (fromDates: string[], toDates: string[]) => Promise<number>;
+    rateMeal: (mealId: number | string, rating: number) => Promise<void>;
     refreshMealPlan: () => Promise<void>;
     loading: boolean;
 }
@@ -419,6 +422,136 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // ── NEW: Move a meal from one date to another (drag-and-drop) ──────────
+    const moveRecipeToDate = async (fromDate: string, mealIndex: number, toDate: string) => {
+        if (fromDate === toDate) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const meal = plannedMeals[fromDate]?.[mealIndex];
+        if (!meal) return;
+
+        // Optimistic: remove from source, add to dest
+        setPlannedMeals(prev => {
+            const next = { ...prev };
+            const fromMeals = [...(next[fromDate] || [])];
+            const [moved] = fromMeals.splice(mealIndex, 1);
+            next[fromDate] = fromMeals;
+            next[toDate] = [...(next[toDate] || []), { ...moved }];
+            return next;
+        });
+
+        // DB: update the date on that row
+        const { error } = await supabase
+            .from('meal_planner')
+            .update({ date: toDate })
+            .eq('id', meal.id);
+
+        if (error) {
+            console.error('Error moving meal:', error);
+            // Revert
+            setPlannedMeals(prev => {
+                const next = { ...prev };
+                const toMeals = [...(next[toDate] || [])];
+                const movedBack = toMeals.pop();
+                next[toDate] = toMeals;
+                if (movedBack) {
+                    const fromMeals = [...(next[fromDate] || [])];
+                    fromMeals.splice(mealIndex, 0, movedBack);
+                    next[fromDate] = fromMeals;
+                }
+                return next;
+            });
+        }
+    };
+
+    // ── NEW: Copy all meals from one set of dates to another (copy week) ────
+    const copyWeekMeals = async (fromDates: string[], toDates: string[]): Promise<number> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return 0;
+
+        const inserts: any[] = [];
+        const optimisticAdds: Array<{ date: string; meal: Omit<PlannerMeal, 'id'> }> = [];
+
+        fromDates.forEach((fromDate, i) => {
+            const toDate = toDates[i];
+            const meals = plannedMeals[fromDate] || [];
+            meals.forEach(meal => {
+                if (meal.recipe) {
+                    inserts.push({ user_id: user.id, date: toDate, recipe_id: meal.recipe.id });
+                    optimisticAdds.push({
+                        date: toDate,
+                        meal: { title: meal.title, image_url: meal.image_url, recipe: meal.recipe, note: '', completed: false }
+                    });
+                } else if (meal.isCustom) {
+                    inserts.push({ user_id: user.id, date: toDate, custom_title: meal.title });
+                    optimisticAdds.push({
+                        date: toDate,
+                        meal: { title: meal.title, isCustom: true, note: '', completed: false }
+                    });
+                }
+            });
+        });
+
+        if (inserts.length === 0) return 0;
+
+        // Optimistic
+        setPlannedMeals(prev => {
+            const next = { ...prev };
+            optimisticAdds.forEach(({ date, meal }) => {
+                next[date] = [...(next[date] || []), { ...meal, id: `temp-copy-${Date.now()}-${Math.random()}` }];
+            });
+            return next;
+        });
+
+        const { data, error } = await supabase
+            .from('meal_planner')
+            .insert(inserts)
+            .select();
+
+        if (error) {
+            console.error('Error copying week:', error);
+            // Revert optimistic — full refresh is safest
+            await fetchMealPlan();
+            return 0;
+        }
+
+        // Replace temp IDs with real IDs from DB response
+        if (data) {
+            await fetchMealPlan();
+        }
+
+        return inserts.length;
+    };
+
+    // ── NEW: Rate a meal (1–5 stars, stored in meal_planner.rating) ─────────
+    const rateMeal = async (mealId: number | string, rating: number) => {
+        // Optimistic update
+        setPlannedMeals(prev => {
+            const next = { ...prev };
+            for (const date in next) {
+                const idx = next[date].findIndex(m => m.id === mealId);
+                if (idx !== -1) {
+                    next[date] = [...next[date]];
+                    next[date][idx] = { ...next[date][idx], rating };
+                    break;
+                }
+            }
+            return next;
+        });
+
+        // Gracefully handle missing column
+        const { error } = await supabase
+            .from('meal_planner')
+            .update({ rating })
+            .eq('id', mealId);
+
+        if (error) {
+            // Column may not exist yet — silently skip, rating stays in memory
+            console.warn('rateMeal DB error (column may not exist yet):', error.message);
+        }
+    };
+
     return (
         <MealPlannerContext.Provider value={{
             plannedMeals,
@@ -432,6 +565,9 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             toggleMealCompleted,
             saveDailyNote,
             saveDailyExpense,
+            moveRecipeToDate,
+            copyWeekMeals,
+            rateMeal,
             loading,
             refreshMealPlan: fetchMealPlan
         }}>
