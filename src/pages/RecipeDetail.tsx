@@ -662,7 +662,7 @@ export default function RecipeDetail() {
                                         <GitMerge size={24} strokeWidth={2.5} />
                                     </Link>
                                     <Link
-                                        to={`/edit/${recipe ? recipe.id : ''}`}
+                                        to={`/recipe/${recipe ? (recipe.slug || recipe.id) : ''}/edit`}
                                         className="bg-white/30 backdrop-blur-md p-3.5 rounded-2xl hover:bg-white/40 transition-all text-white border border-white/20 shadow-xl active:scale-90 flex items-center justify-center"
                                         title="Edit Recipe"
                                     >

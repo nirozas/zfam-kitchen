@@ -384,7 +384,7 @@ export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const isEditing = !!id && location.pathname.startsWith('/edit/');
+  const isEditing = !!id && (location.pathname.startsWith('/edit/') || location.pathname.endsWith('/edit'));
   const isAltering = !!id && location.pathname.startsWith('/alter/');
   const { categories } = useCategories();
   const [originalRecipeTitle, setOriginalRecipeTitle] = useState<string | null>(null);
