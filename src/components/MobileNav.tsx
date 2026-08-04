@@ -14,8 +14,8 @@ export default function MobileNav() {
                     <span className="text-[10px] font-medium">Home</span>
                 </Link>
                 <Link
-                    to="/search"
-                    className={clsx("flex flex-col items-center gap-1 transition-colors", isActive('/search') ? "text-primary-600" : "text-gray-400")}
+                    to="/all_recipes"
+                    className={clsx("flex flex-col items-center gap-1 transition-colors", isActive('/all_recipes') ? "text-primary-600" : "text-gray-400")}
                 >
                     <Search size={22} />
                     <span className="text-[10px] font-medium">Search</span>

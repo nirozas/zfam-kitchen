@@ -38,7 +38,7 @@ function App() {
                         <Routes>
                             <Route element={<Layout />}>
                                 <Route index element={<Home />} />
-                                <Route path="search" element={<Search />} />
+                                <Route path="all_recipes" element={<Search />} />
                                 <Route path="recipe/:id" element={<RecipeDetail />} />
                                 <Route path="planner" element={<Planner />} />
                                 <Route path="create" element={<CreateRecipe />} />

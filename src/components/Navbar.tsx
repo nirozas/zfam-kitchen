@@ -66,7 +66,7 @@ export default function Navbar() {
 
     const dropdownMenu = [
         { label: 'Home', icon: Home, path: '/', color: 'text-gray-600', bg: 'bg-gray-50' },
-        { label: 'All Recipes', icon: Utensils, path: '/search', color: 'text-primary-600', bg: 'bg-primary-50' },
+        { label: 'All Recipes', icon: Utensils, path: '/all_recipes', color: 'text-primary-600', bg: 'bg-primary-50' },
         { label: 'My Favorites', icon: Star, path: '/activity?type=favorites', color: 'text-amber-500', bg: 'bg-amber-50' },
         { label: 'Liked Recipes', icon: Heart, path: '/activity?type=likes', color: 'text-rose-500', bg: 'bg-rose-50' },
         { label: 'Categories', icon: LayoutGrid, path: '/categories', color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -142,7 +142,7 @@ export default function Navbar() {
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Navigation</p>
                                             <div className="flex gap-4">
                                                 <Link to="/" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Home</Link>
-                                                <Link to="/search" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Recipes</Link>
+                                                <Link to="/all_recipes" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Recipes</Link>
                                                 <Link to="/planner" onClick={() => setIsLogoDropdownOpen(false)} className="text-xs font-bold text-gray-600 hover:text-primary-600 transition-colors">Planner</Link>
                                             </div>
                                         </div>
@@ -177,7 +177,7 @@ export default function Navbar() {
                         <Link to="/create" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors whitespace-nowrap">
                             + New Recipe
                         </Link>
-                        <Link to="/search" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
+                        <Link to="/all_recipes" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
                             Recipes
                         </Link>
                         <Link to="/categories" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
@@ -188,14 +188,14 @@ export default function Navbar() {
                     <div className={clsx(
                         "flex-1 transition-all duration-300 ease-in-out px-1 sm:px-2",
                         isSearchExpanded ? "max-w-xl" : "max-w-[32px] sm:max-w-xs md:max-w-md",
-                        location.pathname === '/search' && !isSearchExpanded && "lg:opacity-0 lg:pointer-events-none"
+                        location.pathname === '/all_recipes' && !isSearchExpanded && "lg:opacity-0 lg:pointer-events-none"
                     )}>
                         <form
                             onSubmit={(e) => {
                                 e.preventDefault();
                                 const formData = new FormData(e.currentTarget);
                                 const query = formData.get('search') as string;
-                                navigate(`/search?q=${encodeURIComponent(query)}`);
+                                navigate(`/all_recipes?q=${encodeURIComponent(query)}`);
                             }}
                             className="relative group"
                         >

@@ -262,7 +262,7 @@ export default function Search() {
             <div className="container mx-auto max-w-[1800px]">
                 {/* Main Header Container */}
                 <div className="flex flex-col gap-8 mb-16">
-                    {/* Row 1: Title and Search */}
+                    {/* Row 1: Title and Sort */}
                     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 px-4">
                         <div className="text-left">
                             <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-2 tracking-tight">
@@ -273,6 +273,31 @@ export default function Search() {
                             </p>
                         </div>
 
+                        {/* Sort Controls */}
+                        <div className="flex shrink-0 items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm self-start lg:self-end">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Sort</span>
+                            <div className="h-6 w-px bg-gray-100 mx-1"></div>
+                            <select
+                                value={sortBy}
+                                onChange={(e: any) => setSortBy(e.target.value)}
+                                className="bg-transparent border-none focus:ring-0 font-black text-[10px] uppercase tracking-widest cursor-pointer text-gray-700 hover:text-primary-600 transition-colors pr-8"
+                            >
+                                <option value="created_at">Newest</option>
+                                <option value="title">Alphabetical</option>
+                                <option value="rating">Top Rated</option>
+                                <option value="times_used">Most Popular</option>
+                                <option value="category">Category</option>
+                            </select>
+                            <button
+                                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                className="p-2 bg-gray-50 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-all active:scale-95"
+                            >
+                                {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
+                            </button>
+                        </div>
+
+                    {/* Row 2: Search Bars */}
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-4 z-40 relative">
                         <form 
                             onSubmit={(e) => {
                                 e.preventDefault();
@@ -355,10 +380,6 @@ export default function Search() {
                                 </AnimatePresence>
                             </div>
                         </form>
-                    </div>
-
-                    {/* Row 2: Ingredients Search and Sort */}
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-4 z-40 relative">
                         {/* Ingredients Multi-select input */}
                         <form 
                             onSubmit={(e) => {
@@ -437,8 +458,12 @@ export default function Search() {
                             </AnimatePresence>
                         </form>
 
+                    </div>
+
+                    {/* Row 3: Selected Ingredients Chips */}
+                    {selectedIngredients.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 px-4 mb-6 min-h-[40px]">
                         {/* Selected Ingredients Chips */}
-                        <div className="flex flex-wrap items-center gap-2 flex-1 min-h-[40px]">
                             {selectedIngredients.map(ing => (
                                 <motion.button
                                     initial={{ scale: 0.8, opacity: 0 }}
@@ -460,31 +485,9 @@ export default function Search() {
                                     Clear All
                                 </button>
                             )}
-                        </div>
 
-                        {/* Sort Controls */}
-                        <div className="flex shrink-0 items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Sort</span>
-                            <div className="h-6 w-px bg-gray-100 mx-1"></div>
-                            <select
-                                value={sortBy}
-                                onChange={(e: any) => setSortBy(e.target.value)}
-                                className="bg-transparent border-none focus:ring-0 font-black text-[10px] uppercase tracking-widest cursor-pointer text-gray-700 hover:text-primary-600 transition-colors pr-8"
-                            >
-                                <option value="created_at">Newest</option>
-                                <option value="title">Alphabetical</option>
-                                <option value="rating">Top Rated</option>
-                                <option value="times_used">Most Popular</option>
-                                <option value="category">Category</option>
-                            </select>
-                            <button
-                                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                                className="p-2 bg-gray-50 rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-all active:scale-95"
-                            >
-                                {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                            </button>
                         </div>
-                    </div>
+                    )}
 
                     {/* Row 3: Category Filter and Density */}
                     <div className="flex flex-wrap items-center justify-between gap-4 px-4">
