@@ -133,9 +133,35 @@ export function useRecipes(options?: UseRecipesOptions) {
 }
 
 export function useRecipe(id: string | undefined) {
-    const [recipe, setRecipe] = useState<Recipe | null>(null);
-    const [loading, setLoading] = useState(true);
+    // Pre-check cache to make navigation instant if already loaded on home page
+    let cachedRecipe = null;
+    if (id) {
+        for (const key in recipesCache) {
+            const entry = recipesCache[key];
+            if (Date.now() - entry.ts < CACHE_TTL_MS) {
+                const found = entry.recipes.find(r => r.id === id || r.slug === id);
+                if (found) {
+                    cachedRecipe = found;
+                    break;
+                }
+            }
+        }
+    }
+
+    const [recipe, setRecipe] = useState<Recipe | null>(cachedRecipe);
+    const [loading, setLoading] = useState(!cachedRecipe);
     const [error, setError] = useState<string | null>(null);
+
+    // If id changes, immediately update recipe to cached version (if any) to prevent showing old recipe
+    useEffect(() => {
+        if (cachedRecipe) {
+            setRecipe(cachedRecipe);
+            setLoading(false);
+        } else {
+            setRecipe(null);
+            setLoading(true);
+        }
+    }, [id]);
 
     useEffect(() => {
         if (!id) {
@@ -146,7 +172,8 @@ export function useRecipe(id: string | undefined) {
         async function fetchRecipe() {
             if (!id) return;
             try {
-                setLoading(true);
+                // setLoading is handled by the effect above
+                
                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
                 // One efficient query to get EVERYTHING
