@@ -28,27 +28,73 @@ const DAY_ACCENTS = [
 
 // ── Debounced input helpers ───────────────────────────────────────────────────
 const DebouncedInput = ({ value, onChange, placeholder, className, delay = 500 }: any) => {
-    const [local, setLocal] = useState(value);
+    const [local, setLocal] = useState(value || '');
+    const [isFocused, setIsFocused] = useState(false);
     const timer = useRef<any>(null);
-    useEffect(() => { setLocal(value); }, [value]);
+
+    useEffect(() => { 
+        if (!isFocused) {
+            setLocal(value || '');
+        }
+    }, [value, isFocused]);
+
     const handle = (e: any) => {
-        const v = e.target.value; setLocal(v);
+        const v = e.target.value; 
+        setLocal(v);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => onChange(v), delay);
     };
-    return <input type="text" placeholder={placeholder} className={className} value={local} onChange={handle} />;
+
+    return (
+        <input 
+            type="text" 
+            placeholder={placeholder} 
+            className={className} 
+            value={local} 
+            onChange={handle}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => {
+                setIsFocused(false);
+                if (timer.current) clearTimeout(timer.current);
+                onChange(local);
+            }}
+        />
+    );
 };
 
 const DebouncedTextArea = ({ value, onChange, placeholder, className, delay = 500, onTouchStart }: any) => {
     const [local, setLocal] = useState(value || '');
+    const [isFocused, setIsFocused] = useState(false);
     const timer = useRef<any>(null);
-    useEffect(() => { setLocal(value || ''); }, [value]);
+
+    useEffect(() => { 
+        if (!isFocused) {
+            setLocal(value || '');
+        }
+    }, [value, isFocused]);
+
     const handle = (e: any) => {
-        const v = e.target.value; setLocal(v);
+        const v = e.target.value; 
+        setLocal(v);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => onChange(v), delay);
     };
-    return <textarea placeholder={placeholder} className={className} value={local} onChange={handle} onTouchStart={onTouchStart} />;
+
+    return (
+        <textarea 
+            placeholder={placeholder} 
+            className={className} 
+            value={local} 
+            onChange={handle} 
+            onTouchStart={onTouchStart}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => {
+                setIsFocused(false);
+                if (timer.current) clearTimeout(timer.current);
+                onChange(local);
+            }} 
+        />
+    );
 };
 
 // ── Star Rating Popover ───────────────────────────────────────────────────────
@@ -194,6 +240,7 @@ export default function Planner() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchDate, setSearchDate] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchMealType, setSearchMealType] = useState('dinner');
     const [assigningMealId, setAssigningMealId] = useState<number | string | null>(null);
     const [isStatsOpen, setIsStatsOpen] = useState(false);
     const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -271,7 +318,7 @@ export default function Planner() {
 
     const handleSearchAdd = (recipe: Recipe) => {
         if (assigningMealId) { assignRecipeToMeal(assigningMealId, recipe); setAssigningMealId(null); }
-        else if (searchDate) addRecipeToDate(recipe, searchDate);
+        else if (searchDate) addRecipeToDate(recipe, searchDate, searchMealType);
         setIsSearchOpen(false);
     };
 
@@ -614,7 +661,18 @@ export default function Planner() {
 
                                 {/* Meals */}
                                 <div className="space-y-3 flex-1">
-                                    {meals.map((meal, idx) => {
+                                    {['breakfast', 'lunch', 'dinner', 'sweets', 'extra'].map(mealType => {
+                                        const typeMeals = meals.map((m, i) => ({ m, i })).filter(({ m }) => (m.meal_type || 'dinner') === mealType);
+                                        if (typeMeals.length === 0) return null;
+                                        
+                                        return (
+                                            <div key={mealType} className="mb-4">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1 flex items-center gap-2">
+                                                    {mealType}
+                                                    <div className="h-px bg-gray-100 flex-1" />
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {typeMeals.map(({ m: meal, i: idx }) => {
                                         const matchesSearch = !plannerSearchQuery ||
                                             meal.title.toLowerCase().includes(plannerSearchQuery.toLowerCase()) ||
                                             (meal.recipe?.tags || []).some(t => t.name.toLowerCase().includes(plannerSearchQuery.toLowerCase()));
@@ -645,7 +703,7 @@ export default function Planner() {
                                                     <div className="relative">
                                                         <Link
                                                             to={`/recipe/${meal.recipe.slug || meal.recipe.id}`}
-                                                            className={`block rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100/80 ${meal.completed ? 'opacity-50' : ''}`}
+                                                            className={`block rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100/80`}
                                                             draggable={false}
                                                         >
                                                             <div className="relative h-28 w-full bg-gray-100">
@@ -684,8 +742,7 @@ export default function Planner() {
                                                         {/* Completion overlay */}
                                                         {meal.completed && (
                                                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                <div className="bg-emerald-500/20 backdrop-blur-[2px] rounded-2xl inset-0 absolute" />
-                                                                <CheckCircle2 size={28} className="text-emerald-500 relative z-10" strokeWidth={2.5} />
+                                                                <CheckCircle2 size={28} className="text-emerald-500 bg-white rounded-full p-0.5 shadow-sm relative z-10" strokeWidth={2.5} />
                                                             </div>
                                                         )}
 
@@ -742,6 +799,10 @@ export default function Planner() {
                                                     <X size={11} strokeWidth={4} />
                                                 </button>
                                             </motion.div>
+                                            </div>
+                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -834,7 +895,7 @@ export default function Planner() {
                         >
                             <div className="p-7 border-b border-gray-50 flex items-center gap-5 bg-gradient-to-br from-primary-50 to-rose-50">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-rose-500 flex items-center justify-center text-white shadow-lg flex-shrink-0"><Search size={22} /></div>
-                                <form className="flex-1" onSubmit={e => { e.preventDefault(); if (searchQuery.trim() && !assigningMealId && searchDate) { addCustomMealToDate(searchQuery, searchDate); setIsSearchOpen(false); } }}>
+                                <form className="flex-1" onSubmit={e => { e.preventDefault(); if (searchQuery.trim() && !assigningMealId && searchDate) { addCustomMealToDate(searchQuery, searchDate, searchMealType); setIsSearchOpen(false); } }}>
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 mb-1">{assigningMealId ? 'Replace Entry' : 'Add to Planner'}</p>
                                     <input autoFocus type="text" className="w-full outline-none text-2xl font-black placeholder-gray-300 bg-transparent text-gray-900"
                                         placeholder={assigningMealId ? 'Search for replacement…' : 'Search your kitchen…'}
@@ -844,8 +905,25 @@ export default function Planner() {
                             </div>
 
                             <div className="overflow-y-auto p-5 flex-1 custom-scrollbar">
+                                {!assigningMealId && (
+                                    <div className="mb-6 flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
+                                        {['breakfast', 'lunch', 'dinner', 'sweets', 'extra'].map(type => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setSearchMealType(type)}
+                                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex-shrink-0 border ${
+                                                    searchMealType === type 
+                                                        ? 'bg-primary-500 text-white border-primary-500 shadow-md' 
+                                                        : 'bg-white text-gray-400 hover:bg-gray-50 border-gray-100'
+                                                }`}
+                                            >
+                                                {type}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 {searchQuery.trim() && !assigningMealId && (
-                                    <button onClick={() => { if (searchDate) { addCustomMealToDate(searchQuery, searchDate); setIsSearchOpen(false); } }} className="mb-6 w-full flex items-center gap-4 p-4 bg-primary-50 rounded-2xl border-2 border-dashed border-primary-200 hover:bg-primary-100 transition-all text-left">
+                                    <button onClick={() => { if (searchDate) { addCustomMealToDate(searchQuery, searchDate, searchMealType); setIsSearchOpen(false); } }} className="mb-6 w-full flex items-center gap-4 p-4 bg-primary-50 rounded-2xl border-2 border-dashed border-primary-200 hover:bg-primary-100 transition-all text-left">
                                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-rose-500 flex items-center justify-center text-white shadow-md flex-shrink-0"><Sparkles size={22} /></div>
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest text-primary-600 mb-0.5">Custom Entry</p>

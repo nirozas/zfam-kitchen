@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PieChart, TrendingUp, Utensils, Store, ShoppingBag } from 'lucide-react';
 import { useMealPlanner } from '@/contexts/MealPlannerContext';
-import { format } from 'date-fns';
+import { format, startOfWeek } from 'date-fns';
 
 interface PlannerStatsModalProps {
     isOpen: boolean;
@@ -11,7 +11,7 @@ interface PlannerStatsModalProps {
 
 export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) => {
     const { plannedMeals, dailyExpenses } = useMealPlanner();
-    const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
+    const [viewMode, setViewMode] = useState<'week' | 'month' | 'year'>('week');
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
     const stats = useMemo(() => {
@@ -19,6 +19,7 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
         let homeExpenses = 0;
         let restaurantCount = 0;
         let homeCookedCount = 0;
+        let uniqueDaysDiningIn = 0;
         
         let meatCount = 0;
         let chickenCount = 0;
@@ -28,6 +29,11 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
         const categoryCounts: Record<string, number> = {};
 
         const isIncluded = (dateStr: string) => {
+            if (viewMode === 'week') {
+                const targetStart = format(startOfWeek(new Date(`${dateStr}T12:00:00`), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+                const selectedStart = format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+                return targetStart === selectedStart;
+            }
             if (viewMode === 'month') return dateStr.startsWith(format(selectedDate, 'yyyy-MM'));
             return dateStr.startsWith(format(selectedDate, 'yyyy'));
         };
@@ -47,6 +53,7 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
         // Process meals
         Object.entries(plannedMeals).forEach(([dateStr, meals]) => {
             if (isIncluded(dateStr)) {
+                if (meals.length > 0) uniqueDaysDiningIn++;
                 meals.forEach(meal => {
                     homeCookedCount++;
                     if (meal.recipe) {
@@ -71,7 +78,7 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
         });
 
         return {
-            restaurantExpenses, homeExpenses, restaurantCount, homeCookedCount,
+            restaurantExpenses, homeExpenses, restaurantCount, homeCookedCount, uniqueDaysDiningIn,
             meatCount, chickenCount, fishCount, vegCount,
             categoryCounts
         };
@@ -79,7 +86,8 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
 
     const changeDate = (dir: number) => {
         const newDate = new Date(selectedDate);
-        if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + dir);
+        if (viewMode === 'week') newDate.setDate(newDate.getDate() + (dir * 7));
+        else if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + dir);
         else newDate.setFullYear(newDate.getFullYear() + dir);
         setSelectedDate(newDate);
     };
@@ -119,6 +127,12 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
                     <div className="p-6 bg-white border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex bg-gray-100 p-1 rounded-xl">
                             <button
+                                onClick={() => setViewMode('week')}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${viewMode === 'week' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                Weekly
+                            </button>
+                            <button
                                 onClick={() => setViewMode('month')}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${viewMode === 'month' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                             >
@@ -137,7 +151,8 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
                                 ←
                             </button>
                             <span className="font-bold text-gray-800 min-w-[120px] text-center">
-                                {viewMode === 'month' ? format(selectedDate, 'MMMM yyyy') : format(selectedDate, 'yyyy')}
+                                {viewMode === 'week' ? `Week of ${format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'MMM d')}` :
+                                 viewMode === 'month' ? format(selectedDate, 'MMMM yyyy') : format(selectedDate, 'yyyy')}
                             </span>
                             <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors">
                                 →
@@ -147,7 +162,7 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
 
                     {/* Content */}
                     <div className="p-6 overflow-y-auto bg-gray-50/30">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                             <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
                                 <Store size={24} className="text-orange-500 mb-2" />
                                 <span className="text-2xl font-black text-gray-900">${stats.restaurantExpenses.toFixed(2)}</span>
@@ -167,6 +182,16 @@ export const PlannerStatsModal = ({ isOpen, onClose }: PlannerStatsModalProps) =
                                 <TrendingUp size={24} className="text-blue-500 mb-2" />
                                 <span className="text-2xl font-black text-gray-900">{stats.homeCookedCount + stats.restaurantCount}</span>
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Events</span>
+                            </div>
+                            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                                <Store size={24} className="text-amber-500 mb-2" />
+                                <span className="text-2xl font-black text-gray-900">{stats.restaurantCount}</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Days Dining Out</span>
+                            </div>
+                            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                                <Utensils size={24} className="text-teal-500 mb-2" />
+                                <span className="text-2xl font-black text-gray-900">{stats.uniqueDaysDiningIn}</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Days Dining In</span>
                             </div>
                         </div>
 

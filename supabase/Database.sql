@@ -99,7 +99,11 @@ create table meal_planner (
   user_id uuid references auth.users on delete cascade not null,
   recipe_id uuid references recipes(id) on delete cascade, -- Nullable to allow custom entries
   custom_title text, -- Added for "undocumented meals"
-  date date not null
+  date date not null,
+  note text,
+  completed boolean default false,
+  rating smallint check (rating >= 1 and rating <= 5),
+  meal_type text default 'dinner'
 );
 
 -- 9. REVIEWS (Ratings)

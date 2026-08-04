@@ -16,6 +16,7 @@ interface AddToPlannerModalProps {
 export default function AddToPlannerModal({ isOpen, onClose, recipe }: AddToPlannerModalProps) {
     const { addRecipeToDate, plannedMeals } = useMealPlanner();
     const [weekOffset, setWeekOffset] = useState(0);
+    const [selectedMealType, setSelectedMealType] = useState('dinner');
 
     const today = new Date();
     const currentWeekStart = startOfWeek(addDays(today, weekOffset * 7), { weekStartsOn: 1 });
@@ -24,7 +25,7 @@ export default function AddToPlannerModal({ isOpen, onClose, recipe }: AddToPlan
     if (!isOpen) return null;
 
     const handleAddToDate = (dateStr: string) => {
-        addRecipeToDate(recipe, dateStr);
+        addRecipeToDate(recipe, dateStr, selectedMealType);
         
         toast.success(`Added "${recipe.title}" to ${format(new Date(dateStr), 'EEEE')}!`, {
             icon: '🗓️',
@@ -67,6 +68,23 @@ export default function AddToPlannerModal({ isOpen, onClose, recipe }: AddToPlan
                         </div>
 
                         <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar bg-gray-50/50">
+                            {/* Meal Type Selector */}
+                            <div className="mb-6 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 flex overflow-x-auto custom-scrollbar">
+                                {['breakfast', 'lunch', 'dinner', 'sweets', 'extra'].map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => setSelectedMealType(type)}
+                                        className={`flex-1 min-w-[80px] px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                                            selectedMealType === type 
+                                                ? 'bg-primary-500 text-white shadow-md' 
+                                                : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                                        }`}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+
                             <div className="flex items-center justify-between mb-6">
                                 <button 
                                     onClick={() => setWeekOffset(prev => prev - 1)}

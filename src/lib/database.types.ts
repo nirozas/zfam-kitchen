@@ -214,20 +214,35 @@ export interface Database {
                 Row: {
                     id: number
                     user_id: string
-                    recipe_id: string
+                    recipe_id: string | null
+                    custom_title: string | null
                     date: string
+                    note: string | null
+                    completed: boolean | null
+                    rating: number | null
+                    meal_type: string | null
                 }
                 Insert: {
                     id?: number
                     user_id: string
-                    recipe_id: string
+                    recipe_id?: string | null
+                    custom_title?: string | null
                     date: string
+                    note?: string | null
+                    completed?: boolean | null
+                    rating?: number | null
+                    meal_type?: string | null
                 }
                 Update: {
                     id?: number
                     user_id?: string
-                    recipe_id?: string
+                    recipe_id?: string | null
+                    custom_title?: string | null
                     date?: string
+                    note?: string | null
+                    completed?: boolean | null
+                    rating?: number | null
+                    meal_type?: string | null
                 }
             }
             reviews: {

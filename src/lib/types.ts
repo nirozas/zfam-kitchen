@@ -41,6 +41,7 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     author?: Database['public']['Tables']['profiles']['Row']; // Joined author
     rating: number; // User rating from 1 to 5 stars
     likesCount?: number; // Pre-fetched likes count
+    is_image_recipe: boolean | null;
     // parent_recipe_id is inherited from RecipeRow — links back to the source recipe for alterations
 }
 
@@ -61,6 +62,7 @@ export interface MealPlanEntry {
     custom_title?: string | null;
     note?: string | null;
     completed?: boolean;
+    meal_type?: string;
 }
 
 export type PlannerMeal = {
@@ -73,6 +75,7 @@ export type PlannerMeal = {
     note?: string;
     completed?: boolean;
     rating?: number;
+    meal_type?: string;
 };
 
 // Album Layouts Types

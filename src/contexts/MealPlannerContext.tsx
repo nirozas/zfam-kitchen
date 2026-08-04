@@ -6,8 +6,8 @@ import toast from 'react-hot-toast';
 interface MealPlannerContextType {
     plannedMeals: Record<string, PlannerMeal[]>;
     dailyNotes: Record<string, string>;
-    addRecipeToDate: (recipe: Recipe, dateStr: string) => Promise<boolean>;
-    addCustomMealToDate: (title: string, dateStr: string) => Promise<boolean>;
+    addRecipeToDate: (recipe: Recipe, dateStr: string, mealType?: string) => Promise<boolean>;
+    addCustomMealToDate: (title: string, dateStr: string, mealType?: string) => Promise<boolean>;
     removeRecipeFromDate: (dateStr: string, index: number) => void;
     assignRecipeToMeal: (mealId: number | string, recipe: Recipe) => Promise<void>;
     updateMealNote: (dateStr: string, mealIndex: number, note: string) => Promise<void>;
@@ -70,7 +70,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                         title: item.custom_title,
                         isCustom: true,
                         note: item.note || '',
-                        completed: item.completed || false
+                        completed: item.completed || false,
+                        meal_type: item.meal_type || 'dinner'
                     });
                 } else if (item.recipes) {
                     const rawRecipe = item.recipes;
@@ -91,7 +92,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                         image_url: recipe.image_url || undefined,
                         recipe: recipe,
                         note: item.note || '',
-                        completed: item.completed || false
+                        completed: item.completed || false,
+                        meal_type: item.meal_type || 'dinner'
                     });
                 }
             });
@@ -136,7 +138,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const addRecipeToDate = async (recipe: Recipe, dateStr: string): Promise<boolean> => {
+    const addRecipeToDate = async (recipe: Recipe, dateStr: string, mealType: string = 'dinner'): Promise<boolean> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             toast.error("You must be signed in to add to your meal planner.");
@@ -154,7 +156,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                 image_url: recipe.image_url || undefined,
                 recipe: recipe,
                 note: '',
-                completed: false
+                completed: false,
+                meal_type: mealType
             }]
         }));
 
@@ -163,7 +166,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             .insert({
                 user_id: user.id,
                 recipe_id: recipe.id,
-                date: dateStr
+                date: dateStr,
+                meal_type: mealType
             })
             .select()
             .single();
@@ -193,7 +197,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                         image_url: recipe.image_url || undefined,
                         recipe: recipe,
                         note: '',
-                        completed: false
+                        completed: false,
+                        meal_type: data.meal_type || mealType
                     });
                 }
                 return { ...prev, [dateStr]: meals };
@@ -203,7 +208,7 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
         return false;
     };
 
-    const addCustomMealToDate = async (title: string, dateStr: string): Promise<boolean> => {
+    const addCustomMealToDate = async (title: string, dateStr: string, mealType: string = 'dinner'): Promise<boolean> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             toast.error("You must be signed in to add to your meal planner.");
@@ -220,7 +225,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                 title: title,
                 isCustom: true,
                 note: '',
-                completed: false
+                completed: false,
+                meal_type: mealType
             }]
         }));
 
@@ -229,7 +235,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             .insert({
                 user_id: user.id,
                 custom_title: title,
-                date: dateStr
+                date: dateStr,
+                meal_type: mealType
             })
             .select()
             .single();
@@ -258,7 +265,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
                         title: title,
                         isCustom: true,
                         note: '',
-                        completed: false
+                        completed: false,
+                        meal_type: data.meal_type || mealType
                     });
                 }
                 return { ...prev, [dateStr]: meals };
@@ -423,8 +431,8 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // ── NEW: Move a meal from one date to another (drag-and-drop) ──────────
-    const moveRecipeToDate = async (fromDate: string, mealIndex: number, toDate: string) => {
-        if (fromDate === toDate) return;
+    const moveRecipeToDate = async (fromDate: string, mealIndex: number, toDate: string, toMealType?: string) => {
+        if (fromDate === toDate && !toMealType) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -436,15 +444,21 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             const next = { ...prev };
             const fromMeals = [...(next[fromDate] || [])];
             const [moved] = fromMeals.splice(mealIndex, 1);
+            
+            if (toMealType) moved.meal_type = toMealType;
+
             next[fromDate] = fromMeals;
             next[toDate] = [...(next[toDate] || []), { ...moved }];
             return next;
         });
 
         // DB: update the date on that row
+        const updates: any = { date: toDate };
+        if (toMealType) updates.meal_type = toMealType;
+
         const { error } = await supabase
             .from('meal_planner')
-            .update({ date: toDate })
+            .update(updates)
             .eq('id', meal.id);
 
         if (error) {
@@ -478,16 +492,16 @@ export const MealPlannerProvider = ({ children }: { children: ReactNode }) => {
             const meals = plannedMeals[fromDate] || [];
             meals.forEach(meal => {
                 if (meal.recipe) {
-                    inserts.push({ user_id: user.id, date: toDate, recipe_id: meal.recipe.id });
+                    inserts.push({ user_id: user.id, date: toDate, recipe_id: meal.recipe.id, meal_type: meal.meal_type || 'dinner' });
                     optimisticAdds.push({
                         date: toDate,
-                        meal: { title: meal.title, image_url: meal.image_url, recipe: meal.recipe, note: '', completed: false }
+                        meal: { title: meal.title, image_url: meal.image_url, recipe: meal.recipe, note: '', completed: false, meal_type: meal.meal_type || 'dinner' }
                     });
                 } else if (meal.isCustom) {
-                    inserts.push({ user_id: user.id, date: toDate, custom_title: meal.title });
+                    inserts.push({ user_id: user.id, date: toDate, custom_title: meal.title, meal_type: meal.meal_type || 'dinner' });
                     optimisticAdds.push({
                         date: toDate,
-                        meal: { title: meal.title, isCustom: true, note: '', completed: false }
+                        meal: { title: meal.title, isCustom: true, note: '', completed: false, meal_type: meal.meal_type || 'dinner' }
                     });
                 }
             });
