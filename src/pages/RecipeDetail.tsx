@@ -827,7 +827,7 @@ export default function RecipeDetail() {
                         </div>
 
                         {/* Usage Stats - Optimized for Mobile Grid */}
-                        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-8 lg:gap-16 py-4 sm:py-2 border-t sm:border-none border-white/5 w-full sm:w-auto">
+                        <div className="flex flex-wrap sm:flex-nowrap justify-between sm:justify-start items-center gap-4 sm:gap-8 lg:gap-16 py-4 sm:py-2 border-t sm:border-none border-white/5 w-full sm:w-auto">
                             <div className="flex flex-col items-center sm:items-start">
                                 <span className="text-[8px] sm:text-[10px] text-white/50 mb-0.5 font-black whitespace-nowrap">MONTH</span>
                                 <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none">{usageStats.month}</span>
@@ -840,6 +840,15 @@ export default function RecipeDetail() {
                                 <span className="text-[8px] sm:text-[10px] text-white/50 mb-0.5 font-black whitespace-nowrap">ALL</span>
                                 <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none">{usageStats.allTime}</span>
                             </div>
+                            {usageStats.ratingCount > 0 && (
+                                <div className="flex flex-col items-center sm:items-start">
+                                    <span className="text-[8px] sm:text-[10px] text-amber-400 mb-0.5 font-black whitespace-nowrap flex items-center gap-0.5">PLANNER <Star size={10} className="fill-current" /></span>
+                                    <span className="text-xl sm:text-2xl lg:text-4xl font-black text-white leading-none flex items-baseline gap-1">
+                                        {usageStats.avgRating}
+                                        <span className="text-[10px] sm:text-xs text-white/50 font-medium tracking-normal mb-1">({usageStats.ratingCount})</span>
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex flex-wrap gap-2 print:hidden w-full sm:w-auto justify-start sm:justify-end">

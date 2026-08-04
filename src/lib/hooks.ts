@@ -297,7 +297,7 @@ export function useRecipeStats() {
 }
 
 export function useDetailedRecipeStats(recipeId: string | undefined) {
-    const [stats, setStats] = useState({ month: 0, year: 0, allTime: 0 });
+    const [stats, setStats] = useState({ month: 0, year: 0, allTime: 0, avgRating: 0, ratingCount: 0 });
     const [loading, setLoading] = useState(false); // Start non-blocking
 
     useEffect(() => {
@@ -309,16 +309,22 @@ export function useDetailedRecipeStats(recipeId: string | undefined) {
                 const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
                 const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
 
-                const [allTimeRes, monthRes, yearRes] = await Promise.all([
+                const [allTimeRes, monthRes, yearRes, ratingRes] = await Promise.all([
                     supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId),
                     supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', monthStart),
-                    supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', yearStart)
+                    supabase.from('meal_planner').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId).gte('date', yearStart),
+                    supabase.from('meal_planner').select('rating').eq('recipe_id', recipeId).not('rating', 'is', null)
                 ]);
+
+                const ratings = ratingRes.data?.map(r => r.rating) || [];
+                const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
 
                 setStats({
                     allTime: allTimeRes.count || 0,
                     month: monthRes.count || 0,
-                    year: yearRes.count || 0
+                    year: yearRes.count || 0,
+                    avgRating: Math.round(avgRating * 10) / 10,
+                    ratingCount: ratings.length
                 });
             } catch (err) {
                 console.error('Error fetching detailed stats:', err);
