@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon, GitMerge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
@@ -15,9 +15,12 @@ import { Recipe } from '@/lib/types';
 
 export default function RecipeDetail() {
     const { id } = useParams();
+    const location = useLocation();
+    const initialRecipe = location.state?.initialRecipe;
+    
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
     const navigate = useNavigate();
-    const { recipe, loading, error } = useRecipe(id);
+    const { recipe, loading, error } = useRecipe(id, initialRecipe);
     const { reviews, fetchReviews } = useReviews(isUuid ? id : recipe?.id);
     const { likes, toggleLike } = useLikes();
     const { count: likesCount, fetchCount: fetchLikesCount } = useRecipeLikes(recipe?.id);

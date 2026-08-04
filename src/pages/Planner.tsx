@@ -703,6 +703,7 @@ export default function Planner() {
                                                     <div className="relative">
                                                         <Link
                                                             to={`/recipe/${meal.recipe.slug || meal.recipe.id}`}
+                                                            state={{ initialRecipe: meal.recipe }}
                                                             className={`block rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100/80`}
                                                             draggable={false}
                                                         >

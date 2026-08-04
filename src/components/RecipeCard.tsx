@@ -94,7 +94,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
             className="group bg-white rounded-3xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_40px_-12px_rgba(233,84,84,0.2)] transition-all duration-500 border border-gray-100 relative"
         >
-            <Link to={`/recipe/${recipe.slug || recipe.id}`} className="block">
+            <Link to={`/recipe/${recipe.slug || recipe.id}`} state={{ initialRecipe: recipe }} className="block">
                 <div className="aspect-[3/2] overflow-hidden relative bg-gray-100 flex items-center justify-center">
                     {recipe.image_url ? (
                         <img

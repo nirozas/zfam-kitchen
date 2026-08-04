@@ -132,18 +132,17 @@ export function useRecipes(options?: UseRecipesOptions) {
     return { recipes, loading, error, totalCount };
 }
 
-export function useRecipe(id: string | undefined) {
+export function useRecipe(id: string | undefined, initialRecipe?: any) {
     // Pre-check cache to make navigation instant if already loaded on home page
-    let cachedRecipe = null;
-    if (id) {
+    let cachedRecipe = initialRecipe || null;
+    if (id && !cachedRecipe) {
         for (const key in recipesCache) {
             const entry = recipesCache[key];
-            if (Date.now() - entry.ts < CACHE_TTL_MS) {
-                const found = entry.recipes.find(r => r.id === id || r.slug === id);
-                if (found) {
-                    cachedRecipe = found;
-                    break;
-                }
+            // Stale-While-Revalidate: Use cache even if expired for instant UI, fetch will update it
+            const found = entry.recipes.find(r => r.id === id || r.slug === id);
+            if (found) {
+                cachedRecipe = found;
+                break;
             }
         }
     }
