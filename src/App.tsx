@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ShoppingCartProvider } from './contexts/ShoppingCartContext';
 import { MealPlannerProvider } from './contexts/MealPlannerContext';
+import { UserInteractionsProvider } from './contexts/UserInteractionsContext';
 import { Toaster } from 'react-hot-toast';
 
 // Lazy load pages for code splitting
@@ -30,35 +31,37 @@ const PageLoader = () => (
 
 function App() {
     return (
-        <ShoppingCartProvider>
-            <MealPlannerProvider>
-                <Toaster position="top-center" />
-                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                    <Suspense fallback={<PageLoader />}>
-                        <Routes>
-                            <Route element={<Layout />}>
-                                <Route index element={<Home />} />
-                                <Route path="all_recipes" element={<Search />} />
-                                <Route path="recipe/:id" element={<RecipeDetail />} />
-                                <Route path="planner" element={<Planner />} />
-                                <Route path="create" element={<CreateRecipe />} />
-                                <Route path="recipe/:id/edit" element={<CreateRecipe />} />
-                                <Route path="alter/:id" element={<CreateRecipe />} />
-                                <Route path="auth" element={<Auth />} />
-                                <Route path="admin" element={<AdminDashboard />} />
-                                <Route path="statistics" element={<Statistics />} />
-                                <Route path="cart" element={<ShoppingCart />} />
-                                <Route path="scan" element={<ScanReceipt />} />
-                                <Route path="categories" element={<Categories />} />
-                                <Route path="category/*" element={<CategoryDetail />} />
-                                <Route path="profile" element={<Profile />} />
-                                <Route path="activity" element={<Activity />} />
-                            </Route>
-                        </Routes>
-                    </Suspense>
-                </BrowserRouter>
-            </MealPlannerProvider>
-        </ShoppingCartProvider>
+        <UserInteractionsProvider>
+            <ShoppingCartProvider>
+                <MealPlannerProvider>
+                    <Toaster position="top-center" />
+                    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                        <Suspense fallback={<PageLoader />}>
+                            <Routes>
+                                <Route element={<Layout />}>
+                                    <Route index element={<Home />} />
+                                    <Route path="all_recipes" element={<Search />} />
+                                    <Route path="recipe/:id" element={<RecipeDetail />} />
+                                    <Route path="planner" element={<Planner />} />
+                                    <Route path="create" element={<CreateRecipe />} />
+                                    <Route path="recipe/:id/edit" element={<CreateRecipe />} />
+                                    <Route path="alter/:id" element={<CreateRecipe />} />
+                                    <Route path="auth" element={<Auth />} />
+                                    <Route path="admin" element={<AdminDashboard />} />
+                                    <Route path="statistics" element={<Statistics />} />
+                                    <Route path="cart" element={<ShoppingCart />} />
+                                    <Route path="scan" element={<ScanReceipt />} />
+                                    <Route path="categories" element={<Categories />} />
+                                    <Route path="category/*" element={<CategoryDetail />} />
+                                    <Route path="profile" element={<Profile />} />
+                                    <Route path="activity" element={<Activity />} />
+                                </Route>
+                            </Routes>
+                        </Suspense>
+                    </BrowserRouter>
+                </MealPlannerProvider>
+            </ShoppingCartProvider>
+        </UserInteractionsProvider>
     );
 }
 

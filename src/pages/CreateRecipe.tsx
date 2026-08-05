@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize, ChevronDown, ChevronUp, ChevronRight, Check } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
@@ -136,25 +136,15 @@ const cleanIngData = (ing: any) => {
 
 const IngredientReorderItem = ({
   ing, i, ingredients, setIngredients, updateIngredient, addIngredient, removeIngredient, addAlternative,
-  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling, allIngredientNames, moveGroup
+  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling, moveGroup
 }: any) => {
   const controls = useDragControls();
-  const prevIng = ingredients[i - 1];
-  const showHeader = !prevIng || prevIng.group_name !== ing.group_name;
-
-  const [isFocused, setIsFocused] = useState(false);
-  const suggestions = useMemo(() => {
-    if (!ing.name.trim() || ing.linked_recipe) return [];
-    const search = ing.name.toLowerCase();
-    return (allIngredientNames || [])
-      .filter((n: string) => n.toLowerCase().includes(search) && n.toLowerCase() !== search)
-      .slice(0, 10);
-  }, [ing.name, ing.linked_recipe, allIngredientNames]);
+  const showHeader = i === 0 || ingredients[i - 1]?.group_name !== ing.group_name;
 
   return (
     <Reorder.Item
       value={ing}
-      className={`space-y-4 ${ing.is_alternative ? 'ml-8' : ''} relative ${isFocused ? 'z-50' : 'z-0'}`}
+      className={`space-y-4 ${ing.is_alternative ? 'ml-8' : ''} relative z-0`}
       dragListener={false}
       dragControls={controls}
       initial={isMagicFilling ? { opacity: 0, x: -20 } : false}
@@ -198,31 +188,11 @@ const IngredientReorderItem = ({
             <input
               type="text"
               placeholder="Item"
+              list="ingredient-options"
               className="w-full bg-gray-50 focus:bg-white rounded-lg py-2.5 pl-10 pr-3 text-sm font-medium border-none transition-all"
               value={ing.linked_recipe ? ing.linked_recipe.title : ing.name}
               onChange={e => updateIngredient(i, 'name', e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
             />
-            {isFocused && suggestions.length > 0 && !ing.linked_recipe && (
-              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-100 rounded-lg shadow-xl overflow-hidden">
-                <ul className="max-h-48 overflow-y-auto py-1">
-                  {suggestions.map((suggestion: string, idx: number) => (
-                    <li
-                      key={idx}
-                      className="px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        updateIngredient(i, 'name', suggestion);
-                        setIsFocused(false);
-                      }}
-                    >
-                      {suggestion}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <button
               type="button"
               onClick={() => {
@@ -392,8 +362,8 @@ export default function CreateRecipe() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const isEditing = !!id && (location.pathname.startsWith('/edit/') || location.pathname.endsWith('/edit'));
-  const isAltering = !!id && location.pathname.startsWith('/alter/');
+  const isEditing = !!id && location.pathname.includes('/edit');
+  const isAltering = !!id && location.pathname.includes('/alter');
   const { categories } = useCategories();
   const [originalRecipeTitle, setOriginalRecipeTitle] = useState<string | null>(null);
 
@@ -1831,7 +1801,7 @@ export default function CreateRecipe() {
                       setActiveRecipeLinkType={setActiveRecipeLinkType}
                       setActiveRecipeLinkIndex={setActiveRecipeLinkIndex}
                       isMagicFilling={isMagicFilling}
-                      allIngredientNames={allIngredientNames}
+                      moveGroup={moveGroup}
                     />
                   ))}
                 </Reorder.Group>
@@ -2016,6 +1986,11 @@ export default function CreateRecipe() {
       <datalist id="unit-options">
         {availableUnits.map(u => (
           <option key={u} value={u.charAt(0).toUpperCase() + u.slice(1)} />
+        ))}
+      </datalist>
+      <datalist id="ingredient-options">
+        {allIngredientNames.map(name => (
+          <option key={name} value={name} />
         ))}
       </datalist>
       <LinkImporterModal

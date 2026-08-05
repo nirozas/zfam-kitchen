@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { Recipe } from './types';
+import { useUserInteractions } from '@/contexts/UserInteractionsContext';
 
 // Simple module-level cache so re-mounting components (like modals) don't re-fetch
 const recipesCache: Record<string, { recipes: Recipe[], ts: number }> = {};
@@ -430,67 +431,7 @@ export function useTopTags(limit: number = 12) {
 }
 
 export function useFavorites() {
-    const [favorites, setFavorites] = useState<string[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchFavorites();
-    }, []);
-
-    async function fetchFavorites() {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setFavorites([]);
-                return;
-            }
-
-            const { data, error } = await supabase
-                .from('favorites')
-                .select('recipe_id')
-                .eq('user_id', user.id);
-
-            if (error) throw error;
-            setFavorites(data?.map(f => f.recipe_id) || []);
-        } catch (err) {
-            console.error('Error fetching favorites:', err);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    const toggleFavorite = async (recipeId: string) => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                alert('Please sign in to favorite recipes');
-                return;
-            }
-
-            const isFavorited = favorites.includes(recipeId);
-
-            if (isFavorited) {
-                const { error } = await supabase
-                    .from('favorites')
-                    .delete()
-                    .eq('user_id', user.id)
-                    .eq('recipe_id', recipeId);
-
-                if (error) throw error;
-                setFavorites(favorites.filter(id => id !== recipeId));
-            } else {
-                const { error } = await supabase
-                    .from('favorites')
-                    .insert({ user_id: user.id, recipe_id: recipeId });
-
-                if (error) throw error;
-                setFavorites([...favorites, recipeId]);
-            }
-        } catch (err) {
-            console.error('Error toggling favorite:', err);
-        }
-    };
-
+    const { favorites, toggleFavorite, loading } = useUserInteractions();
     return { favorites, toggleFavorite, loading };
 }
 
@@ -612,61 +553,8 @@ export function useUserStats(userId: string | undefined) {
 
 // --- Likes Hook ---
 export function useLikes() {
-    const [likes, setLikes] = useState<string[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    const fetchLikes = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setLikes([]);
-                return;
-            }
-
-            const { data, error } = await supabase
-                .from('likes')
-                .select('recipe_id')
-                .eq('user_id', user.id);
-
-            if (error) throw error;
-            setLikes(data?.map(l => l.recipe_id) || []);
-        } catch (err) {
-            console.error('Error fetching likes:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchLikes();
-    }, []);
-
-    const toggleLike = async (recipeId: string) => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            if (likes.includes(recipeId)) {
-                const { error } = await supabase
-                    .from('likes')
-                    .delete()
-                    .eq('user_id', user.id)
-                    .eq('recipe_id', recipeId);
-                if (error) throw error;
-                setLikes(prev => prev.filter(id => id !== recipeId));
-            } else {
-                const { error } = await supabase
-                    .from('likes')
-                    .insert([{ user_id: user.id, recipe_id: recipeId }]);
-                if (error) throw error;
-                setLikes(prev => [...prev, recipeId]);
-            }
-        } catch (err) {
-            console.error('Error toggling like:', err);
-        }
-    };
-
-    return { likes, loading, toggleLike, fetchLikes };
+    const { likes, loading, toggleLike, refreshInteractions } = useUserInteractions();
+    return { likes, loading, toggleLike, fetchLikes: refreshInteractions };
 }
 
 export function useRecipeLikes(recipeId?: string) {
