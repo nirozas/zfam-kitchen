@@ -295,6 +295,7 @@ export default function Search() {
                                 {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
                             </button>
                         </div>
+                    </div>
 
                     {/* Row 2: Search Bars */}
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-4 z-40 relative">
