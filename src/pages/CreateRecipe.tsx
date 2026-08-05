@@ -426,6 +426,33 @@ export default function CreateRecipe() {
   const [importedImages, setImportedImages] = useState<string[]>([]);
   const [aiEstimatedFields, setAiEstimatedFields] = useState<string[]>([]);
 
+  const [availableUnits, setAvailableUnits] = useState<string[]>(COMMON_UNITS);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('customUnits');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setAvailableUnits(Array.from(new Set([...COMMON_UNITS, ...parsed])));
+        }
+      } catch(e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentCustom = ingredients
+      .map(ing => ing.unit?.trim().toLowerCase())
+      .filter(unit => unit && !COMMON_UNITS.includes(unit));
+      
+    if (currentCustom.length > 0) {
+      const saved = JSON.parse(localStorage.getItem('customUnits') || '[]');
+      const newSaved = Array.from(new Set([...saved, ...currentCustom]));
+      localStorage.setItem('customUnits', JSON.stringify(newSaved));
+      setAvailableUnits(Array.from(new Set([...COMMON_UNITS, ...newSaved])));
+    }
+  }, [ingredients]);
+
   const [activeRecipeLinkIndex, setActiveRecipeLinkIndex] = useState<number | null>(null);
   const [activeRecipeLinkType, setActiveRecipeLinkType] = useState<'ingredient' | 'step'>('step');
 
@@ -1940,7 +1967,7 @@ export default function CreateRecipe() {
       </AnimatePresence>
 
       <datalist id="unit-options">
-        {COMMON_UNITS.map(u => (
+        {availableUnits.map(u => (
           <option key={u} value={u.charAt(0).toUpperCase() + u.slice(1)} />
         ))}
       </datalist>
