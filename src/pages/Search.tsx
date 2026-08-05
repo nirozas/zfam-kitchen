@@ -128,14 +128,24 @@ export default function Search() {
 
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
-                    const term = si.toLowerCase();
+                    let rawTerm = si.trim();
+                    const isExactMatch = /^".+"$/.test(rawTerm) || /^'.+'$/.test(rawTerm);
+                    if (isExactMatch) {
+                        rawTerm = rawTerm.slice(1, -1);
+                    }
+                    const term = rawTerm.toLowerCase();
 
-                    // Find all canonical ingredients that match the term in ANY language (partial match)
+                    // Find all canonical ingredients that match the term in ANY language
                     const matchingCanonicals = ingredientsData.filter(d =>
-                        d.name.toLowerCase().includes(term) ||
-                        (d.name_ar || '').toLowerCase().includes(term) ||
-                        (d.name_he || '').toLowerCase().includes(term) ||
-                        (d.name_es || '').toLowerCase().includes(term)
+                        isExactMatch
+                            ? d.name.toLowerCase() === term ||
+                              (d.name_ar || '').toLowerCase() === term ||
+                              (d.name_he || '').toLowerCase() === term ||
+                              (d.name_es || '').toLowerCase() === term
+                            : d.name.toLowerCase().includes(term) ||
+                              (d.name_ar || '').toLowerCase().includes(term) ||
+                              (d.name_he || '').toLowerCase().includes(term) ||
+                              (d.name_es || '').toLowerCase().includes(term)
                     );
 
                     // Collect ALL known name variants (all languages) for every matching canonical ingredient
@@ -161,16 +171,28 @@ export default function Search() {
                             const ingEs = (ing.name_es || '').toLowerCase();
                             return Array.from(allVariants).some(variant =>
                                 variant.length > 1 && (
-                                    ingName.includes(variant) ||
-                                    ingAr.includes(variant) ||
-                                    ingHe.includes(variant) ||
-                                    ingEs.includes(variant)
+                                    isExactMatch ? (
+                                        ingName === variant ||
+                                        ingAr === variant ||
+                                        ingHe === variant ||
+                                        ingEs === variant
+                                    ) : (
+                                        ingName.includes(variant) ||
+                                        ingAr.includes(variant) ||
+                                        ingHe.includes(variant) ||
+                                        ingEs.includes(variant)
+                                    )
                                 )
                             );
                         }
 
                         // Fallback: literal match across all language fields
-                        return (
+                        return isExactMatch ? (
+                            (ing.name || '').toLowerCase() === term ||
+                            (ing.name_ar || '').toLowerCase() === term ||
+                            (ing.name_he || '').toLowerCase() === term ||
+                            (ing.name_es || '').toLowerCase() === term
+                        ) : (
                             (ing.name || '').toLowerCase().includes(term) ||
                             (ing.name_ar || '').toLowerCase().includes(term) ||
                             (ing.name_he || '').toLowerCase().includes(term) ||
