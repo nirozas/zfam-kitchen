@@ -603,7 +603,7 @@ export default function Planner() {
                             onDrop={e => handleDrop(e, dateStr)}
                             onDragLeave={() => setDragOverDate(null)}
                             className={`
-                                min-h-[400px] md:min-h-[520px] rounded-[2rem] flex flex-col relative overflow-hidden
+                                min-h-[400px] md:min-h-[520px] rounded-[2rem] flex flex-col relative
                                 transition-all duration-200
                                 ${isToday ? 'shadow-2xl shadow-orange-200/60 ring-2 ring-orange-300 z-10' : 'shadow-sm hover:shadow-lg border border-gray-100'}
                                 ${isWeekend ? 'bg-amber-50/50' : 'bg-white'}
@@ -611,7 +611,7 @@ export default function Planner() {
                             `}
                         >
                             {/* Accent bar */}
-                            <div className={`h-1.5 w-full bg-gradient-to-r ${accent.bg} flex-shrink-0`} />
+                            <div className={`h-1.5 w-full bg-gradient-to-r ${accent.bg} flex-shrink-0 rounded-t-[2rem]`} />
 
                             {/* Grocery progress bar */}
                             {cartProgress && (
@@ -632,7 +632,7 @@ export default function Planner() {
                             )}
 
                             {/* Today glow */}
-                            {isToday && <div className="absolute inset-0 bg-gradient-to-b from-orange-50/80 to-transparent pointer-events-none z-0" />}
+                            {isToday && <div className="absolute inset-0 bg-gradient-to-b from-orange-50/80 to-transparent pointer-events-none z-0 rounded-[2rem]" />}
 
                             <div className="relative z-10 flex flex-col flex-1 p-4">
                                 {/* Day header */}
