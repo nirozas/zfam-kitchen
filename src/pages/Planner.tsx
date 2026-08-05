@@ -608,6 +608,7 @@ export default function Planner() {
                                 ${isToday ? 'shadow-2xl shadow-orange-200/60 ring-2 ring-orange-300 z-10' : 'shadow-sm hover:shadow-lg border border-gray-100'}
                                 ${isWeekend ? 'bg-amber-50/50' : 'bg-white'}
                                 ${isDragOver ? `ring-2 ${accent.border} shadow-lg scale-[1.02]` : ''}
+                                ${ratingFor?.dateStr === dateStr ? 'z-20' : ''}
                             `}
                         >
                             {/* Accent bar */}
@@ -697,7 +698,7 @@ export default function Planner() {
                                                     rotate: isDragging ? 1 : 0,
                                                 }}
                                                 transition={{ delay: idx * 0.04 }}
-                                                className="group relative"
+                                                className={`group relative ${isRatingActive ? 'z-30' : 'z-0'}`}
                                             >
                                                 {meal.recipe ? (
                                                     <div className="relative">
