@@ -14,7 +14,26 @@ export default function Search() {
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const [localQuery, setLocalQuery] = useState(query);
-    const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+    const ingredientsQuery = searchParams.get('ingredients') || '';
+    const [selectedIngredients, setSelectedIngredients] = useState<string[]>(ingredientsQuery ? ingredientsQuery.split(',') : []);
+    
+    // Helper to keep URL in sync with selected ingredients
+    const handleSetIngredients = (action: React.SetStateAction<string[]>) => {
+        setSelectedIngredients(prev => {
+            const next = typeof action === 'function' ? (action as any)(prev) : action;
+            setSearchParams(params => {
+                if (next.length > 0) params.set('ingredients', next.join(','));
+                else params.delete('ingredients');
+                return params;
+            }, { replace: true });
+            return next;
+        });
+    };
+    
+    // Keep local state in sync if URL changes externally (e.g. back button)
+    useEffect(() => {
+        setSelectedIngredients(ingredientsQuery ? ingredientsQuery.split(',') : []);
+    }, [ingredientsQuery]);
     const [ingredientSearch, setIngredientSearch] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isIngredientFocused, setIsIngredientFocused] = useState(false);
@@ -386,7 +405,7 @@ export default function Search() {
                             onSubmit={(e) => {
                                 e.preventDefault();
                                 if (ingredientSearch.trim()) {
-                                    setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
+                                    handleSetIngredients(prev => [...prev, ingredientSearch.trim()]);
                                     setIngredientSearch('');
                                     setIsIngredientFocused(false);
                                     (e.target as any).querySelector('input')?.blur();
@@ -406,7 +425,7 @@ export default function Search() {
                                 onBlur={() => setTimeout(() => setIsIngredientFocused(false), 200)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && ingredientSearch.trim()) {
-                                        setSelectedIngredients(prev => [...prev, ingredientSearch.trim()]);
+                                        handleSetIngredients(prev => [...prev, ingredientSearch.trim()]);
                                         setIngredientSearch('');
                                         setIsIngredientFocused(false);
                                         (e.currentTarget as HTMLInputElement).blur();
@@ -430,7 +449,7 @@ export default function Search() {
                                                 key={ing.name}
                                                 type="button"
                                                 onClick={() => {
-                                                    setSelectedIngredients(prev => [...prev, ing.name]);
+                                                    handleSetIngredients(prev => [...prev, ing.name]);
                                                     setIngredientSearch('');
                                                     setIsIngredientFocused(false);
                                                 }}
@@ -470,7 +489,7 @@ export default function Search() {
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     key={ing}
-                                    onClick={() => setSelectedIngredients(prev => prev.filter(i => i !== ing))}
+                                    onClick={() => handleSetIngredients(prev => prev.filter(i => i !== ing))}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-red-500 transition-all shadow-md group"
                                     title={getIngredientLabel(ing)}
                                 >
@@ -480,7 +499,7 @@ export default function Search() {
                             ))}
                             {selectedIngredients.length > 0 && (
                                 <button
-                                    onClick={() => setSelectedIngredients([])}
+                                    onClick={() => handleSetIngredients([])}
                                     className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors"
                                 >
                                     Clear All
@@ -612,7 +631,7 @@ export default function Search() {
                             onClick={() => {
                                 setLocalQuery('');
                                 setSearchParams({});
-                                setSelectedIngredients([]);
+                                handleSetIngredients([]);
                                 setSelectedCategories([]);
                             }}
                             className="inline-flex items-center justify-center px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-xl active:scale-95"
