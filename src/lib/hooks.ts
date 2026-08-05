@@ -27,6 +27,13 @@ export function useRecipes(options?: UseRecipesOptions) {
                 setLoading(true);
 
                 let query;
+                const MINIMAL_FIELDS = `
+                    id, slug, title, image_url, created_at, rating, category_id, 
+                    time_minutes, servings, is_image_recipe, description,
+                    author:author_id(username),
+                    category:category_id(id, name, slug)
+                `;
+
                 const LIST_FIELDS = `
                     id, slug, title, image_url, created_at, rating, category_id, 
                     time_minutes, description, servings, alternative_titles,
@@ -38,7 +45,10 @@ export function useRecipes(options?: UseRecipesOptions) {
                 `;
 
                 if (options?.minimal) {
-                    query = supabase.from('recipes').select(LIST_FIELDS, { count: 'exact' });
+                    query = supabase.from('recipes').select(`
+                        ${MINIMAL_FIELDS},
+                        recipe_categories(categories(id, name, slug))
+                    `, { count: 'exact' });
                 } else {
                     query = supabase.from('recipes').select(`
                         ${LIST_FIELDS},
@@ -96,8 +106,8 @@ export function useRecipes(options?: UseRecipesOptions) {
                 setRecipes(transformedRecipes);
                 setLoading(false);
 
-                // Fetch likes in the background (non-blocking)
-                if (transformedRecipes.length > 0) {
+                // Fetch likes in the background (non-blocking) - limited to avoid massive payloads
+                if (transformedRecipes.length > 0 && transformedRecipes.length <= 200) {
                     const recipeIds = transformedRecipes.map(r => r.id);
                     supabase
                         .from('likes')
@@ -151,8 +161,10 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
     const [loading, setLoading] = useState(!cachedRecipe);
     const [error, setError] = useState<string | null>(null);
 
-    // If id changes, immediately update recipe to cached version (if any) to prevent showing old recipe
     useEffect(() => {
+        let isMounted = true;
+        let timeoutId: number;
+
         if (cachedRecipe) {
             setRecipe(cachedRecipe);
             setLoading(false);
@@ -160,20 +172,23 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
             setRecipe(null);
             setLoading(true);
         }
-    }, [id]);
 
-    useEffect(() => {
         if (!id) {
             setLoading(false);
             return;
         }
 
         async function fetchRecipe() {
-            if (!id) return;
             try {
-                // setLoading is handled by the effect above
-                
-                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+                // Safety timeout to prevent infinite loading state
+                timeoutId = window.setTimeout(() => {
+                    if (isMounted) {
+                        setError('Request timed out. Please refresh the page.');
+                        setLoading(false);
+                    }
+                }, 10000);
+
+                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
 
                 // One efficient query to get EVERYTHING
                 let query = supabase
@@ -202,7 +217,8 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
 
                 if (error) throw error;
 
-                if (data) {
+                if (data && isMounted) {
+                    clearTimeout(timeoutId);
                     const fullRecipe: Recipe = {
                         ...data,
                         rating: data.rating || 3,
@@ -233,19 +249,28 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
                         .select('*', { count: 'exact', head: true })
                         .eq('recipe_id', fullRecipe.id)
                         .then(({ count: likesCount }) => {
-                            setRecipe(prev => prev ? { ...prev, likesCount: likesCount || 0 } : prev);
+                            if (isMounted) {
+                                setRecipe(prev => prev ? { ...prev, likesCount: likesCount || 0 } : prev);
+                            }
                         });
                 }
             } catch (err: any) {
-                console.error('Full Recipe Fetch Error:', err);
-                const message = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
-                setError(`Fetch Error: ${message}`);
-            } finally {
-                setLoading(false);
+                if (isMounted) {
+                    clearTimeout(timeoutId);
+                    console.error('Full Recipe Fetch Error:', err);
+                    const message = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+                    setError(`Fetch Error: ${message}`);
+                    setLoading(false);
+                }
             }
         }
 
         fetchRecipe();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, [id]);
 
     return { recipe, loading, error };

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, Plus, X, Upload, Loader2, Star, Trash2, Maximize2, Sparkles, GripVertical, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Maximize, ChevronDown, ChevronUp, ChevronRight, Check } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useCategories } from '@/lib/hooks';
@@ -136,7 +136,7 @@ const cleanIngData = (ing: any) => {
 
 const IngredientReorderItem = ({
   ing, i, ingredients, setIngredients, updateIngredient, addIngredient, removeIngredient, addAlternative,
-  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling, allIngredientNames
+  setActiveRecipeLinkType, setActiveRecipeLinkIndex, isMagicFilling, allIngredientNames, moveGroup
 }: any) => {
   const controls = useDragControls();
   const prevIng = ingredients[i - 1];
@@ -163,7 +163,7 @@ const IngredientReorderItem = ({
     >
       <div className="space-y-2">
         {showHeader && (
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0">
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 first:mt-0 first:pt-0 first:border-0 group/header">
             <input type="text" className="flex-1 bg-transparent text-sm font-black text-gray-900 border-none px-0 outline-none uppercase tracking-widest placeholder:text-gray-300 transition-colors" placeholder="Group Name (e.g. Marinade)" value={ing.group_name} onChange={e => {
               const next = [...ingredients];
               const oldGroup = ing.group_name;
@@ -173,6 +173,14 @@ const IngredientReorderItem = ({
               }
               setIngredients(next);
             }} />
+            <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
+               <button type="button" onClick={() => moveGroup(i, 'up')} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Move Section Up">
+                 <ChevronUp size={16} />
+               </button>
+               <button type="button" onClick={() => moveGroup(i, 'down')} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Move Section Down">
+                 <ChevronDown size={16} />
+               </button>
+            </div>
             <button type="button" onClick={() => addIngredient(i)} className="text-[10px] font-black text-primary-600 uppercase">+ Item</button>
           </div>
         )}
@@ -1009,6 +1017,45 @@ export default function CreateRecipe() {
     setIngredients(next);
   };
 
+  const moveGroup = (startIndex: number, direction: 'up' | 'down') => {
+    const groupName = ingredients[startIndex].group_name || 'Ingredients';
+    let endIndex = startIndex;
+    while (endIndex + 1 < ingredients.length && (ingredients[endIndex + 1].group_name || 'Ingredients') === groupName) {
+      endIndex++;
+    }
+    
+    const next = [...ingredients];
+    
+    if (direction === 'up') {
+      if (startIndex === 0) return;
+      
+      const prevGroupName = next[startIndex - 1].group_name || 'Ingredients';
+      let prevStartIndex = startIndex - 1;
+      while (prevStartIndex - 1 >= 0 && (next[prevStartIndex - 1].group_name || 'Ingredients') === prevGroupName) {
+        prevStartIndex--;
+      }
+      
+      const currentBlock = next.slice(startIndex, endIndex + 1);
+      const prevBlock = next.slice(prevStartIndex, startIndex);
+      
+      next.splice(prevStartIndex, currentBlock.length + prevBlock.length, ...currentBlock, ...prevBlock);
+    } else {
+      if (endIndex === next.length - 1) return;
+      
+      const nextGroupName = next[endIndex + 1].group_name || 'Ingredients';
+      let nextEndIndex = endIndex + 1;
+      while (nextEndIndex + 1 < next.length && (next[nextEndIndex + 1].group_name || 'Ingredients') === nextGroupName) {
+        nextEndIndex++;
+      }
+      
+      const currentBlock = next.slice(startIndex, endIndex + 1);
+      const nextBlock = next.slice(endIndex + 1, nextEndIndex + 1);
+      
+      next.splice(startIndex, currentBlock.length + nextBlock.length, ...nextBlock, ...currentBlock);
+    }
+    
+    setIngredients(next);
+  };
 
   const parseBulkIngredients = () => {
     const lines = bulkIngredientsText.split('\n').filter(l => l.trim() !== '');

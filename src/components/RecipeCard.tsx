@@ -1,4 +1,5 @@
 import { Recipe } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -52,11 +53,41 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         await toggleLike(recipe.id);
     };
 
-    const handleAddToCart = (e: React.MouseEvent) => {
+    const handleAddToCart = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
-        setIsStoreModalOpen(true);
+        if (recipe.ingredients && recipe.ingredients.length > 0) {
+            setIsStoreModalOpen(true);
+        } else {
+            toast.loading('Loading ingredients...', { id: 'fetch-ingredients' });
+            try {
+                const { data, error } = await supabase
+                    .from('recipe_ingredients')
+                    .select('amount_in_grams, unit, group_name, note, ingredients(*, purchase_url), linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)')
+                    .eq('recipe_id', recipe.id);
+                
+                if (error) throw error;
+                
+                if (data) {
+                    recipe.ingredients = data.map((ri: any) => ({
+                        amount_in_grams: ri.amount_in_grams,
+                        unit: ri.unit || 'g',
+                        group_name: ri.group_name || 'Ingredients',
+                        note: ri.note,
+                        purchaseUrl: ri.ingredients?.purchase_url || null,
+                        ingredient: ri.ingredients,
+                        linked_recipe: ri.linked_recipe
+                    })).filter((ing: any) => ing.ingredient || ing.linked_recipe);
+                    
+                    toast.dismiss('fetch-ingredients');
+                    setIsStoreModalOpen(true);
+                }
+            } catch (err) {
+                console.error('Failed to fetch ingredients for cart', err);
+                toast.error('Failed to load ingredients', { id: 'fetch-ingredients' });
+            }
+        }
     };
 
     const confirmAddToCart = (storeName: string) => {
