@@ -77,3 +77,19 @@ export function formatAmount(amount: number): string {
     
     return Number(amount.toFixed(2)).toString();
 }
+
+export function minutesToTimeStr(minutes: number | null | undefined): string {
+    if (!minutes || isNaN(minutes)) return '00:00';
+    const h = Math.floor(minutes / 60);
+    const m = Math.floor(minutes % 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+export function timeStrToMinutes(timeStr: string | null | undefined): number {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return parseInt(timeStr, 10) || 0; // fallback if user typed a number
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    return h * 60 + m;
+}

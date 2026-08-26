@@ -37,7 +37,7 @@ export function useRecipes(options?: UseRecipesOptions) {
 
                 const LIST_FIELDS = `
                     id, slug, title, image_url, created_at, rating, category_id, 
-                    time_minutes, description, servings, alternative_titles,
+                    time_minutes, prep_time_minutes, cook_time_minutes, rest_time_minutes, description, servings, alternative_titles,
                     is_image_recipe,
                     author:author_id(username),
                     category:category_id(id, name, slug),

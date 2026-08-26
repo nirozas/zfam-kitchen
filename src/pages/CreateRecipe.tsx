@@ -7,7 +7,7 @@ import { useCategories } from '@/lib/hooks';
 import ImageCropper from '@/components/ImageCropper';
 import LinkImporterModal from '@/components/LinkImporterModal';
 import RecipeSelectorModal from '@/components/RecipeSelectorModal';
-import { generateSlug, getOptimizedImageUrl, fixImageUrl } from '@/lib/utils';
+import { generateSlug, getOptimizedImageUrl, fixImageUrl, minutesToTimeStr, timeStrToMinutes } from '@/lib/utils';
 import { toTitleCase } from '@/utils/stringUtils';
 import { uploadToB2, deleteFromB2 } from '@/lib/b2';
 import toast from 'react-hot-toast';
@@ -383,8 +383,9 @@ export default function CreateRecipe() {
     rating: 3,
     tags: '',
     is_image_recipe: false,
-    prep_time: '15',
-    cook_time: '30',
+    prep_time: '00:15',
+    cook_time: '00:30',
+    rest_time: '00:00',
     servings: '4',
     nutrition: { serving_amount: '', calories: '0', protein: '0', fat: '0', carbs: '0' },
   });
@@ -450,6 +451,7 @@ export default function CreateRecipe() {
   const [tagsList, setTagsList] = useState<string[]>([]);
   const [keywordsList, setKeywordsList] = useState<string[]>([]);
   const [allKeywords, setAllKeywords] = useState<{ id: number, name: string }[]>([]);
+  const [allCountries, setAllCountries] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState('');
   const [showKeywordSuggestions, setShowKeywordSuggestions] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -497,8 +499,16 @@ export default function CreateRecipe() {
         setAllIngredientNames(data.map(d => d.name));
       }
     };
+    const fetchAllCountries = async () => {
+      const { data, error } = await supabase.from('recipes').select('country_origin').not('country_origin', 'is', null);
+      if (!error && data) {
+        const unique = Array.from(new Set(data.map(d => d.country_origin).filter(c => c && c.trim())));
+        setAllCountries(unique as string[]);
+      }
+    };
     fetchAllKeywords();
     fetchAllIngredients();
+    fetchAllCountries();
   }, []);
 
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -633,16 +643,11 @@ export default function CreateRecipe() {
               rating: recipe.rating || 3,
               is_image_recipe: recipe.is_image_recipe || false,
               tags: recipe.recipe_tags?.map((rt: any) => rt.tags?.name ? `#${rt.tags.name}` : '').filter(Boolean).join(' ') || '',
-              prep_time: (recipe.prep_time_minutes || 0).toString(),
-              cook_time: (recipe.cook_time_minutes || 0).toString(),
-              servings: (recipe.servings || 1).toString(),
-              nutrition: {
-                serving_amount: recipe.nutrition?.serving_amount || '',
-                calories: (recipe.nutrition?.calories || 0).toString(),
-                protein: (recipe.nutrition?.protein || 0).toString(),
-                fat: (recipe.nutrition?.fat || 0).toString(),
-                carbs: (recipe.nutrition?.carbs || 0).toString()
-              }
+              prep_time: minutesToTimeStr(recipe.prep_time_minutes),
+              cook_time: minutesToTimeStr(recipe.cook_time_minutes),
+              rest_time: minutesToTimeStr(recipe.rest_time_minutes),
+              servings: (recipe.servings || 0).toString(),
+              nutrition: recipe.nutrition ? (recipe.nutrition as any) : { serving_amount: '', calories: '0', protein: '0', fat: '0', carbs: '0' }
             });
 
             const loadedTags = recipe.recipe_tags?.map((rt: any) => rt.tags?.name).filter(Boolean) || [];
@@ -739,6 +744,10 @@ export default function CreateRecipe() {
       }
 
       const newSlug = generateSlug(formData.title);
+      const prep = timeStrToMinutes(formData.prep_time);
+      const cook = timeStrToMinutes(formData.cook_time);
+      const rest = timeStrToMinutes(formData.rest_time);
+      const servings = parseInt(formData.servings) || 4;
 
       // In alter mode: ensure the title is different from the original AND slug doesn't already exist
       if (isAltering) {
@@ -760,8 +769,6 @@ export default function CreateRecipe() {
         }
       }
 
-      const prep = parseInt(formData.prep_time) || 0;
-      const cook = parseInt(formData.cook_time) || 0;
       const recipeData = {
         title: formData.title,
         description: formData.description,
@@ -774,17 +781,12 @@ export default function CreateRecipe() {
         category_id: formData.category_id || null,
         steps: formData.steps.filter((s: RecipeStep) => s.text.trim() !== '' || s.image_url),
         author_id: session.user.id,
-        time_minutes: prep + cook,
+        time_minutes: prep + cook + rest,
         prep_time_minutes: prep,
         cook_time_minutes: cook,
-        servings: parseInt(formData.servings) || 1,
-        nutrition: {
-          serving_amount: formData.nutrition.serving_amount,
-          calories: parseInt(formData.nutrition.calories) || 0,
-          protein: parseInt(formData.nutrition.protein) || 0,
-          fat: parseInt(formData.nutrition.fat) || 0,
-          carbs: parseInt(formData.nutrition.carbs) || 0
-        },
+        rest_time_minutes: rest,
+        servings: servings,
+        nutrition: formData.nutrition,
         rating: formData.rating,
         is_image_recipe: formData.is_image_recipe,
         slug: newSlug,
@@ -1505,7 +1507,12 @@ export default function CreateRecipe() {
                   </div>
                   <div className="space-y-1 col-span-2">
                     <label className="text-[10px] font-black uppercase text-gray-400">Country of Origin</label>
-                    <input type="text" placeholder="e.g. Italy, Lebanon, Mexico" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm font-bold" value={formData.country_origin} onChange={e => setFormData({ ...formData, country_origin: e.target.value })} />
+                    <input list="country-options" type="text" placeholder="e.g. Italy, Lebanon, Mexico" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm font-bold" value={formData.country_origin} onChange={e => setFormData({ ...formData, country_origin: e.target.value })} />
+                    <datalist id="country-options">
+                      {allCountries.map((country, idx) => (
+                        <option key={idx} value={country} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="space-y-1 col-span-2">
                     <label className="text-[10px] font-black uppercase text-gray-400">Rating</label>
@@ -1517,33 +1524,21 @@ export default function CreateRecipe() {
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
                     <label className="text-[10px] font-black uppercase text-gray-400">Servings</label>
                     <input type="number" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.servings} onChange={e => setFormData({ ...formData, servings: e.target.value })} />
                   </div>
-                  <div className="space-y-1 relative group">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Prep (Min)</label>
-                    <input
-                      type="number"
-                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('prep_time') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`}
-                      value={formData.prep_time}
-                      onChange={e => setFormData({ ...formData, prep_time: e.target.value })}
-                    />
-                    {aiEstimatedFields.includes('prep_time') && (
-                      <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated - Please verify" />
-                    )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Prep (hh:mm)</label>
+                    <input type="text" placeholder="00:15" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.prep_time} onChange={e => setFormData({ ...formData, prep_time: e.target.value })} />
                   </div>
-                  <div className="space-y-1 relative">
-                    <label className="text-[10px] font-black uppercase text-gray-400">Cook (Min)</label>
-                    <input
-                      type="number"
-                      className={`w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm transition-colors ${aiEstimatedFields.includes('cook_time') ? 'border-2 border-yellow-200 bg-yellow-50/30' : ''}`}
-                      value={formData.cook_time}
-                      onChange={e => setFormData({ ...formData, cook_time: e.target.value })}
-                    />
-                    {aiEstimatedFields.includes('cook_time') && (
-                      <div className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" title="AI Estimated - Please verify" />
-                    )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Cook (hh:mm)</label>
+                    <input type="text" placeholder="00:30" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.cook_time} onChange={e => setFormData({ ...formData, cook_time: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Rest (hh:mm)</label>
+                    <input type="text" placeholder="00:00" className="w-full py-2.5 px-3 rounded-lg bg-gray-50 focus:bg-white text-sm" value={formData.rest_time} onChange={e => setFormData({ ...formData, rest_time: e.target.value })} />
                   </div>
                   <div className="space-y-1 col-span-2 sm:col-span-1">
                     <label className="text-[10px] font-black uppercase text-gray-400">Hashtags (Enter to add)</label>

@@ -84,11 +84,13 @@ export interface Database {
                     gallery_urls: Json[] | null
                     prep_time_minutes: number | null
                     cook_time_minutes: number | null
+                    rest_time_minutes: number | null
                     servings: number | null
                     nutrition: Json | null
                     alternative_titles: string | null
                     parent_recipe_id: string | null
                     is_image_recipe: boolean | null
+                    country_origin: string | null
                 }
                 Insert: {
                     id?: string
@@ -102,8 +104,13 @@ export interface Database {
                     description?: string | null
                     steps: string[]
                     alternative_titles?: string | null
+                    prep_time_minutes?: number | null
+                    cook_time_minutes?: number | null
+                    rest_time_minutes?: number | null
+                    servings?: number | null
                     parent_recipe_id?: string | null
                     is_image_recipe?: boolean | null
+                    country_origin?: string | null
                 }
                 Update: {
                     id?: string
@@ -124,10 +131,12 @@ export interface Database {
                     gallery_urls?: Json[] | null
                     prep_time_minutes?: number | null
                     cook_time_minutes?: number | null
+                    rest_time_minutes?: number | null
                     servings?: number | null
                     nutrition?: Json | null
                     parent_recipe_id?: string | null
                     is_image_recipe?: boolean | null
+                    country_origin?: string | null
                 }
             }
             ingredients: {

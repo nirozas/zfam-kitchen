@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { Minus, Plus, Clock, Flame, ArrowLeft, ShoppingCart, Star, ExternalLink, Play, Trash2, Pencil, Loader2, Check, X, Maximize2, AlertTriangle, Printer, Share2, MessageSquare, Heart, LinkIcon, GitMerge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,6 +55,20 @@ export default function RecipeDetail() {
     const [alterations, setAlterations] = useState<Recipe[]>([]);
     const [parentRecipe, setParentRecipe] = useState<Recipe | null>(null);
     const [loadingAlterations, setLoadingAlterations] = useState(false);
+    
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+
+    const handleFullscreen = () => {
+        if (videoContainerRef.current) {
+            if (videoContainerRef.current.requestFullscreen) {
+                videoContainerRef.current.requestFullscreen();
+            } else if ((videoContainerRef.current as any).webkitRequestFullscreen) { /* Safari */
+                (videoContainerRef.current as any).webkitRequestFullscreen();
+            } else if ((videoContainerRef.current as any).msRequestFullscreen) { /* IE11 */
+                (videoContainerRef.current as any).msRequestFullscreen();
+            }
+        }
+    };
 
     useEffect(() => {
         // User requested that ingredients start UNCHECKED and multiplier defaults to 1
@@ -100,7 +114,7 @@ export default function RecipeDetail() {
                 // 3. Fetch full recipe records for these IDs
                 const LIST_FIELDS = `
                     id, slug, title, image_url, created_at, rating, category_id, 
-                    time_minutes, description, servings, alternative_titles,
+                    time_minutes, prep_time_minutes, cook_time_minutes, rest_time_minutes, description, servings, alternative_titles,
                     is_image_recipe,
                     author:author_id(username),
                     category:category_id(id, name, slug),
@@ -159,7 +173,7 @@ export default function RecipeDetail() {
                 setLoadingAlterations(true);
                 const LIST_FIELDS = `
                     id, slug, title, image_url, created_at, rating, category_id,
-                    time_minutes, description, servings, alternative_titles,
+                    time_minutes, prep_time_minutes, cook_time_minutes, rest_time_minutes, description, servings, alternative_titles,
                     is_image_recipe,
                     author:author_id(username),
                     category:category_id(id, name, slug),
@@ -395,33 +409,33 @@ export default function RecipeDetail() {
         try {
             // 1. YouTube
             const ytMatch = trimmedUrl.match(/(?:youtu\.be\/|youtube\.com\/|youtube-nocookie\.com\/)(?:embed\/|v\/|watch\?v=|shorts\/|live\/|watch\?.*?v=)?([\w-]{11})/);
-            if (ytMatch) return { type: 'embed', url: `https://www.youtube.com/embed/${ytMatch[1]}` };
+            if (ytMatch) return { type: 'embed', platform: 'youtube', url: `https://www.youtube.com/embed/${ytMatch[1]}` };
 
             // 2. Vimeo
             const vimeoMatch = trimmedUrl.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-            if (vimeoMatch) return { type: 'embed', url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+            if (vimeoMatch) return { type: 'embed', platform: 'vimeo', url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
 
             // 3. Instagram
             const igMatch = trimmedUrl.match(/instagram\.com\/(?:p|reels|reel)\/([^/?#&]+)/);
-            if (igMatch) return { type: 'embed', url: `https://www.instagram.com/p/${igMatch[1]}/embed` };
+            if (igMatch) return { type: 'embed', platform: 'instagram', url: `https://www.instagram.com/p/${igMatch[1]}/embed` };
 
             // 4. TikTok
             const ttMatch = trimmedUrl.match(/tiktok\.com\/(?:@[\w.-]+\/video\/|v\/|t\/)(\d+)/);
-            if (ttMatch) return { type: 'embed', url: `https://www.tiktok.com/embed/v2/${ttMatch[1]}` };
+            if (ttMatch) return { type: 'embed', platform: 'tiktok', url: `https://www.tiktok.com/embed/v2/${ttMatch[1]}` };
 
             // 4b. Facebook
             const fbMatch = trimmedUrl.match(/(?:facebook\.com|fb\.watch)\/(?:watch\?v=|videos\/|reel\/|reel\/)?([\w.]+)/);
             if (fbMatch && (trimmedUrl.includes('facebook') || trimmedUrl.includes('fb.watch'))) {
-                return { type: 'embed', url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmedUrl)}&show_text=0&width=560` };
+                return { type: 'embed', platform: 'facebook', url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmedUrl)}&show_text=0&width=560` };
             }
 
             // 5. Google Drive
             const gdMatch = trimmedUrl.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
-            if (gdMatch) return { type: 'embed', url: `https://drive.google.com/file/d/${gdMatch[1]}/preview` };
+            if (gdMatch) return { type: 'embed', platform: 'drive', url: `https://drive.google.com/file/d/${gdMatch[1]}/preview` };
 
             // 6. Box
             const boxMatch = trimmedUrl.match(/app\.box\.com\/s\/([\w-]+)/);
-            if (boxMatch) return { type: 'embed', url: `https://app.box.com/embed/s/${boxMatch[1]}` };
+            if (boxMatch) return { type: 'embed', platform: 'box', url: `https://app.box.com/embed/s/${boxMatch[1]}` };
 
             // 7. Dropbox
             const dbMatch = trimmedUrl.match(/dropbox\.com\/(?:scl\/fi\/|s\/)([\w.-]+)/);
@@ -813,7 +827,10 @@ export default function RecipeDetail() {
                         <div className="flex items-center gap-2 sm:gap-4 flex-wrap mt-2 sm:mt-0">
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><Clock size={14} className="sm:w-4 sm:h-4" /></div>
-                                <span className="text-[8px] sm:text-[10px]">{recipe.time_minutes} min total</span>
+                                <span className="text-[8px] sm:text-[10px]">
+                                    {recipe.time_minutes} min total
+                                    {recipe.rest_time_minutes ? ` (inc. ${recipe.rest_time_minutes}m rest)` : ''}
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 <div className="p-1.5 sm:p-2 bg-white/10 rounded-xl"><Flame size={14} className="sm:w-4 sm:h-4" /></div>
@@ -1091,9 +1108,23 @@ export default function RecipeDetail() {
 
                     {/* Main Content Column: Video & Instructions */}
                     <div className="lg:col-span-2 space-y-12 min-w-0">
+                        {recipe.notes && (
+                            <section className="bg-amber-50/50 p-8 sm:p-12 rounded-[3.5rem] border-2 border-dashed border-amber-200 shadow-sm">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl shadow-inner">📝</div>
+                                    <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Chef's Notes</h2>
+                                </div>
+                                <div className="max-w-none">
+                                    <p className="text-gray-800 font-bold leading-relaxed italic whitespace-pre-wrap text-lg">
+                                        "{recipe.notes}"
+                                    </p>
+                                </div>
+                            </section>
+                        )}
+
                         {videoData && (
                             <section className="bg-white p-3 rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden group">
-                                <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden relative">
+                                <div ref={videoContainerRef} className={`${(videoData as any).platform === 'tiktok' || (videoData as any).platform === 'instagram' || (videoData as any).platform === 'facebook' ? 'aspect-[9/16] max-w-[400px] mx-auto' : 'aspect-video w-full'} bg-black rounded-[2.5rem] overflow-hidden relative`}>
                                     {videoData.type === 'embed' ? (
                                         <iframe
                                             src={videoData.url}
@@ -1120,23 +1151,15 @@ export default function RecipeDetail() {
                                         </div>
                                         <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Video Tutorial</span>
                                     </div>
-                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                                        Full-width cinematic view
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-
-                        {recipe.notes && (
-                            <section className="bg-amber-50/50 p-8 sm:p-12 rounded-[3.5rem] border-2 border-dashed border-amber-200 shadow-sm">
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl shadow-inner">📝</div>
-                                    <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Chef's Notes</h2>
-                                </div>
-                                <div className="max-w-none">
-                                    <p className="text-gray-800 font-bold leading-relaxed italic whitespace-pre-wrap text-lg">
-                                        "{recipe.notes}"
-                                    </p>
+                                    <button 
+                                        onClick={handleFullscreen}
+                                        className="text-[10px] font-black text-gray-400 hover:text-gray-600 uppercase tracking-[0.2em] transition-colors focus:outline-none"
+                                        aria-label="Enter fullscreen mode"
+                                    >
+                                        {(videoData as any).platform === 'tiktok' || (videoData as any).platform === 'instagram' || (videoData as any).platform === 'facebook' 
+                                            ? 'Full vertical view' 
+                                            : 'Full cinematic view'}
+                                    </button>
                                 </div>
                             </section>
                         )}

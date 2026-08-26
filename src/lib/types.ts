@@ -11,10 +11,11 @@ export type Tag = Database['public']['Tables']['tags']['Row'];
 // Recipe with joined data (as used in the UI)
 type RecipeRow = Database['public']['Tables']['recipes']['Row'];
 
-export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 'cook_time_minutes' | 'servings' | 'nutrition' | 'gallery_urls' | 'rating' | 'notes'> {
+export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 'cook_time_minutes' | 'rest_time_minutes' | 'country_origin' | 'servings' | 'nutrition' | 'gallery_urls' | 'rating' | 'notes'> {
     // Inherited from Row: id, slug, title, image_url, video_url, source_url, time_minutes, etc.
-    prep_time_minutes?: number;
-    cook_time_minutes?: number;
+    prep_time_minutes?: number | null;
+    cook_time_minutes?: number | null;
+    rest_time_minutes?: number | null;
     servings?: number;
     nutrition?: {
         serving_amount?: string;
