@@ -7,8 +7,9 @@ import { HeroSection } from '@/components/HeroSection';
 import { useRecipes, useCategories } from '@/lib/hooks';
 import RecipeCardSkeleton from '@/components/RecipeCardSkeleton';
 import CategoryCardSkeleton from '@/components/CategoryCardSkeleton';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { PublisherFilter } from '@/components/PublisherFilter';
 
 /* Button Styles Helper */
 const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', size: 'lg' | 'default' = 'default') => {
@@ -27,7 +28,8 @@ const buttonVariants = (variant: 'hero' | 'outline' | 'ghost' | 'secondary', siz
 };
 
 const Index = () => {
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ minimal: true, limit: 150 });
+    const [feedAuthorIds, setFeedAuthorIds] = useState<string[] | null>(null);
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ minimal: true, limit: 150, feedAuthorIds: feedAuthorIds || undefined });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     useEffect(() => {
@@ -93,8 +95,13 @@ const Index = () => {
 
             <HeroSection heroImage="https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2070&auto=format&fit=crop" />
 
+            {/* Publisher Filter */}
+            <section className="pt-8 px-6 md:px-12 w-full max-w-[1800px] mx-auto">
+                <PublisherFilter onFilterChange={setFeedAuthorIds} />
+            </section>
+
             {/* Categories Section */}
-            <section className="py-16 bg-white/50 backdrop-blur-sm border-y border-gray-100">
+            <section className="py-8 bg-white/50 backdrop-blur-sm border-y border-gray-100">
                 <div className="w-full max-w-[1800px] mx-auto px-6 md:px-12">
                     <div className="flex items-center justify-between mb-8">
                         <div>

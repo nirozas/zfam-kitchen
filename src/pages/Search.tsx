@@ -4,9 +4,11 @@ import { useRecipes, useTopTags, useRecipeStats, useCategories, useAllUserIntera
 import RecipeCard from '@/components/RecipeCard';
 import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus, AlertTriangle, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PublisherFilter } from '@/components/PublisherFilter';
 
 export default function Search() {
-    const { recipes, loading, error } = useRecipes();
+    const [feedAuthorIds, setFeedAuthorIds] = useState<string[] | null>(null);
+    const { recipes, loading, error } = useRecipes({ feedAuthorIds: feedAuthorIds || undefined });
     const { tags: topTags } = useTopTags(12);
     const { stats: recipeStats } = useRecipeStats();
     const { categories } = useCategories();
@@ -339,6 +341,11 @@ export default function Search() {
     return (
         <div className="min-h-screen bg-gray-50/50 py-16 px-4">
             <div className="container mx-auto max-w-[1800px]">
+                {/* Publisher Filter */}
+                <div className="mb-8">
+                    <PublisherFilter onFilterChange={setFeedAuthorIds} />
+                </div>
+
                 {/* Main Header Container */}
                 <div className="flex flex-col gap-8 mb-16">
                     {/* Row 1: Title and Sort */}

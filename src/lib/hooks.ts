@@ -11,6 +11,7 @@ export interface UseRecipesOptions {
     limit?: number;
     offset?: number;
     minimal?: boolean;
+    feedAuthorIds?: string[];
 }
 
 export function useRecipes(options?: UseRecipesOptions) {
@@ -20,7 +21,8 @@ export function useRecipes(options?: UseRecipesOptions) {
     const [totalCount, setTotalCount] = useState<number | null>(null);
 
     useEffect(() => {
-        const cacheKey = `${options?.limit ?? 'all'}-${options?.offset ?? 0}-${options?.minimal ?? false}`;
+        const feedIdsKey = options?.feedAuthorIds ? options.feedAuthorIds.sort().join(',') : 'all-authors';
+        const cacheKey = `${options?.limit ?? 'all'}-${options?.offset ?? 0}-${options?.minimal ?? false}-${feedIdsKey}`;
         const cached = recipesCache[cacheKey];
 
         async function fetchRecipes() {
@@ -68,6 +70,10 @@ export function useRecipes(options?: UseRecipesOptions) {
                     const from = options.offset ?? 0;
                     const to = from + options.limit - 1;
                     query = query.range(from, to);
+                }
+
+                if (options?.feedAuthorIds && options.feedAuthorIds.length > 0) {
+                    query = query.in('author_id', options.feedAuthorIds);
                 }
 
                 const { data, error, count } = await query;
@@ -138,7 +144,7 @@ export function useRecipes(options?: UseRecipesOptions) {
         } else {
             fetchRecipes();
         }
-    }, [options?.limit, options?.offset, options?.minimal]);
+    }, [options?.limit, options?.offset, options?.minimal, options?.feedAuthorIds?.join(',')]);
 
     return { recipes, loading, error, totalCount };
 }
@@ -663,3 +669,77 @@ export function useBatchedRecipeLikes(recipeIds: string[]) {
 
     return { counts, loading, fetchCounts };
 }
+
+export function useFollows() {
+    const [follows, setFollows] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchFollows = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setFollows([]);
+                setLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('user_follows')
+                .select(`
+                    *,
+                    following:profiles!user_follows_following_id_fkey(id, username)
+                `)
+                .eq('follower_id', session.user.id);
+
+            if (error) throw error;
+            setFollows(data || []);
+        } catch (err) {
+            console.error('Error fetching follows:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchFollows();
+    }, []);
+
+    const toggleFollow = async (followingId: string) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Not authenticated');
+
+            const existing = follows.find(f => f.following_id === followingId);
+            if (existing) {
+                await supabase.from('user_follows').delete().eq('id', existing.id);
+                setFollows(prev => prev.filter(f => f.id !== existing.id));
+            } else {
+                const { data, error } = await supabase.from('user_follows').insert({
+                    follower_id: session.user.id,
+                    following_id: followingId,
+                    is_active: true
+                }).select(`*, following:profiles!user_follows_following_id_fkey(id, username)`).single();
+                
+                if (error) throw error;
+                if (data) setFollows(prev => [...prev, data]);
+            }
+        } catch (err) {
+            console.error('Error toggling follow:', err);
+            throw err;
+        }
+    };
+
+    const toggleActive = async (followId: string, isActive: boolean) => {
+        try {
+            const { error } = await supabase.from('user_follows').update({ is_active: isActive }).eq('id', followId);
+            if (error) throw error;
+            setFollows(prev => prev.map(f => f.id === followId ? { ...f, is_active: isActive } : f));
+        } catch (err) {
+            console.error('Error toggling active status:', err);
+            throw err;
+        }
+    };
+
+    return { follows, loading, toggleFollow, toggleActive, refreshFollows: fetchFollows };
+}
+

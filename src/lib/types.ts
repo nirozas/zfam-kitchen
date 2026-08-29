@@ -122,3 +122,12 @@ export interface UserInteraction {
     tasted_before: boolean;
     created_at: string;
 }
+
+export interface UserFollow {
+    id: string;
+    follower_id: string;
+    following_id: string;
+    is_active: boolean;
+    created_at: string;
+}
+

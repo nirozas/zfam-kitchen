@@ -4,6 +4,7 @@ import RecipeCard from '@/components/RecipeCard';
 import { ArrowLeft, Frown, ChefHat, Plus, SortAsc, SortDesc, Search, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useMemo } from 'react';
+import { PublisherFilter } from '@/components/PublisherFilter';
 
 export default function CategoryDetail() {
     const params = useParams();
@@ -11,7 +12,9 @@ export default function CategoryDetail() {
     const [searchParams, setSearchParams] = useSearchParams();
     const tagQuery = searchParams.get('q') || '';
 
-    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes();
+    const [feedAuthorIds, setFeedAuthorIds] = useState<string[] | null>(null);
+
+    const { recipes, loading: recipesLoading, error: recipesError } = useRecipes({ feedAuthorIds: feedAuthorIds || undefined });
     const { categories, loading: categoriesLoading } = useCategories();
     const { stats: recipeStats } = useRecipeStats();
 
@@ -285,6 +288,10 @@ export default function CategoryDetail() {
                     </div>
 
                 </div>
+            </div>
+
+            <div className="container mx-auto px-4 pt-8 max-w-[1800px]">
+                <PublisherFilter onFilterChange={setFeedAuthorIds} />
             </div>
 
             {/* Sub-Categories Grid */}

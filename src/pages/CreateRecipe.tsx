@@ -810,6 +810,26 @@ export default function CreateRecipe() {
         slug: newSlug,
         country_origin: formData.country_origin || null,
       };
+
+      // Ensure profile exists for the user to prevent foreign key constraint errors
+      const { data: profile } = await supabase.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
+      if (!profile) {
+        // Try to insert a basic profile. This requires the insert policy to be added in Supabase.
+        const usernameBase = session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User';
+        const uniqueUsername = `${usernameBase}_${Math.floor(Math.random() * 10000)}`;
+        
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: session.user.id,
+          username: uniqueUsername,
+          role: 'user',
+          is_approved: false
+        });
+        
+        if (profileError) {
+           console.error("Profile creation failed, recipe insertion might fail due to FK constraint:", profileError);
+        }
+      }
+
       let recipeIdForIngredients: string;
       if (isEditing) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id!);
