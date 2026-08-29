@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFollows } from '@/lib/hooks';
 import { supabase } from '@/lib/supabase';
 import { Users, Check, UserPlus, X, Eye } from 'lucide-react';
@@ -10,7 +10,7 @@ interface PublisherFilterProps {
 }
 
 export function PublisherFilter({ onFilterChange }: PublisherFilterProps) {
-    const { follows, loading: followsLoading, toggleActive, toggleFollow, refreshFollows } = useFollows();
+    const { follows, loading: followsLoading, toggleActive, toggleFollow } = useFollows();
     const [publishers, setPublishers] = useState<any[]>([]);
     const [loadingPublishers, setLoadingPublishers] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
