@@ -473,6 +473,40 @@ export function useReviews(recipeId: string | undefined) {
     return { reviews, loading, fetchReviews };
 }
 
+export function useAllUserInteractions() {
+    const [interactions, setInteractions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchInteractions = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setInteractions([]);
+                setLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('reviews')
+                .select('*')
+                .eq('user_id', session.user.id);
+
+            if (error) throw error;
+            setInteractions(data || []);
+        } catch (err) {
+            console.error('Error fetching user interactions:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchInteractions();
+    }, []);
+
+    return { interactions, loading, fetchInteractions };
+}
+
 export function useLikesCount(recipeId: string | undefined) {
     const [count, setCount] = useState(0);
     const [loading, setLoading] = useState(true);

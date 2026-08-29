@@ -111,3 +111,14 @@ export interface AlbumLayout {
     name: string;
     config: AlbumLayoutConfig; // Mapped from the JSONB column
 }
+
+export interface UserInteraction {
+    id: number;
+    user_id: string;
+    recipe_id: string;
+    rating: number | null;
+    comment: string | null;
+    cooked_before: boolean;
+    tasted_before: boolean;
+    created_at: string;
+}

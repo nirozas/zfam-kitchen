@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useRecipes, useTopTags, useRecipeStats, useCategories } from '@/lib/hooks';
+import { useRecipes, useTopTags, useRecipeStats, useCategories, useAllUserInteractions } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
 import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus, AlertTriangle, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,7 @@ export default function Search() {
     const { tags: topTags } = useTopTags(12);
     const { stats: recipeStats } = useRecipeStats();
     const { categories } = useCategories();
+    const { interactions } = useAllUserInteractions();
 
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
@@ -41,6 +42,8 @@ export default function Search() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+    const [cookedFilter, setCookedFilter] = useState<'all' | 'cooked_before' | 'never_tried'>('all');
+    const [tastedFilter, setTastedFilter] = useState<'all' | 'tasted_before' | 'never_tasted'>('all');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [gridDensity, setGridDensity] = useState(2); // 1 = large, 2 = normal, 3 = compact
 
@@ -210,7 +213,17 @@ export default function Search() {
                     });
                 });
 
-            return matchesSearch && matchesCategory && matchesType && matchesIngredients;
+            const interaction = interactions.find(i => i.recipe_id === recipe.id);
+            
+            const matchesCooked = cookedFilter === 'all' || 
+                (cookedFilter === 'cooked_before' && interaction?.cooked_before) || 
+                (cookedFilter === 'never_tried' && !interaction?.cooked_before);
+                
+            const matchesTasted = tastedFilter === 'all' || 
+                (tastedFilter === 'tasted_before' && interaction?.tasted_before) || 
+                (tastedFilter === 'never_tasted' && !interaction?.tasted_before);
+
+            return matchesSearch && matchesCategory && matchesType && matchesIngredients && matchesCooked && matchesTasted;
         }).sort((a, b) => {
             let comparison = 0;
             if (sortBy === 'title') {
@@ -229,7 +242,20 @@ export default function Search() {
             }
             return sortOrder === 'asc' ? comparison : -comparison;
         });
-    }, [recipes, localQuery, selectedCategories, selectedTypes, selectedIngredients, sortBy, sortOrder, recipeStats]);
+    }, [
+        recipes,
+        localQuery,
+        selectedCategories,
+        selectedTypes,
+        selectedIngredients,
+        cookedFilter,
+        tastedFilter,
+        sortBy,
+        sortOrder,
+        recipeStats,
+        ingredientsData,
+        interactions
+    ]);
 
     const handleTagClick = (tagName: string) => {
         setLocalQuery(tagName);
@@ -603,6 +629,42 @@ export default function Search() {
                                 ))}
                             </div>
 
+                            <div className="hidden lg:flex items-center gap-2 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm flex-wrap max-w-lg">
+                                {/* Cooked Filter */}
+                                <div className="flex items-center overflow-hidden rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest transition-colors">
+                                    <button
+                                        onClick={() => setCookedFilter(prev => prev === 'cooked_before' ? 'all' : 'cooked_before')}
+                                        className={`px-3 py-2 transition-colors ${cookedFilter === 'cooked_before' ? 'bg-green-500 text-white shadow-inner' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                    >
+                                        Cooked Before
+                                    </button>
+                                    <span className="text-gray-200 bg-gray-50 px-1 py-2">/</span>
+                                    <button
+                                        onClick={() => setCookedFilter(prev => prev === 'never_tried' ? 'all' : 'never_tried')}
+                                        className={`px-3 py-2 transition-colors ${cookedFilter === 'never_tried' ? 'bg-orange-500 text-white shadow-inner' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                    >
+                                        Never Tried
+                                    </button>
+                                </div>
+                                
+                                {/* Tasted Filter */}
+                                <div className="flex items-center overflow-hidden rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest transition-colors">
+                                    <button
+                                        onClick={() => setTastedFilter(prev => prev === 'tasted_before' ? 'all' : 'tasted_before')}
+                                        className={`px-3 py-2 transition-colors ${tastedFilter === 'tasted_before' ? 'bg-green-500 text-white shadow-inner' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                    >
+                                        Tasted Before
+                                    </button>
+                                    <span className="text-gray-200 bg-gray-50 px-1 py-2">/</span>
+                                    <button
+                                        onClick={() => setTastedFilter(prev => prev === 'never_tasted' ? 'all' : 'never_tasted')}
+                                        className={`px-3 py-2 transition-colors ${tastedFilter === 'never_tasted' ? 'bg-orange-500 text-white shadow-inner' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                    >
+                                        Never Tasted
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="hidden lg:flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Density</span>
                                 <div className="flex items-center gap-1">
@@ -712,6 +774,8 @@ export default function Search() {
                                 handleSetIngredients([]);
                                 setSelectedCategories([]);
                                 setSelectedTypes([]);
+                                setCookedFilter('all');
+                                setTastedFilter('all');
                             }}
                             className="inline-flex items-center justify-center px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-xl active:scale-95"
                         >

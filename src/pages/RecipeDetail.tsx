@@ -33,6 +33,8 @@ export default function RecipeDetail() {
     const [crossedSteps, setCrossedSteps] = useState<number[]>([]);
     const [selectedForCart, setSelectedForCart] = useState<number[]>([]);
     const [userRating, setUserRating] = useState<number | null>(0);
+    const [cookedBefore, setCookedBefore] = useState(false);
+    const [tastedBefore, setTastedBefore] = useState(false);
     const [reviewComment, setReviewComment] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
     const { addToCart } = useShoppingCart();
@@ -57,6 +59,17 @@ export default function RecipeDetail() {
     const [loadingAlterations, setLoadingAlterations] = useState(false);
     
     const videoContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (currentUserId && reviews && reviews.length > 0) {
+            const userReview = reviews.find(r => r.user_id === currentUserId);
+            if (userReview) {
+                setUserRating(userReview.rating || 0);
+                setCookedBefore(userReview.cooked_before || false);
+                setTastedBefore(userReview.tasted_before || false);
+            }
+        }
+    }, [currentUserId, reviews]);
 
     const handleFullscreen = () => {
         if (videoContainerRef.current) {
@@ -259,21 +272,51 @@ export default function RecipeDetail() {
         checkUser();
     }, []);
 
-    const handleSubmitReview = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!recipe || !currentUserId || userRating === 0) return;
-        setSubmittingReview(true);
+    const updateUserInteraction = async (updates: { rating?: number | null, comment?: string, cooked_before?: boolean, tasted_before?: boolean }) => {
+        if (!recipe || !currentUserId) return;
         try {
             const { error } = await supabase
                 .from('reviews')
                 .upsert({
                     user_id: currentUserId,
-                    recipe_id: recipe!.id,
-                    rating: userRating,
-                    comment: reviewComment
+                    recipe_id: recipe.id,
+                    rating: updates.rating !== undefined ? updates.rating : userRating,
+                    comment: updates.comment !== undefined ? updates.comment : reviewComment,
+                    cooked_before: updates.cooked_before !== undefined ? updates.cooked_before : cookedBefore,
+                    tasted_before: updates.tasted_before !== undefined ? updates.tasted_before : tastedBefore,
                 }, { onConflict: 'user_id,recipe_id' });
 
             if (error) throw error;
+            
+            // Re-fetch reviews to update local state
+            fetchReviews();
+            return true;
+        } catch (error) {
+            console.error('Error updating interaction:', error);
+            toast.error('Failed to update interaction');
+            return false;
+        }
+    };
+
+    const handleToggleCooked = async () => {
+        const newValue = !cookedBefore;
+        setCookedBefore(newValue);
+        await updateUserInteraction({ cooked_before: newValue });
+    };
+
+    const handleToggleTasted = async () => {
+        const newValue = !tastedBefore;
+        setTastedBefore(newValue);
+        await updateUserInteraction({ tasted_before: newValue });
+    };
+
+    const handleSubmitReview = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!recipe || !currentUserId || userRating === 0) return;
+        setSubmittingReview(true);
+        try {
+            const success = await updateUserInteraction({ rating: userRating, comment: reviewComment });
+            if (!success) throw new Error("Failed to update interaction");
 
             // Also update the average rating in recipes table for performance/sorting
             const { data: allReviews } = await supabase
@@ -290,11 +333,9 @@ export default function RecipeDetail() {
             }
 
             setReviewComment('');
-            fetchReviews();
             toast.success('Review submitted! Thank you.');
         } catch (error) {
             console.error('Error submitting review:', error);
-            toast.error('Failed to submit review.');
         } finally {
             setSubmittingReview(false);
         }
@@ -768,26 +809,59 @@ export default function RecipeDetail() {
                             {recipe.description}
                         </p>
 
-                        {/* Rating and Tags Section */}
+                        {/* Rating, Interactions and Tags Section */}
                         <div className="space-y-4">
                             {/* Stars directly above hashtags */}
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full w-fit border border-white/10">
                                 {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                        key={star}
-                                        onClick={(e) => { e.stopPropagation(); setUserRating(star); }}
-                                        className="transition-transform hover:scale-125 focus:outline-none"
-                                    >
+                                    <div key={star}>
                                         <Star
                                             size={14}
-                                            className={`${star <= (userRating || recipe.rating || 0)
+                                            className={`${star <= (recipe.rating || 0)
                                                 ? 'fill-yellow-400 text-yellow-400'
                                                 : 'text-gray-300'
                                                 }`}
                                         />
-                                    </button>
+                                    </div>
                                 ))}
-                                <span className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-2">Rating</span>
+                                <span className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-2">Average Rating</span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            onClick={(e) => { e.stopPropagation(); setUserRating(star); updateUserInteraction({ rating: star }); }}
+                                            className="transition-transform hover:scale-125 focus:outline-none"
+                                        >
+                                            <Star
+                                                size={14}
+                                                className={`${star <= (userRating || 0)
+                                                    ? 'fill-yellow-400 text-yellow-400'
+                                                    : 'text-gray-300/50'
+                                                    }`}
+                                            />
+                                        </button>
+                                    ))}
+                                    <span className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-2">Your Rating</span>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleToggleCooked(); }}
+                                    className="flex items-center overflow-hidden rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest transition-colors bg-white/5 hover:border-white/20"
+                                >
+                                    <span className={`px-3 py-1.5 transition-colors ${cookedBefore ? 'bg-green-500/20 text-green-400' : 'text-white/30 hover:text-white/60'}`}>Cooked Before</span>
+                                    <span className="text-white/20 px-1">/</span>
+                                    <span className={`px-3 py-1.5 transition-colors ${!cookedBefore ? 'bg-white/10 text-white/80' : 'text-white/30 hover:text-white/60'}`}>Never Tried</span>
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleToggleTasted(); }}
+                                    className="flex items-center overflow-hidden rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest transition-colors bg-white/5 hover:border-white/20"
+                                >
+                                    <span className={`px-3 py-1.5 transition-colors ${tastedBefore ? 'bg-green-500/20 text-green-400' : 'text-white/30 hover:text-white/60'}`}>Tasted Before</span>
+                                    <span className="text-white/20 px-1">/</span>
+                                    <span className={`px-3 py-1.5 transition-colors ${!tastedBefore ? 'bg-white/10 text-white/80' : 'text-white/30 hover:text-white/60'}`}>Never Tasted</span>
+                                </button>
                             </div>
 
                             {recipe.tags && recipe.tags.length > 0 && (
