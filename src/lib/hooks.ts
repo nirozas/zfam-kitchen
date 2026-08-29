@@ -205,6 +205,10 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
                             amount_in_grams, unit, group_name, order_index, note, 
                             ingredients(*), 
                             linked_recipe:recipes!linked_recipe_id(id, title, slug, image_url)
+                        ),
+                        recipes_involved:recipe_links!parent_recipe_id(
+                            id, sort_order, notes,
+                            child_recipe:recipes!child_recipe_id(id, title, slug, image_url)
                         )
                     `);
 
@@ -227,6 +231,8 @@ export function useRecipe(id: string | undefined, initialRecipe?: any) {
                         all_categories: data.recipe_categories?.map((rc: any) => rc.categories).filter(Boolean) || [],
                         tags: data.recipe_tags?.map((rt: any) => rt.tags).filter(Boolean) || [],
                         keywords: data.recipe_keywords?.map((rk: any) => rk.keywords).filter(Boolean) || [],
+                        recipes_involved: (data.recipes_involved || [])
+                            .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
                         ingredients: (data.recipe_ingredients || [])
                             .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
                             .map((ri: any) => ({

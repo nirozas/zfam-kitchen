@@ -1,7 +1,7 @@
 import RecipeCard from '@/components/RecipeCard';
 import CategoryCard from '@/components/CategoryCard';
 import { motion } from 'framer-motion';
-import { ArrowRight, Heart, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowRight, Heart, Plus, Search, Sparkles, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HeroSection } from '@/components/HeroSection';
 import { useRecipes, useCategories } from '@/lib/hooks';
@@ -193,6 +193,10 @@ const Index = () => {
                             <Link to="/create" className={buttonVariants('hero')}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">New Recipe</span>
+                            </Link>
+                            <Link to="/create?assembly=1" className={buttonVariants('outline')}>
+                                <Layers className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">New Assembly</span>
                             </Link>
                             <Link to="/search" className={buttonVariants('outline')}>
                                 <Search className="h-4 w-4 mr-2" />

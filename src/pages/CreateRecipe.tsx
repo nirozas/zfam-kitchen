@@ -433,7 +433,9 @@ export default function CreateRecipe() {
   }, [ingredients]);
 
   const [activeRecipeLinkIndex, setActiveRecipeLinkIndex] = useState<number | null>(null);
-  const [activeRecipeLinkType, setActiveRecipeLinkType] = useState<'ingredient' | 'step'>('step');
+  const [activeRecipeLinkType, setActiveRecipeLinkType] = useState<'ingredient' | 'step' | 'assembly'>('step');
+  const [recipesInvolved, setRecipesInvolved] = useState<{ id: string, recipe: any, notes: string }[]>([]);
+  const isAssembly = new URLSearchParams(location.search).get('assembly') === '1';
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -602,7 +604,11 @@ export default function CreateRecipe() {
               ),
               recipe_tags(tags(id, name)),
               recipe_keywords(keywords(id, name)),
-              recipe_categories(category_id)
+              recipe_categories(category_id),
+              recipes_involved:recipe_links!parent_recipe_id(
+                id, sort_order, notes,
+                child_recipe:recipes!child_recipe_id(id, title, slug, image_url)
+              )
             `);
 
           if (isUuid) {
@@ -671,6 +677,18 @@ export default function CreateRecipe() {
               }));
 
             setIngredients(loadedIngredients.length > 0 ? loadedIngredients : [{ id: Math.random().toString(), name: '', amount: '', unit: '', note: '', purchase_url: '', group_name: 'Ingredients', linked_recipe: null, is_alternative: false }]);
+
+            if (recipe.recipes_involved) {
+              setRecipesInvolved(
+                recipe.recipes_involved
+                  .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                  .map((ri: any) => ({
+                    id: ri.id || Math.random().toString(),
+                    recipe: ri.child_recipe,
+                    notes: ri.notes || ''
+                  }))
+              );
+            }
           }
         } catch (error) {
           console.error('Load recipe error:', error);
@@ -898,6 +916,20 @@ export default function CreateRecipe() {
         if (kw) {
           await supabase.from('recipe_keywords').upsert({ recipe_id: recipeIdForIngredients, keyword_id: kw.id });
         }
+      }
+
+      // Handle recipes involved (Assembly)
+      if (isAssembly || recipesInvolved.length > 0) {
+          if (isEditing) await supabase.from('recipe_links').delete().eq('parent_recipe_id', recipeIdForIngredients);
+          const linksToInsert = recipesInvolved.map((ri, idx) => ({
+             parent_recipe_id: recipeIdForIngredients,
+             child_recipe_id: ri.recipe.id,
+             notes: ri.notes,
+             sort_order: idx
+          }));
+          if (linksToInsert.length > 0) {
+             await supabase.from('recipe_links').insert(linksToInsert);
+          }
       }
 
       // Background Cleanup: Remove orphaned ingredients
@@ -1219,6 +1251,8 @@ export default function CreateRecipe() {
     }
     return normalized;
   };
+  const assemblyCategory = categories.find(c => c.slug === 'assembly' || c.name.toLowerCase() === 'assembly');
+  const isAssemblyForm = isAssembly || (assemblyCategory && formData.category_id === assemblyCategory.id) || recipesInvolved.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50/30 font-sans">
@@ -1228,7 +1262,7 @@ export default function CreateRecipe() {
             <button onClick={() => navigate(-1)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors text-gray-400"><ArrowLeft size={20} /></button>
             <div>
               <h1 className="text-xl font-black gradient-text tracking-tighter leading-none">
-                {isAltering ? 'Alter Recipe' : isEditing ? 'Edit Recipe' : 'New Recipe'}
+                {isAltering ? `Alter ${isAssemblyForm ? 'Assembly' : 'Recipe'}` : isEditing ? `Edit ${isAssemblyForm ? 'Assembly' : 'Recipe'}` : `New ${isAssemblyForm ? 'Assembly' : 'Recipe'}`}
               </h1>
               <p className="text-[10px] font-black uppercase tracking-widest text-primary-500 mt-1">{formData.title || (isAltering ? 'Enter a new title below' : 'Untitled')}</p>
             </div>
@@ -1802,6 +1836,34 @@ export default function CreateRecipe() {
                 </Reorder.Group>
               </section>
 
+              {isAssembly && (
+                <section id="recipes_involved" className="section-card space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg shadow-inner">🔗</div>
+                    <h2 className="text-xl font-black tracking-tighter">Recipes Involved</h2>
+                  </div>
+                  <div className="space-y-2">
+                    {recipesInvolved.map((ri, index) => (
+                      <div key={ri.id} className="flex gap-2 items-center bg-gray-50 p-2 rounded-xl border border-gray-100">
+                        <div className="flex-1 bg-white p-2.5 rounded-lg text-sm font-medium border border-gray-200 truncate">{ri.recipe?.title}</div>
+                        <input type="text" placeholder="Notes (e.g. for the sauce)" value={ri.notes} onChange={e => {
+                          const next = [...recipesInvolved];
+                          next[index].notes = e.target.value;
+                          setRecipesInvolved(next);
+                        }} className="flex-1 text-sm bg-white rounded-lg px-3 py-2.5 border border-gray-200 focus:ring-primary-500 focus:border-primary-500" />
+                        <button type="button" onClick={() => setRecipesInvolved(recipesInvolved.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X size={20} /></button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => {
+                    setActiveRecipeLinkType('assembly');
+                    setActiveRecipeLinkIndex(recipesInvolved.length);
+                  }} className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-200 transition-all font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2">
+                    <Plus size={16} /> Add Recipe Link
+                  </button>
+                </section>
+              )}
+
               <section id="instructions" className="section-card space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1951,7 +2013,13 @@ export default function CreateRecipe() {
             onSelect={(recipe) => {
               if (activeRecipeLinkIndex === null) return;
 
-              if (activeRecipeLinkType === 'ingredient') {
+              if (activeRecipeLinkType === 'assembly') {
+                const currentLinks = [...recipesInvolved];
+                if (!currentLinks.find(ri => ri.recipe.id === recipe.id)) {
+                   currentLinks.push({ id: Math.random().toString(), recipe, notes: '' });
+                   setRecipesInvolved(currentLinks);
+                }
+              } else if (activeRecipeLinkType === 'ingredient') {
                 const next = [...ingredients];
                 next[activeRecipeLinkIndex] = {
                   ...next[activeRecipeLinkIndex],

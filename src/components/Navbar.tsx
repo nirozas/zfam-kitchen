@@ -1,4 +1,4 @@
-import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid, Home, Bug, Settings } from 'lucide-react';
+import { Search, Calendar, LogIn, LogOut, ShoppingCart, TrendingUp, ChevronDown, Utensils, Heart, Star, LayoutGrid, Home, Bug, Settings, Layers } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -177,6 +177,9 @@ export default function Navbar() {
                         <Link to="/create" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors whitespace-nowrap">
                             + New Recipe
                         </Link>
+                        <Link to="/create?assembly=1" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors whitespace-nowrap flex items-center gap-1" title="Create an Assembly Recipe">
+                            <Layers size={14} /> Assembly
+                        </Link>
                         <Link to="/all_recipes" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
                             Recipes
                         </Link>
@@ -221,6 +224,9 @@ export default function Navbar() {
 
                     {/* Right Actions */}
                     <div className="flex items-center gap-1 sm:gap-3">
+                        <Link to="/create?assembly=1" className="lg:hidden p-2 text-gray-600 hover:text-primary-600 transition-colors rounded-lg hover:bg-gray-100" title="New Assembly">
+                            <Layers size={22} />
+                        </Link>
                         <Link to="/create" className="lg:hidden p-2 text-gray-600 hover:text-primary-600 transition-colors rounded-lg hover:bg-gray-100" title="New Recipe">
                             <TrendingUp size={22} className="rotate-45" />
                         </Link>

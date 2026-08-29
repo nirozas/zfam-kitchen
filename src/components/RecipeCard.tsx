@@ -1,6 +1,6 @@
 import { Recipe } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus, Image as ImageIcon } from 'lucide-react';
+import { Clock, Flame, Star, ShoppingCart, Heart, CalendarPlus, Image as ImageIcon, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useShoppingCart, getCurrentWeekId } from '@/contexts/ShoppingCartContext';
@@ -143,8 +143,14 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
 
                     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 items-start">
                         <span className="px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider text-primary-600 shadow-sm border border-white">
-                            {recipe.category?.name || 'Recipe'}
+                            {(recipe.category?.slug === 'assembly' || recipe.all_categories?.some(c => c.slug === 'assembly')) ? (recipe.all_categories?.find(c => c.slug !== 'assembly')?.name || 'Assembly') : (recipe.category?.name || 'Recipe')}
                         </span>
+                        {(recipe.category?.slug === 'assembly' || recipe.all_categories?.some(c => c.slug === 'assembly')) && (
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm border border-orange-400">
+                                <Layers size={12} />
+                                Assembly
+                            </span>
+                        )}
                         {recipe.is_image_recipe && (
                             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm border border-indigo-400">
                                 <ImageIcon size={12} />

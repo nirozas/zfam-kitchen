@@ -44,6 +44,16 @@ export interface Recipe extends Omit<RecipeRow, 'steps' | 'prep_time_minutes' | 
     likesCount?: number; // Pre-fetched likes count
     is_image_recipe: boolean | null;
     // parent_recipe_id is inherited from RecipeRow — links back to the source recipe for alterations
+    recipes_involved?: Array<{
+        child_recipe: {
+            id: string;
+            title: string;
+            slug: string;
+            image_url: string | null;
+        };
+        sort_order: number;
+        notes?: string;
+    }>;
 }
 
 export interface RecipeIngredient {

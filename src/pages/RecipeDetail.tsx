@@ -1164,6 +1164,45 @@ export default function RecipeDetail() {
                             </section>
                         )}
 
+                        {recipe.recipes_involved && recipe.recipes_involved.length > 0 && (
+                            <section className="bg-white p-8 sm:p-14 rounded-[3.5rem] shadow-xl shadow-gray-100/50 border border-gray-100 mb-12">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-14 h-14 rounded-[1.5rem] bg-orange-50 flex items-center justify-center text-3xl shadow-inner">🔗</div>
+                                        <h2 className="text-4xl font-black text-gray-900 tracking-tighter">Recipes Involved</h2>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {recipe.recipes_involved.map((ri) => (
+                                        <Link 
+                                            key={ri.child_recipe.id} 
+                                            to={`/recipe/${ri.child_recipe.slug}`}
+                                            className="flex items-center gap-4 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 p-4 rounded-[2rem] transition-all group shadow-sm hover:shadow-md"
+                                        >
+                                            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-200 shrink-0 shadow-sm border border-black/5">
+                                                {ri.child_recipe.image_url ? (
+                                                    <img src={ri.child_recipe.image_url} alt={ri.child_recipe.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl bg-gray-100">{ri.child_recipe.title.substring(0, 2)}</div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0 py-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <ExternalLink size={12} className="text-indigo-400" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Recipe Link</span>
+                                                </div>
+                                                <h3 className="font-bold text-gray-900 text-lg truncate group-hover:text-indigo-600 transition-colors">{ri.child_recipe.title}</h3>
+                                                {ri.notes && (
+                                                    <p className="text-xs font-medium text-gray-500 truncate mt-0.5">{ri.notes}</p>
+                                                )}
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
                         <section className="bg-white p-8 sm:p-14 rounded-[3.5rem] shadow-xl shadow-gray-100/50 border border-gray-100">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-14">
                                 <div className="flex items-center gap-5">

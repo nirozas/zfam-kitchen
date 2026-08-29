@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useRecipes, useTopTags, useRecipeStats, useCategories } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
-import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus, AlertTriangle } from 'lucide-react';
+import { Search as SearchIcon, Frown, Hash, SortAsc, SortDesc, Filter, X, Plus, AlertTriangle, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Search() {
@@ -37,9 +37,10 @@ export default function Search() {
     const [ingredientSearch, setIngredientSearch] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isIngredientFocused, setIsIngredientFocused] = useState(false);
-    const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used' | 'category'>('created_at');
+    const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'rating' | 'times_used' | 'category' | 'type'>('created_at');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+    const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [gridDensity, setGridDensity] = useState(2); // 1 = large, 2 = normal, 3 = compact
 
@@ -126,6 +127,14 @@ export default function Search() {
                 (recipe.category && selectedCategories.includes(recipe.category.id)) ||
                 recipe.all_categories?.some(cat => selectedCategories.includes(cat.id));
 
+            const matchesType = selectedTypes.length === 0 || selectedTypes.some(type => {
+                const isAssembly = recipe.category?.slug === 'assembly' || recipe.all_categories?.some(cat => cat.slug === 'assembly');
+                if (type === 'assembly') return isAssembly;
+                if (type === 'image') return recipe.is_image_recipe && !isAssembly;
+                if (type === 'original') return !recipe.is_image_recipe && !isAssembly;
+                return false;
+            });
+
             const matchesIngredients = selectedIngredients.length === 0 ||
                 selectedIngredients.every(si => {
                     let rawTerm = si.trim();
@@ -201,7 +210,7 @@ export default function Search() {
                     });
                 });
 
-            return matchesSearch && matchesCategory && matchesIngredients;
+            return matchesSearch && matchesCategory && matchesType && matchesIngredients;
         }).sort((a, b) => {
             let comparison = 0;
             if (sortBy === 'title') {
@@ -214,10 +223,13 @@ export default function Search() {
                 comparison = (recipeStats[a.id] || 0) - (recipeStats[b.id] || 0);
             } else if (sortBy === 'category') {
                 comparison = (a.category?.name || '').localeCompare(b.category?.name || '');
+            } else if (sortBy === 'type') {
+                const getTypeRank = (r: any) => (r.category?.slug === 'assembly' || r.all_categories?.some((c: any) => c.slug === 'assembly')) ? 3 : r.is_image_recipe ? 2 : 1;
+                comparison = getTypeRank(a) - getTypeRank(b);
             }
             return sortOrder === 'asc' ? comparison : -comparison;
         });
-    }, [recipes, localQuery, selectedCategories, selectedIngredients, sortBy, sortOrder, recipeStats]);
+    }, [recipes, localQuery, selectedCategories, selectedTypes, selectedIngredients, sortBy, sortOrder, recipeStats]);
 
     const handleTagClick = (tagName: string) => {
         setLocalQuery(tagName);
@@ -314,9 +326,27 @@ export default function Search() {
                             </p>
                         </div>
 
-                        {/* Sort Controls */}
-                        <div className="flex shrink-0 items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm self-start lg:self-end">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Sort</span>
+                        {/* Actions and Sort Controls */}
+                        <div className="flex flex-col sm:flex-row shrink-0 items-start sm:items-center gap-3 self-start lg:self-end">
+                            <div className="flex gap-2">
+                                <Link
+                                    to="/create"
+                                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg hover:-translate-y-0.5"
+                                >
+                                    <Plus size={16} />
+                                    Add Recipe
+                                </Link>
+                                <Link
+                                    to="/create?assembly=1"
+                                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm hover:-translate-y-0.5"
+                                >
+                                    <Layers size={16} />
+                                    Add Assembly
+                                </Link>
+                            </div>
+                            
+                            <div className="flex shrink-0 items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Sort</span>
                             <div className="h-6 w-px bg-gray-100 mx-1"></div>
                             <select
                                 value={sortBy}
@@ -328,6 +358,7 @@ export default function Search() {
                                 <option value="rating">Top Rated</option>
                                 <option value="times_used">Most Popular</option>
                                 <option value="category">Category</option>
+                                <option value="type">Recipe Type</option>
                             </select>
                             <button
                                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
@@ -337,8 +368,9 @@ export default function Search() {
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    {/* Row 2: Search Bars */}
+                {/* Row 2: Search Bars */}
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-4 z-40 relative">
                         <form 
                             onSubmit={(e) => {
@@ -547,6 +579,30 @@ export default function Search() {
                                 )}
                             </button>
 
+                            <div className="hidden md:flex items-center gap-1 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
+                                {[
+                                    { id: 'original', label: 'Original' },
+                                    { id: 'image', label: 'Image Recipe' },
+                                    { id: 'assembly', label: 'Assembly' }
+                                ].map(type => (
+                                    <button
+                                        key={type.id}
+                                        onClick={() => {
+                                            setSelectedTypes(prev => 
+                                                prev.includes(type.id) ? prev.filter(t => t !== type.id) : [...prev, type.id]
+                                            );
+                                        }}
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                            selectedTypes.includes(type.id)
+                                                ? 'bg-primary-600 text-white shadow-md shadow-primary-200/50'
+                                                : 'text-gray-500 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {type.label}
+                                    </button>
+                                ))}
+                            </div>
+
                             <div className="hidden lg:flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Density</span>
                                 <div className="flex items-center gap-1">
@@ -655,6 +711,7 @@ export default function Search() {
                                 setSearchParams({});
                                 handleSetIngredients([]);
                                 setSelectedCategories([]);
+                                setSelectedTypes([]);
                             }}
                             className="inline-flex items-center justify-center px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-xl active:scale-95"
                         >

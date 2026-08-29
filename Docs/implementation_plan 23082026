@@ -1,0 +1,64 @@
+# Recipe Enhancements Implementation Plan
+
+This plan addresses four main feature requests:
+1. Adding "rest time" to recipes.
+2. Changing preparation, cook, and rest time inputs to an `hh:mm` format.
+3. Adjusting video embed dimensions based on platform (YouTube vs TikTok/Instagram) and adding fullscreen support.
+4. Moving the "Notes" section above the video section in the recipe details view.
+5. Making the "Country of Origin" field a dropdown that allows picking established entries while still allowing new text input.
+
+## User Review Required
+> [!IMPORTANT]
+> Adding `rest_time_minutes` requires updating the Supabase database schema. This plan will add the field to the TypeScript interfaces and UI, but **you will need to run a migration or manually add the `rest_time_minutes` column (type: integer) to your `recipes` table in Supabase** for it to save properly.
+
+## Proposed Changes
+
+### Database & Types
+Modify the TypeScript interfaces to support the new `rest_time_minutes` field.
+
+#### [MODIFY] [database.types.ts](file:///c:/Users/asnir/Documents/Projects%20Website/1.Zoabi_Kitchen/src/lib/database.types.ts)
+- Add `rest_time_minutes: number | null` to `Row`, `Insert`, and `Update` types under `recipes`.
+
+#### [MODIFY] [types.ts](file:///c:/Users/asnir/Documents/Projects%20Website/1.Zoabi_Kitchen/src/lib/types.ts)
+- Add `rest_time_minutes?: number;` to the `Recipe` interface.
+
+---
+
+### UI Components (Create/Edit Recipe)
+Update the recipe creation and editing form to handle time inputs in `hh:mm` format, include the new rest time field, and improve the Country of Origin input.
+
+#### [MODIFY] [CreateRecipe.tsx](file:///c:/Users/asnir/Documents/Projects%20Website/1.Zoabi_Kitchen/src/pages/CreateRecipe.tsx)
+- **Time Inputs:** Create a new helper component or modify the existing inputs to accept time in `hh:mm` format. 
+  - Parse the `hh:mm` string into total minutes before saving.
+  - Convert total minutes to `hh:mm` when editing a recipe.
+- **Rest Time:** Add the `rest_time` field to the initial state, `formData`, and validation logic.
+- **Country of Origin:** Update the `country_origin` input to use a searchable combobox (e.g., using an HTML `<datalist>`). The component will fetch the list of distinct countries from existing recipes to populate the dropdown options, while still allowing manual typing for new entries.
+
+---
+
+### UI Components (Recipe Detail)
+Update the recipe detail view to show the new rest time, reorder the notes/video sections, and adjust the video aspect ratio.
+
+#### [MODIFY] [RecipeDetail.tsx](file:///c:/Users/asnir/Documents/Projects%20Website/1.Zoabi_Kitchen/src/pages/RecipeDetail.tsx)
+- **Time Display:** Update the header/stats section to display `rest_time_minutes` formatted nicely (e.g., `1h 30m`).
+- **Video Logic:** Update `getVideoData` to detect the video platform (e.g., `'youtube'`, `'tiktok'`, `'instagram'`).
+- **Video Render:** 
+  - Adjust aspect ratios dynamically based on the platform (e.g., vertical for TikTok/Instagram Shorts, horizontal for YouTube).
+  - Ensure `allowFullScreen` is active on the `iframe`.
+- **Notes Reordering:** Move the `recipe.notes` rendering block so it appears *before* the video section.
+
+## Verification Plan
+
+### Automated Tests
+- Run TypeScript compiler to ensure type safety.
+- Run the build command to ensure no build errors are introduced.
+
+### Manual Verification
+- **Create Recipe:** 
+  - Fill out `hh:mm` for prep, cook, and rest times.
+  - Use the Country of Origin dropdown and type a new country.
+- **Edit Recipe:** Verify the times populate correctly in `hh:mm` format.
+- **Recipe Details:**
+  - Verify the notes appear above the video.
+  - Verify YouTube videos are horizontal (16:9) and TikTok/Instagram videos are vertical (9:16).
+  - Verify the full-screen button works.

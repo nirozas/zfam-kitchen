@@ -1,7 +1,7 @@
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useRecipes, useCategories, useRecipeStats } from '@/lib/hooks';
 import RecipeCard from '@/components/RecipeCard';
-import { ArrowLeft, Frown, ChefHat, Plus, SortAsc, SortDesc, Search } from 'lucide-react';
+import { ArrowLeft, Frown, ChefHat, Plus, SortAsc, SortDesc, Search, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useMemo } from 'react';
 
@@ -230,13 +230,22 @@ export default function CategoryDetail() {
 
                         {/* Search and Sort - Moved up and right */}
                         <div className="flex flex-col items-end gap-3 self-center">
-                            <Link
-                                to={`/create?category=${categoryId}`}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg hover:-translate-y-0.5"
-                            >
-                                <Plus size={16} />
-                                Add Recipe
-                            </Link>
+                            <div className="flex gap-2">
+                                <Link
+                                    to={`/create?category=${categoryId}`}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg hover:-translate-y-0.5"
+                                >
+                                    <Plus size={16} />
+                                    Add Recipe
+                                </Link>
+                                <Link
+                                    to={`/create?category=${categoryId}&assembly=1`}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm hover:-translate-y-0.5"
+                                >
+                                    <Layers size={16} />
+                                    Add Assembly
+                                </Link>
+                            </div>
 
                             <div className="flex items-center gap-2">
                                 {/* Compact Search Bar */}
@@ -331,6 +340,10 @@ export default function CategoryDetail() {
                             <Link to={`/create?category=${categoryId}`} className="inline-flex items-center justify-center px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200">
                                 <Plus size={20} className="mr-2" />
                                 Add a Recipe
+                            </Link>
+                            <Link to={`/create?category=${categoryId}&assembly=1`} className="inline-flex items-center justify-center px-8 py-3 bg-white text-gray-900 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors shadow-sm">
+                                <Layers size={20} className="mr-2" />
+                                Add an Assembly
                             </Link>
                         </div>
                     </motion.div>
